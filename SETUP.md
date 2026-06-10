@@ -144,4 +144,4 @@ Semua tabel menggunakan **Row Level Security (RLS)** — setiap user hanya bisa 
 - [x] Advance week / simulasi waktu
 - [x] Hasil pertarungan tersimpan (rekor, purse, reputasi, riwayat)
 - [x] Masa pemulihan fighter pasca-tanding (jadwal siap bertanding per minggu)
-- [ ] Leaderboard multiplayer
+- [x] Leaderboard multiplayer (peringkat reputasi & total menang antar gym)

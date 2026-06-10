@@ -7,6 +7,7 @@ import { simulateRound, calculateFightResult } from '@/lib/fight-engine'
 import { getAICornerAdvice, getAINarration } from '@/lib/ai-corner'
 import { createClient } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/format'
+import { syncLeaderboard } from '@/lib/leaderboard'
 import type { Fighter, FighterAttrs, GamePlan, CornerAdvice, Specialty } from '@/types'
 
 const TOTAL_ROUNDS = 3
@@ -221,6 +222,9 @@ export default function FightPage() {
     } else {
       if (fighterRes.data) updateFighter(fighter.id, fighterRes.data)
       if (gymRes.data) setGym(gymRes.data)
+
+      const state = useGameStore.getState()
+      if (state.gym) syncLeaderboard(state.gym, state.fighters)
     }
 
     setFightResultSummary(purse, reputationChange, newRecord)
