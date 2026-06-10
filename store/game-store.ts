@@ -36,6 +36,7 @@ interface GameStore {
 
   // fight actions
   setFightFighter: (f: Fighter) => void
+  setOpponent: (opponent: FightState['opponent']) => void
   setFightPhase: (phase: FightState['phase']) => void
   setGamePlan: (plan: GamePlan) => void
   setCornerAdvice: (advice: CornerAdvice) => void
@@ -82,6 +83,8 @@ export const useGameStore = create<GameStore>()(
 
       setFightFighter: (f) =>
         set((s) => ({ fight: { ...s.fight, fighter: f } })),
+      setOpponent: (opponent) =>
+        set((s) => ({ fight: { ...s.fight, opponent } })),
       setFightPhase: (phase) =>
         set((s) => ({ fight: { ...s.fight, phase } })),
       setGamePlan: (plan) =>
