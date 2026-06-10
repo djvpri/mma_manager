@@ -140,7 +140,7 @@ Semua tabel menggunakan **Row Level Security (RLS)** — setiap user hanya bisa 
 - [x] Onboarding: buat nama gym & pilih kota awal
 - [x] Seed data fighter awal (6 fighter default per gym baru)
 - [x] Navigasi utama (sidebar / bottom nav)
+- [x] Sistem rekrutmen fighter baru
+- [x] Advance week / simulasi waktu
 - [ ] Kalender pertarungan
-- [ ] Sistem rekrutmen fighter baru
 - [ ] Leaderboard multiplayer
-- [ ] Advance week / simulasi waktu
