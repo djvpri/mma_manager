@@ -2,6 +2,20 @@ import { NextRequest, NextResponse } from 'next/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { createServerSupabase } from '@/lib/supabase-server'
 
+// TEMPORARY DEBUG: list models available to this API key.
+// Visit /api/ai-avatar in the browser, then remove this once we know the right model name.
+export async function GET() {
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models?key=${process.env.GEMINI_API_KEY}`
+  )
+  const data = await res.json()
+  const models = (data.models ?? []).map((m: { name: string; supportedGenerationMethods?: string[] }) => ({
+    name: m.name,
+    methods: m.supportedGenerationMethods,
+  }))
+  return NextResponse.json({ models })
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { fighterId, name, nickname, weight_class, specialty, personality } = await req.json()
