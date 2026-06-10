@@ -53,14 +53,14 @@ Style: gritty digital illustration, dramatic rim lighting, head-and-shoulders fr
     }
 
     const buffer = Buffer.from(imagePart.inlineData.data, 'base64')
-    const path = `${fighter.gym_id}/${fighterId}.png`
+    const path = `${user.id}/${fighterId}.png`
 
     const { error: uploadError } = await supabase.storage
       .from('avatars')
       .upload(path, buffer, { contentType: 'image/png', upsert: true })
 
     if (uploadError) {
-      return NextResponse.json({ error: uploadError.message }, { status: 500 })
+      return NextResponse.json({ error: `Upload gagal: ${uploadError.message}` }, { status: 500 })
     }
 
     const { data: publicUrlData } = supabase.storage.from('avatars').getPublicUrl(path)
