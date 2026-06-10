@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useGameStore } from '@/store/game-store'
 import { createClient } from '@/lib/supabase'
+import { formatCurrency } from '@/lib/format'
 
 function IconRoster(props: React.SVGProps<SVGSVGElement>) {
   return (
@@ -52,6 +53,17 @@ function IconLeaderboard(props: React.SVGProps<SVGSVGElement>) {
   )
 }
 
+function IconStaff(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <circle cx="9" cy="7" r="3" />
+      <circle cx="17" cy="7" r="3" />
+      <path d="M2 21c0-3.3 3-5.5 7-5.5s7 2.2 7 5.5" />
+      <path d="M14.5 15.7c3 .4 5.5 2.5 5.5 5.3" />
+    </svg>
+  )
+}
+
 function IconRecruit(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -77,17 +89,10 @@ const NAV_ITEMS = [
   { href: '/game/roster', label: 'Roster', icon: IconRoster },
   { href: '/game/fight', label: 'Fight Night', icon: IconFight },
   { href: '/game/gym', label: 'Gym', icon: IconGym },
+  { href: '/game/staff', label: 'Staf', icon: IconStaff },
   { href: '/game/recruit', label: 'Rekrutmen', icon: IconRecruit },
   { href: '/game/leaderboard', label: 'Leaderboard', icon: IconLeaderboard },
 ]
-
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat('id-ID', {
-    style: 'currency',
-    currency: 'IDR',
-    maximumFractionDigits: 0,
-  }).format(value)
-}
 
 export default function Sidebar() {
   const pathname = usePathname()
