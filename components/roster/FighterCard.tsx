@@ -6,6 +6,7 @@ import Avatar from '@/components/avatar/Avatar'
 import { useGameStore } from '@/store/game-store'
 import { generateFighterAvatar } from '@/lib/ai-avatar'
 import { createClient } from '@/lib/supabase'
+import { formatCurrency } from '@/lib/format'
 
 const STATUS_STYLES: Record<Fighter['status'], string> = {
   active: 'border-octagon-teal/30 bg-octagon-teal/15 text-octagon-teal',
@@ -41,14 +42,20 @@ const FOCUS_OPTIONS: { key: keyof Fighter['attrs']; label: string }[] = [
 
 export default function FighterCard({ fighter }: { fighter: Fighter }) {
   const { record, attrs } = fighter
+  const renewalCost = Math.round((fighter.salary_monthly * 4) / 500_000) * 500_000
+  const newSalary = Math.round((fighter.salary_monthly * 1.1) / 100_000) * 100_000
   const updateFighter = useGameStore((s) => s.updateFighter)
-  const seasonWeek = useGameStore((s) => s.gym?.season_week ?? 1)
+  const gym = useGameStore((s) => s.gym)
+  const setGym = useGameStore((s) => s.setGym)
+  const seasonWeek = gym?.season_week ?? 1
   const [generating, setGenerating] = useState(false)
   const [genError, setGenError] = useState<string | null>(null)
   const [showHistory, setShowHistory] = useState(false)
   const [history, setHistory] = useState<FightResult[] | null>(null)
   const [loadingHistory, setLoadingHistory] = useState(false)
   const [savingFocus, setSavingFocus] = useState(false)
+  const [renewing, setRenewing] = useState(false)
+  const [renewError, setRenewError] = useState<string | null>(null)
 
   async function handleToggleHistory() {
     if (!showHistory && history === null) {
@@ -76,6 +83,47 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
       updateFighter(fighter.id, { training_focus: newFocus })
     }
     setSavingFocus(false)
+  }
+
+  async function handleRenewContract() {
+    if (!gym) return
+    setRenewError(null)
+
+    if (gym.balance < renewalCost) {
+      setRenewError('Saldo tidak cukup untuk perpanjang kontrak.')
+      return
+    }
+
+    setRenewing(true)
+    const supabase = createClient()
+
+    const { error: fighterError } = await supabase
+      .from('fighters')
+      .update({ contract_fights_left: 3, salary_monthly: newSalary })
+      .eq('id', fighter.id)
+
+    if (fighterError) {
+      setRenewError(fighterError.message)
+      setRenewing(false)
+      return
+    }
+
+    const newBalance = gym.balance - renewalCost
+    const newExpense = gym.monthly_expense - fighter.salary_monthly + newSalary
+    const { error: gymError } = await supabase
+      .from('gyms')
+      .update({ balance: newBalance, monthly_expense: newExpense })
+      .eq('id', gym.id)
+
+    if (gymError) {
+      setRenewError(gymError.message)
+      setRenewing(false)
+      return
+    }
+
+    updateFighter(fighter.id, { contract_fights_left: 3, salary_monthly: newSalary })
+    setGym({ ...gym, balance: newBalance, monthly_expense: newExpense })
+    setRenewing(false)
   }
 
   async function handleGenerateAvatar() {
@@ -170,6 +218,31 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
       )}
       {fighter.next_fight_week !== null && fighter.next_fight_week > seasonWeek && (
         <p className="mt-3 text-xs text-octagon-amber">📅 Siap bertanding minggu ke-{fighter.next_fight_week}</p>
+      )}
+
+      {fighter.status !== 'retired' && (
+        <div className="mt-3 text-xs text-gray-400">
+          Kontrak:{' '}
+          <span className={fighter.contract_fights_left <= 1 ? 'font-semibold text-octagon-red' : 'text-gray-200'}>
+            {fighter.contract_fights_left} pertarungan tersisa
+          </span>
+        </div>
+      )}
+
+      {fighter.status !== 'retired' && fighter.contract_fights_left <= 1 && (
+        <div className="mt-2 rounded-md border border-octagon-amber/30 bg-octagon-amber/10 p-2">
+          <p className="text-xs text-octagon-amber">
+            ⚠ Kontrak hampir habis — perpanjang atau berisiko fighter pensiun.
+          </p>
+          <button
+            onClick={handleRenewContract}
+            disabled={renewing || (gym ? gym.balance < renewalCost : true)}
+            className="mt-2 w-full rounded-md bg-octagon-amber px-3 py-1.5 text-xs font-semibold text-octagon-dark transition-colors hover:bg-octagon-amber/90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {renewing ? 'Memproses...' : `Perpanjang Kontrak (${formatCurrency(renewalCost)})`}
+          </button>
+          {renewError && <p className="mt-1 text-[10px] text-octagon-red">{renewError}</p>}
+        </div>
       )}
 
       <button

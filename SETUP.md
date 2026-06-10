@@ -148,3 +148,4 @@ Semua tabel menggunakan **Row Level Security (RLS)** — setiap user hanya bisa 
 - [x] Sistem cedera fighter (peluang cedera pasca-tanding, pemulihan tiap minggu)
 - [x] Manajemen staf gym (rekrut/pecat, mempengaruhi pengeluaran bulanan)
 - [x] Perkembangan atribut fighter (fokus latihan mingguan, dipercepat ruangan & staf)
+- [x] Sistem kontrak fighter (gaji masuk pengeluaran bulanan, perpanjangan kontrak, risiko pensiun)
