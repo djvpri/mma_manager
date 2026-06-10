@@ -161,7 +161,18 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
             <p className="truncate text-sm italic text-octagon-amber">&ldquo;{fighter.nickname}&rdquo;</p>
           )}
           <p className="mt-1 text-xs text-gray-400">
-            {fighter.weight_class} · {fighter.specialty} · {fighter.age} th
+            {fighter.weight_class} · {fighter.specialty} ·{' '}
+            <span
+              className={
+                fighter.age >= 38
+                  ? 'font-semibold text-octagon-red'
+                  : fighter.age >= 32
+                    ? 'font-semibold text-octagon-amber'
+                    : ''
+              }
+            >
+              {fighter.age} th
+            </span>
           </p>
         </div>
       </div>

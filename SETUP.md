@@ -149,3 +149,4 @@ Semua tabel menggunakan **Row Level Security (RLS)** — setiap user hanya bisa 
 - [x] Manajemen staf gym (rekrut/pecat, mempengaruhi pengeluaran bulanan)
 - [x] Perkembangan atribut fighter (fokus latihan mingguan, dipercepat ruangan & staf)
 - [x] Sistem kontrak fighter (gaji masuk pengeluaran bulanan, perpanjangan kontrak, risiko pensiun)
+- [x] Sistem usia fighter (umur bertambah tiap 12 minggu, pensiun alami di usia veteran)
