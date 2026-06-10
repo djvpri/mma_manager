@@ -44,7 +44,12 @@ Style: gritty digital illustration, dramatic rim lighting, head-and-shoulders fr
     const imagePart = parts.find((p) => p?.inlineData)
 
     if (!imagePart?.inlineData) {
-      return NextResponse.json({ error: 'Gagal membuat gambar dari AI' }, { status: 502 })
+      const textPart = parts.find((p) => p?.text)?.text
+      console.error('AI Avatar: no image returned', JSON.stringify(result.response))
+      return NextResponse.json(
+        { error: textPart ? `AI tidak mengembalikan gambar: ${textPart}` : 'AI tidak mengembalikan gambar' },
+        { status: 502 }
+      )
     }
 
     const buffer = Buffer.from(imagePart.inlineData.data, 'base64')
@@ -66,6 +71,7 @@ Style: gritty digital illustration, dramatic rim lighting, head-and-shoulders fr
     return NextResponse.json({ avatar_url: avatarUrl })
   } catch (err) {
     console.error('AI Avatar error:', err)
-    return NextResponse.json({ error: 'Gagal membuat foto fighter' }, { status: 500 })
+    const message = err instanceof Error ? err.message : 'Gagal membuat foto fighter'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
