@@ -24,7 +24,6 @@ Format: 3 bagian singkat — (1) Kekuatan utama, (2) Kelemahan/risiko, (3) Rekom
     return NextResponse.json({ text })
   } catch (err) {
     console.error('AI Scout error:', err)
-    const message = err instanceof Error ? err.message : String(err)
-    return NextResponse.json({ text: `Gagal memuat scouting report: ${message}` })
+    return NextResponse.json({ text: 'Gagal memuat scouting report.' })
   }
 }
