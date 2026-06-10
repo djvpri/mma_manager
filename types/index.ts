@@ -65,6 +65,7 @@ export interface Fighter {
   avatar_seed: number
   avatar_url: string | null
   next_fight_week: number | null
+  training_focus: keyof FighterAttrs | null
   created_at: string
 }
 

@@ -31,6 +31,14 @@ const ATTR_LABELS: { key: keyof Fighter['attrs']; label: string }[] = [
   { key: 'mental', label: 'MNT' },
 ]
 
+const FOCUS_OPTIONS: { key: keyof Fighter['attrs']; label: string }[] = [
+  { key: 'striking', label: 'Striking' },
+  { key: 'grappling', label: 'Grappling' },
+  { key: 'cardio', label: 'Cardio' },
+  { key: 'fight_iq', label: 'Fight IQ' },
+  { key: 'mental', label: 'Mental' },
+]
+
 export default function FighterCard({ fighter }: { fighter: Fighter }) {
   const { record, attrs } = fighter
   const updateFighter = useGameStore((s) => s.updateFighter)
@@ -40,6 +48,7 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
   const [showHistory, setShowHistory] = useState(false)
   const [history, setHistory] = useState<FightResult[] | null>(null)
   const [loadingHistory, setLoadingHistory] = useState(false)
+  const [savingFocus, setSavingFocus] = useState(false)
 
   async function handleToggleHistory() {
     if (!showHistory && history === null) {
@@ -55,6 +64,18 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
       setLoadingHistory(false)
     }
     setShowHistory((v) => !v)
+  }
+
+  async function handleFocusChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const value = e.target.value
+    const newFocus = (value === '' ? null : value) as Fighter['training_focus']
+    setSavingFocus(true)
+    const supabase = createClient()
+    const { error } = await supabase.from('fighters').update({ training_focus: newFocus }).eq('id', fighter.id)
+    if (!error) {
+      updateFighter(fighter.id, { training_focus: newFocus })
+    }
+    setSavingFocus(false)
   }
 
   async function handleGenerateAvatar() {
@@ -118,6 +139,28 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
           </div>
         ))}
       </div>
+
+      {fighter.status === 'training' && (
+        <div className="mt-3 flex items-center justify-between gap-2 text-xs">
+          <label htmlFor={`focus-${fighter.id}`} className="text-gray-400">
+            Fokus Latihan
+          </label>
+          <select
+            id={`focus-${fighter.id}`}
+            value={fighter.training_focus ?? ''}
+            onChange={handleFocusChange}
+            disabled={savingFocus}
+            className="rounded-md border border-octagon-border bg-octagon-dark px-2 py-1 text-xs text-white disabled:opacity-50"
+          >
+            <option value="">Tidak ada</option>
+            {FOCUS_OPTIONS.map(({ key, label }) => (
+              <option key={key} value={key}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {fighter.injury && (
         <p className="mt-3 text-xs text-octagon-red">
