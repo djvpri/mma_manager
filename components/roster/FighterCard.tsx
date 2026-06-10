@@ -1,5 +1,10 @@
+'use client'
+
+import { useState } from 'react'
 import type { Fighter } from '@/types'
 import Avatar from '@/components/avatar/Avatar'
+import { useGameStore } from '@/store/game-store'
+import { generateFighterAvatar } from '@/lib/ai-avatar'
 
 const STATUS_STYLES: Record<Fighter['status'], string> = {
   active: 'border-octagon-teal/30 bg-octagon-teal/15 text-octagon-teal',
@@ -27,12 +32,29 @@ const ATTR_LABELS: { key: keyof Fighter['attrs']; label: string }[] = [
 
 export default function FighterCard({ fighter }: { fighter: Fighter }) {
   const { record, attrs } = fighter
+  const updateFighter = useGameStore((s) => s.updateFighter)
+  const [generating, setGenerating] = useState(false)
+  const [genError, setGenError] = useState<string | null>(null)
+
+  async function handleGenerateAvatar() {
+    setGenError(null)
+    setGenerating(true)
+    try {
+      const avatarUrl = await generateFighterAvatar(fighter)
+      updateFighter(fighter.id, { avatar_url: avatarUrl })
+    } catch (err) {
+      setGenError(err instanceof Error ? err.message : 'Gagal membuat foto')
+    } finally {
+      setGenerating(false)
+    }
+  }
 
   return (
     <div className="rounded-lg border border-octagon-border bg-octagon-card p-4">
       <div className="flex items-start gap-3">
         <Avatar
           seed={fighter.avatar_seed}
+          imageUrl={fighter.avatar_url}
           size={64}
           className="shrink-0 overflow-hidden rounded-full bg-octagon-dark"
         />
@@ -77,6 +99,15 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
       </div>
 
       {fighter.injury && <p className="mt-3 text-xs text-octagon-red">⚠ Cedera: {fighter.injury}</p>}
+
+      <button
+        onClick={handleGenerateAvatar}
+        disabled={generating}
+        className="mt-3 w-full rounded-md border border-octagon-border px-3 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:border-octagon-teal hover:text-octagon-teal disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {generating ? 'Membuat foto...' : fighter.avatar_url ? 'Buat Ulang Foto AI' : 'Generate Foto AI'}
+      </button>
+      {genError && <p className="mt-1 text-[10px] text-octagon-red">{genError}</p>}
     </div>
   )
 }

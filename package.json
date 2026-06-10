@@ -18,7 +18,7 @@
     "@supabase/ssr": "^0.5.0",
     "zustand": "^4.5.4",
     "ai": "^3.3.0",
-    "@google/generative-ai": "^0.21.0",
+    "@google/generative-ai": "^0.24.1",
     "tailwindcss": "^3.4.1",
     "clsx": "^2.1.1"
   },
