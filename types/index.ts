@@ -43,6 +43,14 @@ export interface FighterRecord {
   d: number
 }
 
+export interface Opponent {
+  name: string
+  attrs: FighterAttrs
+  record: FighterRecord
+  specialty: string
+  color: string
+}
+
 export interface Fighter {
   id: string
   gym_id: string
@@ -64,6 +72,8 @@ export interface Fighter {
   avatar_seed: number
   avatar_url: string | null
   next_fight_date: string | null
+  scheduled_week: number | null
+  scheduled_opponent: Opponent | null
   created_at: string
 }
 
