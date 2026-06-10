@@ -136,10 +136,10 @@ Semua tabel menggunakan **Row Level Security (RLS)** — setiap user hanya bisa 
 
 ## Lanjutan (roadmap)
 
-- [ ] Auth dengan Google OAuth
-- [ ] Onboarding: buat nama gym & pilih kota awal
-- [ ] Seed data fighter awal (6 fighter default per gym baru)
-- [ ] Navigasi utama (sidebar / bottom nav)
+- [x] Auth dengan Email/Password (Google OAuth opsional, belum diaktifkan)
+- [x] Onboarding: buat nama gym & pilih kota awal
+- [x] Seed data fighter awal (6 fighter default per gym baru)
+- [x] Navigasi utama (sidebar / bottom nav)
 - [ ] Kalender pertarungan
 - [ ] Sistem rekrutmen fighter baru
 - [ ] Leaderboard multiplayer

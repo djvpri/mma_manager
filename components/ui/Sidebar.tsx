@@ -1,8 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useGameStore } from '@/store/game-store'
+import { createClient } from '@/lib/supabase'
 
 function IconRoster(props: React.SVGProps<SVGSVGElement>) {
   return (
@@ -61,6 +62,16 @@ function IconRecruit(props: React.SVGProps<SVGSVGElement>) {
   )
 }
 
+function IconLogout(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <polyline points="16 17 21 12 16 7" />
+      <line x1="21" y1="12" x2="9" y2="12" />
+    </svg>
+  )
+}
+
 const NAV_ITEMS = [
   { href: '/game/roster', label: 'Roster', icon: IconRoster },
   { href: '/game/fight', label: 'Fight Night', icon: IconFight },
@@ -79,7 +90,15 @@ function formatCurrency(value: number) {
 
 export default function Sidebar() {
   const pathname = usePathname()
+  const router = useRouter()
   const gym = useGameStore((s) => s.gym)
+
+  async function handleLogout() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push('/auth/login')
+    router.refresh()
+  }
 
   return (
     <aside className="flex h-screen w-64 shrink-0 flex-col border-r border-octagon-border bg-octagon-card">
@@ -124,6 +143,16 @@ export default function Sidebar() {
           )
         })}
       </nav>
+
+      <div className="border-t border-octagon-border px-3 py-3">
+        <button
+          onClick={handleLogout}
+          className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-gray-400 transition-colors hover:bg-white/5 hover:text-octagon-red"
+        >
+          <IconLogout className="h-5 w-5" />
+          Keluar
+        </button>
+      </div>
 
       <div className="border-t border-octagon-border px-5 py-4 text-xs text-gray-500">
         Minggu ke-{gym?.season_week ?? 1}
