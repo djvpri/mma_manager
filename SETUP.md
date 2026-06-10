@@ -142,5 +142,6 @@ Semua tabel menggunakan **Row Level Security (RLS)** — setiap user hanya bisa 
 - [x] Navigasi utama (sidebar / bottom nav)
 - [x] Sistem rekrutmen fighter baru
 - [x] Advance week / simulasi waktu
-- [ ] Kalender pertarungan
+- [x] Hasil pertarungan tersimpan (rekor, purse, reputasi, riwayat)
+- [x] Masa pemulihan fighter pasca-tanding (jadwal siap bertanding per minggu)
 - [ ] Leaderboard multiplayer

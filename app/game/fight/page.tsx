@@ -109,7 +109,14 @@ export default function FightPage() {
   const [savingResult, setSavingResult] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
 
-  const eligibleFighters = fighters.filter((f) => f.status !== 'retired' && f.status !== 'injured')
+  const seasonWeek = gym?.season_week ?? 1
+  const notRetiredOrInjured = fighters.filter((f) => f.status !== 'retired' && f.status !== 'injured')
+  const eligibleFighters = notRetiredOrInjured.filter(
+    (f) => f.next_fight_week === null || f.next_fight_week <= seasonWeek
+  )
+  const cooldownFighters = notRetiredOrInjured.filter(
+    (f) => f.next_fight_week !== null && f.next_fight_week > seasonWeek
+  )
   const currentRoundResult = fight.roundResults.find((r) => r.round === fight.currentRound)
   const isFightOver =
     !!currentRoundResult &&
@@ -169,6 +176,7 @@ export default function FightPage() {
     }
     const newTrainingLoad = Math.min(100, fighter.training_load + 25)
     const newContractFightsLeft = Math.max(0, fighter.contract_fights_left - 1)
+    const newNextFightWeek = gym.season_week + randInt(1, 3)
     const newBalance = gym.balance + purse
     const newReputation = Math.max(0, Math.min(100, gym.reputation + reputationChange))
     const finishRound = fight.roundResults.find((r) => r.finish)?.round ?? null
@@ -193,6 +201,7 @@ export default function FightPage() {
           record: newRecord,
           training_load: newTrainingLoad,
           contract_fights_left: newContractFightsLeft,
+          next_fight_week: newNextFightWeek,
         })
         .eq('id', fighter.id)
         .select()
@@ -297,9 +306,11 @@ export default function FightPage() {
           {eligibleFighters.length === 0 ? (
             <div className="rounded-lg border border-dashed border-octagon-border bg-octagon-card p-8 text-center">
               <p className="text-gray-400">Tidak ada fighter yang siap bertanding.</p>
-              <Link href="/game/roster" className="mt-2 inline-block text-sm font-medium text-octagon-amber hover:underline">
-                Cek Roster →
-              </Link>
+              {cooldownFighters.length === 0 && (
+                <Link href="/game/roster" className="mt-2 inline-block text-sm font-medium text-octagon-amber hover:underline">
+                  Cek Roster →
+                </Link>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -322,13 +333,34 @@ export default function FightPage() {
             </div>
           )}
 
-          <button
-            onClick={handleStartFight}
-            disabled={!selectedFighterId}
-            className="rounded-md bg-octagon-red px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-octagon-red/90 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Cari Lawan
-          </button>
+          {eligibleFighters.length > 0 && (
+            <button
+              onClick={handleStartFight}
+              disabled={!selectedFighterId}
+              className="rounded-md bg-octagon-red px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-octagon-red/90 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Cari Lawan
+            </button>
+          )}
+
+          {cooldownFighters.length > 0 && (
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Masih Pemulihan</p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {cooldownFighters.map((f) => (
+                  <div key={f.id} className="rounded-lg border border-octagon-border bg-octagon-card/50 p-4 opacity-70">
+                    <p className="font-semibold text-white">{f.name}</p>
+                    <p className="text-xs text-gray-400">
+                      {f.weight_class} · {f.specialty} · {f.record.w}-{f.record.l}-{f.record.d}
+                    </p>
+                    <p className="mt-1 text-xs text-octagon-amber">
+                      Siap bertanding minggu ke-{f.next_fight_week}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

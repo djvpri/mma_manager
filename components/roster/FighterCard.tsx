@@ -34,6 +34,7 @@ const ATTR_LABELS: { key: keyof Fighter['attrs']; label: string }[] = [
 export default function FighterCard({ fighter }: { fighter: Fighter }) {
   const { record, attrs } = fighter
   const updateFighter = useGameStore((s) => s.updateFighter)
+  const seasonWeek = useGameStore((s) => s.gym?.season_week ?? 1)
   const [generating, setGenerating] = useState(false)
   const [genError, setGenError] = useState<string | null>(null)
   const [showHistory, setShowHistory] = useState(false)
@@ -119,6 +120,9 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
       </div>
 
       {fighter.injury && <p className="mt-3 text-xs text-octagon-red">⚠ Cedera: {fighter.injury}</p>}
+      {fighter.next_fight_week !== null && fighter.next_fight_week > seasonWeek && (
+        <p className="mt-3 text-xs text-octagon-amber">📅 Siap bertanding minggu ke-{fighter.next_fight_week}</p>
+      )}
 
       <button
         onClick={handleToggleHistory}

@@ -63,7 +63,7 @@ export interface Fighter {
   salary_monthly: number
   avatar_seed: number
   avatar_url: string | null
-  next_fight_date: string | null
+  next_fight_week: number | null
   created_at: string
 }
 
