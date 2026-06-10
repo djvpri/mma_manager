@@ -128,3 +128,26 @@ export function calculateFightResult(rounds: RoundResult[]): {
     scorecard: `${myScore}–${oppScore}`,
   }
 }
+
+const INJURY_POOL: { name: string; minWeeks: number; maxWeeks: number }[] = [
+  { name: 'Memar wajah', minWeeks: 1, maxWeeks: 1 },
+  { name: 'Cedera tangan', minWeeks: 2, maxWeeks: 3 },
+  { name: 'Cedera bahu', minWeeks: 2, maxWeeks: 4 },
+  { name: 'Cedera lutut', minWeeks: 3, maxWeeks: 5 },
+  { name: 'Patah tulang rusuk', minWeeks: 4, maxWeeks: 8 },
+  { name: 'Gegar otak ringan', minWeeks: 2, maxWeeks: 4 },
+]
+
+export function rollInjury(
+  winner: 'my' | 'opp' | 'draw',
+  isFinish: boolean
+): { name: string; weeks: number } | null {
+  const chance =
+    winner === 'opp' ? (isFinish ? 0.25 : 0.15) : winner === 'draw' ? 0.08 : isFinish ? 0.06 : 0.04
+
+  if (Math.random() > chance) return null
+
+  const pick = INJURY_POOL[Math.floor(Math.random() * INJURY_POOL.length)]
+  const weeks = pick.minWeeks + Math.floor(Math.random() * (pick.maxWeeks - pick.minWeeks + 1))
+  return { name: pick.name, weeks }
+}

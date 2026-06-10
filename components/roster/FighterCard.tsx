@@ -119,7 +119,12 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
         ))}
       </div>
 
-      {fighter.injury && <p className="mt-3 text-xs text-octagon-red">⚠ Cedera: {fighter.injury}</p>}
+      {fighter.injury && (
+        <p className="mt-3 text-xs text-octagon-red">
+          ⚠ Cedera: {fighter.injury}
+          {fighter.injury_weeks_left !== null && ` · sembuh dalam ${fighter.injury_weeks_left} minggu`}
+        </p>
+      )}
       {fighter.next_fight_week !== null && fighter.next_fight_week > seasonWeek && (
         <p className="mt-3 text-xs text-octagon-amber">📅 Siap bertanding minggu ke-{fighter.next_fight_week}</p>
       )}

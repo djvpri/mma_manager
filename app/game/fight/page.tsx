@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useGameStore } from '@/store/game-store'
-import { simulateRound, calculateFightResult } from '@/lib/fight-engine'
+import { simulateRound, calculateFightResult, rollInjury } from '@/lib/fight-engine'
 import { getAICornerAdvice, getAINarration } from '@/lib/ai-corner'
 import { createClient } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/format'
@@ -181,6 +181,7 @@ export default function FightPage() {
     const newBalance = gym.balance + purse
     const newReputation = Math.max(0, Math.min(100, gym.reputation + reputationChange))
     const finishRound = fight.roundResults.find((r) => r.finish)?.round ?? null
+    const injury = rollInjury(result.winner, isFinish)
 
     const supabase = createClient()
     const [insertRes, fighterRes, gymRes] = await Promise.all([
@@ -203,6 +204,9 @@ export default function FightPage() {
           training_load: newTrainingLoad,
           contract_fights_left: newContractFightsLeft,
           next_fight_week: newNextFightWeek,
+          ...(injury
+            ? { status: 'injured', injury: injury.name, injury_weeks_left: injury.weeks }
+            : {}),
         })
         .eq('id', fighter.id)
         .select()
@@ -227,7 +231,7 @@ export default function FightPage() {
       if (state.gym) syncLeaderboard(state.gym, state.fighters)
     }
 
-    setFightResultSummary(purse, reputationChange, newRecord)
+    setFightResultSummary(purse, reputationChange, newRecord, injury)
     setSavingResult(false)
   }
 
@@ -631,6 +635,12 @@ export default function FightPage() {
                       {fight.fightSummary.newRecord.w}-{fight.fightSummary.newRecord.l}-{fight.fightSummary.newRecord.d}
                     </span>
                   </div>
+                  {fight.fightSummary.injury && (
+                    <div className="mt-2 rounded-md bg-octagon-red/10 px-3 py-2 text-octagon-red">
+                      ⚠ {fight.fighter!.name.split(' ')[0]} mengalami {fight.fightSummary.injury.name} — pulih
+                      dalam {fight.fightSummary.injury.weeks} minggu.
+                    </div>
+                  )}
                 </div>
               ) : null}
             </div>

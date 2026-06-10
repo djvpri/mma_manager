@@ -59,6 +59,7 @@ export interface Fighter {
   potential: number       // 0–100, hidden from player
   training_load: number   // 0–100
   injury: string | null
+  injury_weeks_left: number | null
   contract_fights_left: number
   salary_monthly: number
   avatar_seed: number

@@ -22,7 +22,12 @@ interface FightState {
   aiNarration: string
   aiLoading: boolean
   resultSaved: boolean
-  fightSummary: { purse: number; reputationChange: number; newRecord: Fighter['record'] } | null
+  fightSummary: {
+    purse: number
+    reputationChange: number
+    newRecord: Fighter['record']
+    injury: { name: string; weeks: number } | null
+  } | null
 }
 
 interface GameStore {
@@ -48,7 +53,12 @@ interface GameStore {
   setAiCornerText: (text: string) => void
   setAiNarration: (text: string) => void
   setAiLoading: (loading: boolean) => void
-  setFightResultSummary: (purse: number, reputationChange: number, newRecord: Fighter['record']) => void
+  setFightResultSummary: (
+    purse: number,
+    reputationChange: number,
+    newRecord: Fighter['record'],
+    injury: { name: string; weeks: number } | null
+  ) => void
   advanceRound: () => void
   resetFight: () => void
 }
@@ -106,9 +116,9 @@ export const useGameStore = create<GameStore>()(
         set((s) => ({ fight: { ...s.fight, aiNarration: text } })),
       setAiLoading: (loading) =>
         set((s) => ({ fight: { ...s.fight, aiLoading: loading } })),
-      setFightResultSummary: (purse, reputationChange, newRecord) =>
+      setFightResultSummary: (purse, reputationChange, newRecord, injury) =>
         set((s) => ({
-          fight: { ...s.fight, resultSaved: true, fightSummary: { purse, reputationChange, newRecord } },
+          fight: { ...s.fight, resultSaved: true, fightSummary: { purse, reputationChange, newRecord, injury } },
         })),
       advanceRound: () =>
         set((s) => ({ fight: { ...s.fight, currentRound: s.fight.currentRound + 1, aiNarration: '' } })),
