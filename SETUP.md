@@ -4,7 +4,7 @@
 - Node.js 18+
 - npm atau pnpm
 - Akun Supabase (gratis): https://supabase.com
-- Akun Anthropic (untuk AI): https://console.anthropic.com
+- Akun Google AI Studio (untuk AI / Gemini): https://aistudio.google.com
 
 ---
 
@@ -51,12 +51,12 @@ Edit file `.env.local`:
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=https://xxxxxxxxxxxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJI...
-ANTHROPIC_API_KEY=sk-ant-...
+GEMINI_API_KEY=AIza...
 ```
 
-**Cara dapat Anthropic API key:**
-1. Buka https://console.anthropic.com/settings/keys
-2. Klik **Create Key**
+**Cara dapat Gemini API key:**
+1. Buka https://aistudio.google.com/app/apikey
+2. Klik **Create API Key**
 3. Copy dan paste ke `.env.local`
 
 ---

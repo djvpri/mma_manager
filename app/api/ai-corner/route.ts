@@ -1,22 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
+import { GoogleGenerativeAI } from '@google/generative-ai'
 
 export async function POST(req: NextRequest) {
   try {
     const { prompt } = await req.json()
     if (!prompt) return NextResponse.json({ error: 'No prompt' }, { status: 400 })
 
-    const client = new Anthropic()
-    const message = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 300,
-      messages: [{ role: 'user', content: prompt }],
-    })
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
 
-    const text = message.content
-      .filter((b) => b.type === 'text')
-      .map((b) => (b as { type: 'text'; text: string }).text)
-      .join('')
+    const result = await model.generateContent(prompt)
+    const text = result.response.text()
 
     return NextResponse.json({ text })
   } catch (err) {
