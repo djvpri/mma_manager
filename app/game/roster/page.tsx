@@ -10,7 +10,7 @@ export default function RosterPage() {
 
   return (
     <div>
-      <header className="mb-6 flex items-center justify-between">
+      <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Roster Fighter</h1>
           <p className="text-sm text-gray-400">
@@ -20,7 +20,7 @@ export default function RosterPage() {
         </div>
         <Link
           href="/game/recruit"
-          className="rounded-md bg-octagon-red px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-octagon-red/90"
+          className="inline-block rounded-md bg-octagon-red px-4 py-2 text-center text-sm font-semibold text-white transition-colors hover:bg-octagon-red/90"
         >
           + Rekrut Fighter
         </Link>

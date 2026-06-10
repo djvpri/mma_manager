@@ -3,6 +3,8 @@
 import { useEffect } from 'react'
 import { useGameStore } from '@/store/game-store'
 import Sidebar from './Sidebar'
+import MobileHeader from './MobileHeader'
+import MobileNav from './MobileNav'
 import type { Fighter, Gym } from '@/types'
 
 export default function GameShell({
@@ -26,7 +28,11 @@ export default function GameShell({
   return (
     <div className="flex min-h-screen bg-octagon-dark">
       <Sidebar />
-      <main className="flex-1 p-6 lg:p-8">{children}</main>
+      <div className="flex min-h-screen flex-1 flex-col">
+        <MobileHeader />
+        <main className="flex-1 p-4 pb-20 lg:p-8 lg:pb-8">{children}</main>
+        <MobileNav />
+      </div>
     </div>
   )
 }
