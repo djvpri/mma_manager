@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 
-const client = new Anthropic()
-
 export async function POST(req: NextRequest) {
   try {
     const { prompt } = await req.json()
     if (!prompt) return NextResponse.json({ error: 'No prompt' }, { status: 400 })
 
+    const client = new Anthropic()
     const message = await client.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 300,

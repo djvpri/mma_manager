@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 
-const client = new Anthropic()
-
 export async function POST(req: NextRequest) {
   try {
     const { fighter, opponent } = await req.json()
@@ -20,6 +18,7 @@ Lawan: ${opponent.name}
 
 Format: 3 bagian singkat — (1) Keunggulan kita, (2) Ancaman lawan, (3) Rekomendasi game plan. Total maks 150 kata.`
 
+    const client = new Anthropic()
     const message = await client.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 500,
