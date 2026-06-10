@@ -1,10 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import type { Fighter } from '@/types'
+import type { Fighter, FightResult } from '@/types'
 import Avatar from '@/components/avatar/Avatar'
 import { useGameStore } from '@/store/game-store'
 import { generateFighterAvatar } from '@/lib/ai-avatar'
+import { createClient } from '@/lib/supabase'
 
 const STATUS_STYLES: Record<Fighter['status'], string> = {
   active: 'border-octagon-teal/30 bg-octagon-teal/15 text-octagon-teal',
@@ -35,6 +36,25 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
   const updateFighter = useGameStore((s) => s.updateFighter)
   const [generating, setGenerating] = useState(false)
   const [genError, setGenError] = useState<string | null>(null)
+  const [showHistory, setShowHistory] = useState(false)
+  const [history, setHistory] = useState<FightResult[] | null>(null)
+  const [loadingHistory, setLoadingHistory] = useState(false)
+
+  async function handleToggleHistory() {
+    if (!showHistory && history === null) {
+      setLoadingHistory(true)
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('fight_results')
+        .select('*')
+        .eq('fighter_id', fighter.id)
+        .order('fight_date', { ascending: false })
+        .limit(5)
+      setHistory((data ?? []) as FightResult[])
+      setLoadingHistory(false)
+    }
+    setShowHistory((v) => !v)
+  }
 
   async function handleGenerateAvatar() {
     setGenError(null)
@@ -99,6 +119,43 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
       </div>
 
       {fighter.injury && <p className="mt-3 text-xs text-octagon-red">⚠ Cedera: {fighter.injury}</p>}
+
+      <button
+        onClick={handleToggleHistory}
+        className="mt-3 w-full rounded-md border border-octagon-border px-3 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:border-octagon-teal hover:text-octagon-teal"
+      >
+        {loadingHistory ? 'Memuat riwayat...' : showHistory ? 'Sembunyikan Riwayat' : 'Riwayat Pertarungan'}
+      </button>
+
+      {showHistory && !loadingHistory && (
+        <div className="mt-2 space-y-1.5">
+          {history && history.length > 0 ? (
+            history.map((fr) => (
+              <div key={fr.id} className="flex items-center justify-between rounded-md bg-octagon-dark px-2.5 py-1.5 text-xs">
+                <div className="min-w-0">
+                  <p className="truncate text-gray-200">vs {fr.opponent_name}</p>
+                  <p className="text-gray-500">{new Date(fr.fight_date).toLocaleDateString('id-ID')}</p>
+                </div>
+                <span
+                  className={`shrink-0 font-semibold uppercase ${
+                    fr.overall_winner === 'my'
+                      ? 'text-octagon-teal'
+                      : fr.overall_winner === 'opp'
+                        ? 'text-octagon-red'
+                        : 'text-octagon-amber'
+                  }`}
+                >
+                  {fr.overall_winner === 'my' ? 'Menang' : fr.overall_winner === 'opp' ? 'Kalah' : 'Imbang'}
+                  {' · '}
+                  {fr.finish_method.toUpperCase()}
+                </span>
+              </div>
+            ))
+          ) : (
+            <p className="text-center text-xs text-gray-500">Belum ada riwayat pertarungan.</p>
+          )}
+        </div>
+      )}
 
       <button
         onClick={handleGenerateAvatar}

@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { useGameStore } from '@/store/game-store'
 import { simulateRound, calculateFightResult } from '@/lib/fight-engine'
 import { getAICornerAdvice, getAINarration } from '@/lib/ai-corner'
+import { createClient } from '@/lib/supabase'
+import { formatCurrency } from '@/lib/format'
 import type { Fighter, FighterAttrs, GamePlan, CornerAdvice, Specialty } from '@/types'
 
 const TOTAL_ROUNDS = 3
@@ -84,6 +86,7 @@ function HpBar({ label, value, colorClass }: { label: string; value: number; col
 
 export default function FightPage() {
   const fighters = useGameStore((s) => s.fighters)
+  const gym = useGameStore((s) => s.gym)
   const fight = useGameStore((s) => s.fight)
   const setFightFighter = useGameStore((s) => s.setFightFighter)
   const setOpponent = useGameStore((s) => s.setOpponent)
@@ -96,10 +99,15 @@ export default function FightPage() {
   const setAiCornerText = useGameStore((s) => s.setAiCornerText)
   const setAiNarration = useGameStore((s) => s.setAiNarration)
   const setAiLoading = useGameStore((s) => s.setAiLoading)
+  const setFightResultSummary = useGameStore((s) => s.setFightResultSummary)
+  const setGym = useGameStore((s) => s.setGym)
+  const updateFighter = useGameStore((s) => s.updateFighter)
   const advanceRound = useGameStore((s) => s.advanceRound)
   const resetFight = useGameStore((s) => s.resetFight)
 
   const [selectedFighterId, setSelectedFighterId] = useState<string | null>(fight.fighter?.id ?? null)
+  const [savingResult, setSavingResult] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const eligibleFighters = fighters.filter((f) => f.status !== 'retired' && f.status !== 'injured')
   const currentRoundResult = fight.roundResults.find((r) => r.round === fight.currentRound)
@@ -124,6 +132,91 @@ export default function FightPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fight.phase])
+
+  // Simpan hasil pertarungan ke database saat masuk fase result
+  useEffect(() => {
+    if (fight.phase === 'result' && fight.fighter && fight.opponent && gym && !fight.resultSaved) {
+      saveFightResult()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fight.phase])
+
+  async function saveFightResult() {
+    const fighter = fight.fighter
+    const opponent = fight.opponent
+    if (!fighter || !opponent || !gym || !fight.gamePlan) return
+
+    setSavingResult(true)
+    setSaveError(null)
+
+    const result = calculateFightResult(fight.roundResults)
+    const isFinish = result.method !== 'decision'
+
+    let purse = 3_000_000
+    let reputationChange = 0
+    if (result.winner === 'my') {
+      purse = isFinish ? 8_000_000 : 5_000_000
+      reputationChange = isFinish ? 5 : 3
+    } else if (result.winner === 'opp') {
+      purse = 2_000_000
+      reputationChange = isFinish ? -4 : -2
+    }
+
+    const newRecord = {
+      w: fighter.record.w + (result.winner === 'my' ? 1 : 0),
+      l: fighter.record.l + (result.winner === 'opp' ? 1 : 0),
+      d: fighter.record.d + (result.winner === 'draw' ? 1 : 0),
+    }
+    const newTrainingLoad = Math.min(100, fighter.training_load + 25)
+    const newContractFightsLeft = Math.max(0, fighter.contract_fights_left - 1)
+    const newBalance = gym.balance + purse
+    const newReputation = Math.max(0, Math.min(100, gym.reputation + reputationChange))
+    const finishRound = fight.roundResults.find((r) => r.finish)?.round ?? null
+
+    const supabase = createClient()
+    const [insertRes, fighterRes, gymRes] = await Promise.all([
+      supabase.from('fight_results').insert({
+        gym_id: gym.id,
+        fighter_id: fighter.id,
+        opponent_name: opponent.name,
+        opponent_record: opponent.record,
+        round_results: fight.roundResults,
+        overall_winner: result.winner,
+        finish_method: result.method,
+        finish_round: finishRound,
+        scorecard: result.scorecard || null,
+        game_plan_used: fight.gamePlan,
+      }),
+      supabase
+        .from('fighters')
+        .update({
+          record: newRecord,
+          training_load: newTrainingLoad,
+          contract_fights_left: newContractFightsLeft,
+        })
+        .eq('id', fighter.id)
+        .select()
+        .single(),
+      supabase
+        .from('gyms')
+        .update({ balance: newBalance, reputation: newReputation })
+        .eq('id', gym.id)
+        .select()
+        .single(),
+    ])
+
+    if (insertRes.error || fighterRes.error || gymRes.error) {
+      setSaveError(
+        insertRes.error?.message || fighterRes.error?.message || gymRes.error?.message || 'Gagal menyimpan hasil pertarungan.'
+      )
+    } else {
+      if (fighterRes.data) updateFighter(fighter.id, fighterRes.data)
+      if (gymRes.data) setGym(gymRes.data)
+    }
+
+    setFightResultSummary(purse, reputationChange, newRecord)
+    setSavingResult(false)
+  }
 
   function handleStartFight() {
     const fighter = eligibleFighters.find((f) => f.id === selectedFighterId)
@@ -465,6 +558,45 @@ export default function FightPage() {
                   </div>
                 ))}
               </div>
+            </div>
+
+            <div className="rounded-lg border border-octagon-border bg-octagon-card p-4 text-left">
+              <p className="mb-3 text-xs font-semibold uppercase text-gray-500">Dampak Pertarungan</p>
+              {savingResult ? (
+                <p className="animate-pulse text-sm text-gray-500">Menyimpan hasil pertarungan...</p>
+              ) : saveError ? (
+                <p className="text-sm text-octagon-red">Gagal menyimpan hasil: {saveError}</p>
+              ) : fight.fightSummary ? (
+                <div className="space-y-1.5 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-400">Purse</span>
+                    <span className="font-semibold text-octagon-amber">
+                      +{formatCurrency(fight.fightSummary.purse)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-400">Reputasi Gym</span>
+                    <span
+                      className={`font-semibold ${
+                        fight.fightSummary.reputationChange > 0
+                          ? 'text-octagon-teal'
+                          : fight.fightSummary.reputationChange < 0
+                            ? 'text-octagon-red'
+                            : 'text-gray-300'
+                      }`}
+                    >
+                      {fight.fightSummary.reputationChange > 0 ? '+' : ''}
+                      {fight.fightSummary.reputationChange}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-400">Rekor {fight.fighter!.name.split(' ')[0]}</span>
+                    <span className="font-semibold text-white">
+                      {fight.fightSummary.newRecord.w}-{fight.fightSummary.newRecord.l}-{fight.fightSummary.newRecord.d}
+                    </span>
+                  </div>
+                </div>
+              ) : null}
             </div>
 
             <div className="flex justify-center gap-3">
