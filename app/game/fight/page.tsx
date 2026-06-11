@@ -18,8 +18,8 @@ import { createClient } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/format'
 import { syncLeaderboard } from '@/lib/leaderboard'
 import { ATTR_GROUPS, ALL_ATTR_KEYS } from '@/lib/attrs'
-import { EVENT_TIER_CONFIG, EVENT_TIER_BADGE_CLASS, type EventTier } from '@/lib/generate-events'
-import type { Fighter, FighterAttrs, GamePlan, CornerAdvice, Specialty, RoundResult, RoundTick, FightStats } from '@/types'
+import { EVENT_TIER_CONFIG, EVENT_TIER_BADGE_CLASS } from '@/lib/generate-events'
+import type { Fighter, FighterAttrs, GamePlan, CornerAdvice, Specialty, RoundResult, RoundTick, FightStats, EventTier } from '@/types'
 
 const TOTAL_ROUNDS = 3
 
