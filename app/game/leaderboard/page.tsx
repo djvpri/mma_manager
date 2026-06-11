@@ -4,12 +4,20 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useGameStore } from '@/store/game-store'
 
+interface TopFighter {
+  name: string
+  record: string
+  specialty: string
+  wins: number
+}
+
 interface LeaderboardEntry {
   id: string
   gym_id: string
   gym_name: string
   reputation: number
   total_wins: number
+  top_fighters: TopFighter[]
 }
 
 export default function LeaderboardPage() {
@@ -52,7 +60,7 @@ export default function LeaderboardPage() {
             <thead>
               <tr className="border-b border-octagon-border text-left text-xs uppercase text-gray-500">
                 <th className="px-4 py-3">#</th>
-                <th className="px-4 py-3">Gym</th>
+                <th className="px-4 py-3">Gym & Fighter Terbaik</th>
                 <th className="px-4 py-3 text-right">Reputasi</th>
                 <th className="px-4 py-3 text-right">Menang</th>
               </tr>
@@ -66,7 +74,22 @@ export default function LeaderboardPage() {
                   }`}
                 >
                   <td className="px-4 py-3 text-gray-400">{i + 1}</td>
-                  <td className="px-4 py-3 font-semibold text-white">{entry.gym_name}</td>
+                  <td className="px-4 py-3">
+                    <p className="font-semibold text-white">{entry.gym_name}</p>
+                    {entry.top_fighters?.length > 0 && (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {entry.top_fighters.map((f, j) => (
+                          <span
+                            key={j}
+                            className="inline-flex items-center gap-1 rounded border border-octagon-border bg-octagon-dark px-1.5 py-0.5 text-[10px] text-gray-300"
+                          >
+                            <span className="font-medium text-white">{f.name}</span>
+                            <span className="text-gray-500">{f.record}</span>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-right font-semibold text-octagon-teal">{entry.reputation}</td>
                   <td className="px-4 py-3 text-right text-gray-200">{entry.total_wins}</td>
                 </tr>
