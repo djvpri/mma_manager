@@ -160,6 +160,14 @@ export default function FightPage() {
     const result = calculateFightResult(fight.roundResults)
     const isFinish = result.method !== 'decision'
 
+    const supabase = createClient()
+    const { data: staffData } = await supabase
+      .from('staff')
+      .select('specialty')
+      .eq('gym_id', gym.id)
+      .eq('is_hired', true)
+    const specialties = (staffData ?? []).map((s) => s.specialty)
+
     let purse = 3_000_000
     let reputationChange = 0
     if (result.winner === 'my') {
@@ -168,6 +176,11 @@ export default function FightPage() {
     } else if (result.winner === 'opp') {
       purse = 2_000_000
       reputationChange = isFinish ? -4 : -2
+    }
+
+    // Manajer Pertarungan: negosiasi purse lebih baik
+    if (specialties.includes('Matchmaking & Promosi')) {
+      purse = Math.round((purse * 1.15) / 100_000) * 100_000
     }
 
     const newRecord = {
@@ -181,9 +194,10 @@ export default function FightPage() {
     const newBalance = gym.balance + purse
     const newReputation = Math.max(0, Math.min(100, gym.reputation + reputationChange))
     const finishRound = fight.roundResults.find((r) => r.finish)?.round ?? null
-    const injury = rollInjury(result.winner, isFinish)
+    // Fisioterapis: kurangi risiko cedera pasca-tanding
+    const injuryReduction = specialties.includes('Pemulihan Cedera') ? 0.3 : 0
+    const injury = rollInjury(result.winner, isFinish, injuryReduction)
 
-    const supabase = createClient()
     const [insertRes, fighterRes, gymRes] = await Promise.all([
       supabase.from('fight_results').insert({
         gym_id: gym.id,

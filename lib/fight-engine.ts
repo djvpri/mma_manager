@@ -140,10 +140,12 @@ const INJURY_POOL: { name: string; minWeeks: number; maxWeeks: number }[] = [
 
 export function rollInjury(
   winner: 'my' | 'opp' | 'draw',
-  isFinish: boolean
+  isFinish: boolean,
+  injuryReduction = 0
 ): { name: string; weeks: number } | null {
   const chance =
-    winner === 'opp' ? (isFinish ? 0.25 : 0.15) : winner === 'draw' ? 0.08 : isFinish ? 0.06 : 0.04
+    (winner === 'opp' ? (isFinish ? 0.25 : 0.15) : winner === 'draw' ? 0.08 : isFinish ? 0.06 : 0.04) *
+    (1 - injuryReduction)
 
   if (Math.random() > chance) return null
 

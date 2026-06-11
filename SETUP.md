@@ -151,3 +151,4 @@ Semua tabel menggunakan **Row Level Security (RLS)** — setiap user hanya bisa 
 - [x] Sistem kontrak fighter (gaji masuk pengeluaran bulanan, perpanjangan kontrak, risiko pensiun)
 - [x] Sistem usia fighter (umur bertambah tiap 12 minggu, pensiun alami di usia veteran)
 - [x] Laporan mingguan setelah Advance Week (perkembangan atribut, cedera sembuh, pensiun, kontrak)
+- [x] Efek spesialisasi staf: Manajer Pertarungan (purse), Fisioterapis (risiko & pemulihan cedera), Ahli Gizi (pemulihan training load)
