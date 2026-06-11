@@ -3,9 +3,76 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useGameStore } from '@/store/game-store'
-import type { GymRooms } from '@/types'
+import type { Fighter, FighterAttrs, GymRooms } from '@/types'
 
 type RoomKey = keyof GymRooms
+
+const ATTR_NAME_LABELS: Record<keyof FighterAttrs, string> = {
+  striking: 'Striking',
+  grappling: 'Grappling',
+  cardio: 'Cardio',
+  fight_iq: 'Fight IQ',
+  mental: 'Mental',
+}
+
+interface WeeklyReport {
+  week: number
+  balanceChange: number
+  agedUp: boolean
+  retirements: { name: string; reason: string }[]
+  healed: string[]
+  growth: { name: string; attr: string; from: number; to: number }[]
+  contractWarnings: string[]
+}
+
+function buildWeeklyReport(
+  prev: Fighter[],
+  next: Fighter[],
+  prevBalance: number,
+  newBalance: number,
+  newWeek: number
+): WeeklyReport {
+  const prevById = new Map(prev.map((f) => [f.id, f]))
+  const retirements: WeeklyReport['retirements'] = []
+  const healed: string[] = []
+  const growth: WeeklyReport['growth'] = []
+  const contractWarnings: string[] = []
+
+  for (const f of next) {
+    const p = prevById.get(f.id)
+    if (!p) continue
+
+    if (p.status !== 'retired' && f.status === 'retired') {
+      const reason = f.age >= 38 ? 'usia veteran' : 'kontrak habis'
+      retirements.push({ name: f.name, reason })
+      continue
+    }
+
+    if (p.status === 'injured' && f.status === 'training') {
+      healed.push(f.name)
+    }
+
+    for (const key of Object.keys(ATTR_NAME_LABELS) as (keyof FighterAttrs)[]) {
+      if (f.attrs[key] > p.attrs[key]) {
+        growth.push({ name: f.name, attr: ATTR_NAME_LABELS[key], from: p.attrs[key], to: f.attrs[key] })
+      }
+    }
+
+    if (f.status !== 'retired' && f.contract_fights_left <= 1) {
+      contractWarnings.push(f.name)
+    }
+  }
+
+  return {
+    week: newWeek,
+    balanceChange: newBalance - prevBalance,
+    agedUp: newWeek % 12 === 0,
+    retirements,
+    healed,
+    growth,
+    contractWarnings,
+  }
+}
 
 const ROOM_META: Record<RoomKey, { label: string; description: string; baseCost: number }> = {
   striking: {
@@ -62,6 +129,7 @@ export default function GymPage() {
   const [upgrading, setUpgrading] = useState<RoomKey | null>(null)
   const [advancing, setAdvancing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [report, setReport] = useState<WeeklyReport | null>(null)
 
   if (!gym) {
     return <p className="text-sm text-gray-400">Memuat data gym...</p>
@@ -106,7 +174,11 @@ export default function GymPage() {
     if (!gym) return
     setError(null)
     setAdvancing(true)
+    setReport(null)
     const supabase = createClient()
+
+    const prevFighters = useGameStore.getState().fighters
+    const prevBalance = gym.balance
 
     const { error: rpcError } = await supabase.rpc('advance_week', { p_gym_id: gym.id })
     if (rpcError) {
@@ -123,7 +195,19 @@ export default function GymPage() {
     if (gymRes.error) setError(gymRes.error.message)
     else if (gymRes.data) setGym(gymRes.data)
 
-    if (!fightersRes.error && fightersRes.data) setFighters(fightersRes.data)
+    if (!fightersRes.error && fightersRes.data) {
+      const newFighters = fightersRes.data as Fighter[]
+      setFighters(newFighters)
+      setReport(
+        buildWeeklyReport(
+          prevFighters,
+          newFighters,
+          prevBalance,
+          gymRes.data?.balance ?? prevBalance,
+          gymRes.data?.season_week ?? gym.season_week + 1
+        )
+      )
+    }
 
     setAdvancing(false)
   }
@@ -178,6 +262,74 @@ export default function GymPage() {
       </div>
 
       {error && <p className="text-sm text-octagon-red">{error}</p>}
+
+      {report && (
+        <div className="rounded-lg border border-octagon-border bg-octagon-card p-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-white">Laporan Minggu ke-{report.week}</h2>
+            <button onClick={() => setReport(null)} className="text-xs text-gray-400 hover:text-gray-200">
+              Tutup
+            </button>
+          </div>
+
+          <p className="mt-2 text-xs text-gray-400">
+            Saldo {report.balanceChange >= 0 ? 'bertambah' : 'berkurang'}{' '}
+            <span className={`font-semibold ${report.balanceChange >= 0 ? 'text-octagon-teal' : 'text-octagon-red'}`}>
+              {formatCurrency(Math.abs(report.balanceChange))}
+            </span>
+          </p>
+
+          {report.agedUp && <p className="mt-1 text-xs text-octagon-amber">🎂 Semua fighter bertambah usia 1 tahun.</p>}
+
+          {report.growth.length > 0 && (
+            <div className="mt-2">
+              <p className="text-xs font-semibold text-gray-300">Perkembangan Atribut</p>
+              <ul className="mt-1 space-y-0.5 text-xs text-octagon-teal">
+                {report.growth.map((g, i) => (
+                  <li key={i}>
+                    {g.name}: {g.attr} {g.from} → {g.to}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {report.healed.length > 0 && (
+            <div className="mt-2">
+              <p className="text-xs font-semibold text-gray-300">Pulih dari Cedera</p>
+              <ul className="mt-1 space-y-0.5 text-xs text-octagon-teal">
+                {report.healed.map((name, i) => (
+                  <li key={i}>{name} sudah pulih dan kembali berlatih.</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {report.retirements.length > 0 && (
+            <div className="mt-2">
+              <p className="text-xs font-semibold text-gray-300">Pensiun</p>
+              <ul className="mt-1 space-y-0.5 text-xs text-octagon-red">
+                {report.retirements.map((r, i) => (
+                  <li key={i}>
+                    {r.name} pensiun ({r.reason}).
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {report.contractWarnings.length > 0 && (
+            <div className="mt-2">
+              <p className="text-xs font-semibold text-gray-300">Kontrak Hampir Habis</p>
+              <ul className="mt-1 space-y-0.5 text-xs text-octagon-amber">
+                {report.contractWarnings.map((name, i) => (
+                  <li key={i}>{name} — segera perpanjang kontrak di halaman Roster.</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
 
       <div>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-400">Fasilitas Gym</h2>
