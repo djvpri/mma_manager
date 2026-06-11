@@ -22,9 +22,13 @@ export default function RosterPage() {
   const [report, setReport] = useState<WeeklyReport | null>(null)
 
   const activeFighters = fighters.filter((f) => f.status !== 'retired')
-  const pendingFight = gym
-    ? activeFighters.find((f) => f.next_fight_week === gym.season_week) ?? null
-    : null
+  const todaysEvent = gym?.events.find((e) => e.week === gym.season_week) ?? null
+  const pendingFighters = todaysEvent
+    ? todaysEvent.fighter_ids
+        .map((id) => fighters.find((f) => f.id === id))
+        .filter((f): f is Fighter => f !== undefined)
+    : []
+  const hasPendingFight = pendingFighters.length > 0
 
   async function handleAdvanceWeek() {
     if (!gym) return
@@ -87,13 +91,13 @@ export default function RosterPage() {
       </header>
 
       {gym && (
-        <div className={`mb-6 rounded-lg border bg-octagon-card p-4 ${pendingFight ? 'border-octagon-amber/50' : 'border-octagon-border'}`}>
+        <div className={`mb-6 rounded-lg border bg-octagon-card p-4 ${hasPendingFight ? 'border-octagon-amber/50' : 'border-octagon-border'}`}>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-sm font-semibold text-white">Minggu ke-{gym.season_week}</p>
-              {pendingFight ? (
+              {hasPendingFight ? (
                 <p className="text-xs text-octagon-amber">
-                  ⚡ {pendingFight.name} dijadwalkan bertanding minggu ini — selesaikan fight night dulu!
+                  ⚡ {pendingFighters.map((f) => f.name).join(', ')} dijadwalkan bertanding minggu ini — selesaikan fight night dulu!
                 </p>
               ) : (
                 <p className="text-xs text-gray-400">
@@ -101,7 +105,7 @@ export default function RosterPage() {
                 </p>
               )}
             </div>
-            {pendingFight ? (
+            {hasPendingFight ? (
               <button
                 onClick={() => router.push('/game/fight')}
                 className="shrink-0 rounded-md bg-octagon-amber px-4 py-2 text-sm font-semibold text-black transition-colors hover:bg-octagon-amber/90"
