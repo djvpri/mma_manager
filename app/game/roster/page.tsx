@@ -65,7 +65,7 @@ export default function RosterPage() {
     (e.slots ?? [])
       .filter((s) => s.fighter_id !== null)
       .map((s) => fighters.find((f) => f.id === s.fighter_id))
-      .filter((f): f is Fighter => f !== undefined)
+      .filter((f): f is Fighter => f !== undefined && f.status !== 'injured' && f.status !== 'retired')
   )
   const hasPendingFight = pendingFighters.length > 0
 
