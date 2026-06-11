@@ -31,6 +31,9 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
   const renewalCost = Math.round((fighter.salary_monthly * 4) / 500_000) * 500_000
   const newSalary = Math.round((fighter.salary_monthly * 1.1) / 100_000) * 100_000
   const newWinBonus = Math.round((fighter.win_bonus * 1.1) / 100_000) * 100_000
+  const newMorale = Math.min(100, fighter.morale + 10)
+  const moraleColorClass =
+    fighter.morale < 30 ? 'bg-octagon-red' : fighter.morale < 60 ? 'bg-octagon-amber' : 'bg-octagon-teal'
   const isUnderContract = fighter.status !== 'retired' && fighter.contract_fights_left > 0
   const buyoutCost = isUnderContract ? fighter.buyout_clause : 0
   const potentialLabel = getPotentialLabel(fighter.potential)
@@ -93,7 +96,7 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
 
     const { error: fighterError } = await supabase
       .from('fighters')
-      .update({ contract_fights_left: 3, salary_monthly: newSalary, win_bonus: newWinBonus })
+      .update({ contract_fights_left: 3, salary_monthly: newSalary, win_bonus: newWinBonus, morale: newMorale })
       .eq('id', fighter.id)
 
     if (fighterError) {
@@ -115,7 +118,7 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
       return
     }
 
-    updateFighter(fighter.id, { contract_fights_left: 3, salary_monthly: newSalary, win_bonus: newWinBonus })
+    updateFighter(fighter.id, { contract_fights_left: 3, salary_monthly: newSalary, win_bonus: newWinBonus, morale: newMorale })
     setGym({ ...gym, balance: newBalance, monthly_expense: newExpense })
     setRenewing(false)
   }
@@ -233,6 +236,16 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
         ))}
       </div>
 
+      {fighter.status !== 'retired' && (
+        <div className="mt-1.5 flex items-center gap-2">
+          <span className="w-8 text-[10px] font-medium text-gray-500">Morale</span>
+          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-octagon-dark">
+            <div className={`h-full rounded-full ${moraleColorClass}`} style={{ width: `${fighter.morale}%` }} />
+          </div>
+          <span className="w-6 text-right text-[10px] text-gray-400">{fighter.morale}</span>
+        </div>
+      )}
+
       {fighter.status === 'training' && (
         <div className="mt-3 flex items-center justify-between gap-2 text-xs">
           <label htmlFor={`focus-${fighter.id}`} className="text-gray-400">
@@ -297,6 +310,12 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
       {fighter.title_shot_pending && (
         <p className="mt-2 text-xs font-semibold text-octagon-amber">
           🏆 Berhak menuntut Title Shot sesuai klausul kontrak.
+        </p>
+      )}
+
+      {fighter.status !== 'retired' && fighter.morale < 30 && (
+        <p className="mt-2 text-xs font-semibold text-octagon-red">
+          ⚠ Morale {fighter.name.split(' ')[0]} rendah — risiko fighter pergi saat kontrak habis meningkat.
         </p>
       )}
 

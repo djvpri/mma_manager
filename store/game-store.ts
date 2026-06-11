@@ -35,6 +35,7 @@ interface FightState {
     titleShotTriggered: boolean
     commission: number
     medicalCost: number
+    moraleChange: number
   } | null
 }
 
@@ -72,7 +73,8 @@ interface GameStore {
     winBonusPaid: number,
     titleShotTriggered: boolean,
     commission: number,
-    medicalCost: number
+    medicalCost: number,
+    moraleChange: number
   ) => void
   advanceRound: () => void
   resetFight: () => void
@@ -149,7 +151,8 @@ export const useGameStore = create<GameStore>()(
         winBonusPaid,
         titleShotTriggered,
         commission,
-        medicalCost
+        medicalCost,
+        moraleChange
       ) =>
         set((s) => ({
           fight: {
@@ -164,6 +167,7 @@ export const useGameStore = create<GameStore>()(
               titleShotTriggered,
               commission,
               medicalCost,
+              moraleChange,
             },
           },
         })),

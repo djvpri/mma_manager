@@ -82,6 +82,7 @@ export interface Fighter {
   buyout_clause: number
   win_streak: number
   title_shot_pending: boolean
+  morale: number          // 0–100, mempengaruhi peluang bertahan saat kontrak habis
   avatar_seed: number
   avatar_url: string | null
   next_fight_week: number | null

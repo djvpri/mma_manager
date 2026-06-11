@@ -326,6 +326,18 @@ export default function FightPage() {
     const medicalDiscount = specialties.includes('Pemulihan Cedera') ? 0.3 : 0
     const medicalCost = injury ? Math.round(injury.weeks * 1_000_000 * (1 - medicalDiscount)) : 0
 
+    // Morale: naik saat menang/dapat win bonus/title shot, turun saat kalah/cedera
+    let moraleChange = 0
+    if (result.winner === 'my') {
+      moraleChange += isFinish ? 5 : 3
+      if (winBonusPaid > 0) moraleChange += 2
+    } else if (result.winner === 'opp') {
+      moraleChange -= isFinish ? 6 : 3
+    }
+    if (injury) moraleChange -= 5
+    if (titleShotTriggered) moraleChange += 10
+    const newMorale = Math.max(0, Math.min(100, fighter.morale + moraleChange))
+
     const newBalance = gym.balance + purse + commission - winBonusPaid - medicalCost
     const newReputation = Math.max(0, Math.min(100, gym.reputation + reputationChange + reputationBonus))
 
@@ -350,6 +362,7 @@ export default function FightPage() {
           contract_fights_left: newContractFightsLeft,
           next_fight_week: newNextFightWeek,
           win_streak: newWinStreak,
+          morale: newMorale,
           ...(titleShotTriggered ? { title_shot_pending: true } : {}),
           ...(injury
             ? { status: 'injured', injury: injury.name, injury_weeks_left: injury.weeks }
@@ -386,7 +399,8 @@ export default function FightPage() {
       winBonusPaid,
       titleShotTriggered,
       commission,
-      medicalCost
+      medicalCost,
+      moraleChange
     )
     setSavingResult(false)
   }
@@ -993,6 +1007,19 @@ export default function FightPage() {
                       <span className="text-gray-400">Win Bonus untuk {fight.fighter!.name.split(' ')[0]}</span>
                       <span className="font-semibold text-octagon-red">
                         -{formatCurrency(fight.fightSummary.winBonusPaid)}
+                      </span>
+                    </div>
+                  )}
+                  {fight.fightSummary.moraleChange !== 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-400">Morale {fight.fighter!.name.split(' ')[0]}</span>
+                      <span
+                        className={`font-semibold ${
+                          fight.fightSummary.moraleChange > 0 ? 'text-octagon-teal' : 'text-octagon-red'
+                        }`}
+                      >
+                        {fight.fightSummary.moraleChange > 0 ? '+' : ''}
+                        {fight.fightSummary.moraleChange}
                       </span>
                     </div>
                   )}

@@ -105,6 +105,7 @@ export default function RecruitPage() {
         buyout_clause: offer.buyoutClause,
         win_streak: 0,
         title_shot_pending: false,
+        morale: 70,
       })
       .select()
       .single()
