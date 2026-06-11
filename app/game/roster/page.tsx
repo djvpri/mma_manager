@@ -19,6 +19,8 @@ export default function RosterPage() {
   const [error, setError] = useState<string | null>(null)
   const [report, setReport] = useState<WeeklyReport | null>(null)
 
+  const activeFighters = fighters.filter((f) => f.status !== 'retired')
+
   async function handleAdvanceWeek() {
     if (!gym) return
     setError(null)
@@ -68,7 +70,7 @@ export default function RosterPage() {
           <h1 className="text-2xl font-bold text-white">Roster Fighter</h1>
           <p className="text-sm text-gray-400">
             {gym ? `${gym.name} — ` : ''}
-            {fighters.length} fighter terdaftar
+            {activeFighters.length} fighter terdaftar
           </p>
         </div>
         <Link
@@ -169,7 +171,7 @@ export default function RosterPage() {
         </div>
       )}
 
-      {fighters.length === 0 ? (
+      {activeFighters.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-octagon-border bg-octagon-card py-16 text-center">
           <p className="text-gray-400">Belum ada fighter di roster.</p>
           <Link href="/game/recruit" className="mt-3 text-sm font-medium text-octagon-amber hover:underline">
@@ -178,7 +180,7 @@ export default function RosterPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {fighters.map((fighter) => (
+          {activeFighters.map((fighter) => (
             <FighterCard key={fighter.id} fighter={fighter} />
           ))}
         </div>

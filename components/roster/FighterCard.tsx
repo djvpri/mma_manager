@@ -391,7 +391,7 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
         confirmingRelease ? (
           <div className="mt-3 rounded-md border border-octagon-red/30 bg-octagon-red/10 p-2">
             <p className="text-xs text-octagon-red">
-              Yakin putus kontrak {fighter.name}? Fighter akan pensiun dan tidak bisa lagi bertanding untuk gym ini.
+              Yakin putus kontrak {fighter.name}? Fighter akan keluar dari roster secara permanen.
               {buyoutCost > 0 && ` Gym akan membayar klausul buyout sebesar ${formatCurrency(buyoutCost)}.`}
             </p>
             <div className="mt-2 flex gap-2">
