@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import Avatar from '@/components/avatar/Avatar'
 import { useGameStore } from '@/store/game-store'
 import { simulateRound, calculateFightResult, rollInjury } from '@/lib/fight-engine'
 import { getAICornerAdvice, getAINarration } from '@/lib/ai-corner'
@@ -79,9 +80,80 @@ function HpBar({ label, value, colorClass }: { label: string; value: number; col
         <span>{value}/100</span>
       </div>
       <div className="h-2.5 w-full overflow-hidden rounded-full bg-octagon-dark">
-        <div className={`h-full rounded-full transition-all ${colorClass}`} style={{ width: `${value}%` }} />
+        <div className={`h-full rounded-full transition-all duration-500 ${colorClass}`} style={{ width: `${value}%` }} />
       </div>
     </div>
+  )
+}
+
+function FighterPortrait({
+  imageUrl,
+  ringColor,
+  size = 40,
+}: {
+  imageUrl?: string | null
+  ringColor: string
+  size?: number
+}) {
+  return (
+    <div className="shrink-0 overflow-hidden rounded-full bg-octagon-dark" style={{ boxShadow: `0 0 0 2px ${ringColor}` }}>
+      <Avatar imageUrl={imageUrl} size={size} className="block" />
+    </div>
+  )
+}
+
+function RoundSplitBar({
+  myPct,
+  oppPct,
+  myLabel,
+  oppLabel,
+  oppColor,
+  compact = false,
+}: {
+  myPct: number
+  oppPct: number
+  myLabel?: string
+  oppLabel?: string
+  oppColor: string
+  compact?: boolean
+}) {
+  return (
+    <div>
+      {!compact && (
+        <div className="mb-1 flex justify-between text-xs font-semibold">
+          <span className="text-octagon-teal">{myLabel} · {myPct}</span>
+          <span style={{ color: oppColor }}>{oppPct} · {oppLabel}</span>
+        </div>
+      )}
+      <div className={`flex w-full overflow-hidden rounded-full bg-octagon-dark ${compact ? 'h-1.5' : 'h-2'}`}>
+        <div className="h-full bg-octagon-teal transition-all duration-500" style={{ width: `${myPct}%` }} />
+        <div className="h-full transition-all duration-500" style={{ width: `${oppPct}%`, backgroundColor: oppColor }} />
+      </div>
+    </div>
+  )
+}
+
+function OctagonBackground() {
+  return (
+    <svg
+      className="pointer-events-none fixed inset-0 -z-10 h-full w-full opacity-[0.04]"
+      viewBox="0 0 400 400"
+      preserveAspectRatio="xMidYMid slice"
+      aria-hidden="true"
+    >
+      <polygon
+        points="120,20 280,20 380,120 380,280 280,380 120,380 20,280 20,120"
+        fill="none"
+        stroke="#E24B4A"
+        strokeWidth="2"
+      />
+      <polygon
+        points="160,60 240,60 340,160 340,240 240,340 160,340 60,240 60,160"
+        fill="none"
+        stroke="#E24B4A"
+        strokeWidth="1"
+      />
+    </svg>
   )
 }
 
@@ -109,6 +181,8 @@ export default function FightPage() {
   const [selectedFighterId, setSelectedFighterId] = useState<string | null>(fight.fighter?.id ?? null)
   const [savingResult, setSavingResult] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [flashMy, setFlashMy] = useState(false)
+  const [flashOpp, setFlashOpp] = useState(false)
 
   const seasonWeek = gym?.season_week ?? 1
   const notRetiredOrInjured = fighters.filter((f) => f.status !== 'retired' && f.status !== 'injured')
@@ -282,6 +356,16 @@ export default function FightPage() {
     setMyHP(newMyHP)
     setOppHP(newOppHP)
 
+    const BIG_HIT = 15
+    if (dmgToMe >= BIG_HIT) {
+      setFlashMy(true)
+      setTimeout(() => setFlashMy(false), 600)
+    }
+    if (dmgToOpp >= BIG_HIT) {
+      setFlashOpp(true)
+      setTimeout(() => setFlashOpp(false), 600)
+    }
+
     const knockedOut = (newMyHP === 0 || newOppHP === 0) && !result.finish
     const final = knockedOut
       ? { ...result, winner: (newOppHP === 0 ? 'my' : 'opp') as 'my' | 'opp', finish: 'tko' as const }
@@ -312,6 +396,7 @@ export default function FightPage() {
 
   return (
     <div>
+      <OctagonBackground />
       <header className="mb-6">
         <h1 className="text-2xl font-bold text-white">Fight Night</h1>
         {fight.fighter && fight.opponent ? (
@@ -390,14 +475,14 @@ export default function FightPage() {
         <div className="space-y-6">
           <div className="rounded-lg border border-octagon-border bg-octagon-card p-4">
             <p className="text-xs uppercase tracking-wide text-gray-500">Lawan Ditemukan</p>
-            <div className="mt-2 flex items-center justify-between">
+            <div className="mt-2 flex items-center gap-3">
+              <FighterPortrait imageUrl={null} ringColor={fight.opponent.color} size={48} />
               <div>
                 <p className="font-semibold text-white">{fight.opponent.name}</p>
                 <p className="text-xs text-gray-400">
                   {fight.opponent.specialty} · {fight.opponent.record.w}-{fight.opponent.record.l}-{fight.opponent.record.d}
                 </p>
               </div>
-              <span className="h-3 w-3 rounded-full" style={{ backgroundColor: fight.opponent.color }} />
             </div>
           </div>
 
@@ -433,27 +518,74 @@ export default function FightPage() {
 
       {fight.phase === 'fighting' && fight.fighter && fight.opponent && (
         <div className="space-y-6">
-          <div className="flex items-center justify-between rounded-lg border border-octagon-border bg-octagon-card p-4">
-            <div>
-              <p className="text-xs text-gray-500">Ronde</p>
-              <p className="text-3xl font-bold text-white">
-                {fight.currentRound} <span className="text-base font-normal text-gray-500">/ {TOTAL_ROUNDS}</span>
-              </p>
+          <div className="rounded-lg border border-octagon-border bg-octagon-card p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-2">
+                <FighterPortrait imageUrl={fight.fighter.avatar_url} ringColor="#1D9E75" size={36} />
+                <p className="truncate text-sm font-semibold text-white">{fight.fighter.name.split(' ')[0]}</p>
+              </div>
+              <span className="shrink-0 text-xs font-bold text-gray-600">VS</span>
+              <div className="flex min-w-0 flex-row-reverse items-center gap-2">
+                <FighterPortrait imageUrl={null} ringColor={fight.opponent.color} size={36} />
+                <p className="truncate text-sm font-semibold text-white">{fight.opponent.name.split(' ')[0]}</p>
+              </div>
             </div>
-            <div className="text-right">
-              <p className="text-xs text-gray-500">Game Plan</p>
-              <p className="font-semibold capitalize text-octagon-amber">{fight.gamePlan}</p>
+
+            <div className="mt-4 flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-500">Ronde</p>
+                <div className="mt-1 flex items-center gap-2">
+                  <p className="text-2xl font-bold text-white">
+                    {fight.currentRound} <span className="text-sm font-normal text-gray-500">/ {TOTAL_ROUNDS}</span>
+                  </p>
+                  <div className="flex items-center gap-1.5">
+                    {Array.from({ length: TOTAL_ROUNDS }).map((_, i) => {
+                      const roundNum = i + 1
+                      const done =
+                        roundNum < fight.currentRound || (roundNum === fight.currentRound && !!currentRoundResult)
+                      const active = roundNum === fight.currentRound
+                      return (
+                        <span
+                          key={roundNum}
+                          className={`h-2.5 w-2.5 rounded-full transition-colors ${
+                            done
+                              ? 'bg-octagon-red'
+                              : active
+                                ? 'bg-octagon-red/40 ring-2 ring-octagon-red'
+                                : 'bg-octagon-border'
+                          }`}
+                        />
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-gray-500">Game Plan</p>
+                <p className="font-semibold capitalize text-octagon-amber">{fight.gamePlan}</p>
+              </div>
             </div>
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="rounded-lg border border-octagon-border bg-octagon-card p-4">
-              <p className="mb-2 truncate font-semibold text-white">{fight.fighter.name}</p>
+            <div
+              className={`rounded-lg border p-4 transition-colors duration-500 ${
+                flashMy ? 'border-octagon-red bg-octagon-red/20' : 'border-octagon-border bg-octagon-card'
+              }`}
+            >
+              <div className="mb-2 flex items-center gap-3">
+                <FighterPortrait imageUrl={fight.fighter.avatar_url} ringColor="#1D9E75" />
+                <p className="truncate font-semibold text-white">{fight.fighter.name}</p>
+              </div>
               <HpBar label="HP" value={fight.myHP} colorClass="bg-octagon-teal" />
             </div>
-            <div className="rounded-lg border border-octagon-border bg-octagon-card p-4">
-              <div className="mb-2 flex items-center gap-2">
-                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: fight.opponent.color }} />
+            <div
+              className={`rounded-lg border p-4 transition-colors duration-500 ${
+                flashOpp ? 'border-octagon-red bg-octagon-red/20' : 'border-octagon-border bg-octagon-card'
+              }`}
+            >
+              <div className="mb-2 flex items-center gap-3">
+                <FighterPortrait imageUrl={null} ringColor={fight.opponent.color} />
                 <p className="truncate font-semibold text-white">{fight.opponent.name}</p>
               </div>
               <HpBar label="HP" value={fight.oppHP} colorClass="bg-octagon-red" />
@@ -467,7 +599,14 @@ export default function FightPage() {
                 {currentRoundResult.winner === 'my' ? fight.fighter.name : fight.opponent.name} unggul (
                 {currentRoundResult.my_pct}–{currentRoundResult.opp_pct})
               </p>
-              <ul className="space-y-1 text-sm text-gray-300">
+              <RoundSplitBar
+                myPct={currentRoundResult.my_pct}
+                oppPct={currentRoundResult.opp_pct}
+                myLabel={fight.fighter.name.split(' ')[0]}
+                oppLabel={fight.opponent.name.split(' ')[0]}
+                oppColor={fight.opponent.color}
+              />
+              <ul className="mt-3 space-y-1 text-sm text-gray-300">
                 {currentRoundResult.events.map((e, i) => (
                   <li key={i}>• {e}</li>
                 ))}
@@ -506,17 +645,17 @@ export default function FightPage() {
           {fight.roundResults.length > 1 && (
             <div className="rounded-lg border border-octagon-border bg-octagon-card p-4">
               <p className="mb-2 text-xs font-semibold uppercase text-gray-500">Riwayat Ronde</p>
-              <div className="space-y-1.5">
+              <div className="space-y-2.5">
                 {fight.roundResults.map((r) => (
-                  <div key={r.round} className="flex items-center justify-between text-sm">
-                    <span className="text-gray-400">Ronde {r.round}</span>
-                    <span className="text-gray-200">
-                      {r.my_pct}–{r.opp_pct}
-                    </span>
-                    <span className={r.winner === 'my' ? 'text-octagon-teal' : 'text-octagon-red'}>
-                      {r.winner === 'my' ? fight.fighter!.name.split(' ')[0] : fight.opponent!.name.split(' ')[0]}
-                      {r.finish ? ` (${r.finish.toUpperCase()})` : ''}
-                    </span>
+                  <div key={r.round} className="space-y-1">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-400">Ronde {r.round}</span>
+                      <span className={r.winner === 'my' ? 'text-octagon-teal' : 'text-octagon-red'}>
+                        {r.winner === 'my' ? fight.fighter!.name.split(' ')[0] : fight.opponent!.name.split(' ')[0]}
+                        {r.finish ? ` (${r.finish.toUpperCase()})` : ''}
+                      </span>
+                    </div>
+                    <RoundSplitBar myPct={r.my_pct} oppPct={r.opp_pct} oppColor={fight.opponent!.color} compact />
                   </div>
                 ))}
               </div>
@@ -529,12 +668,15 @@ export default function FightPage() {
         <div className="space-y-6">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="rounded-lg border border-octagon-border bg-octagon-card p-4">
-              <p className="mb-2 truncate font-semibold text-white">{fight.fighter.name}</p>
+              <div className="mb-2 flex items-center gap-3">
+                <FighterPortrait imageUrl={fight.fighter.avatar_url} ringColor="#1D9E75" />
+                <p className="truncate font-semibold text-white">{fight.fighter.name}</p>
+              </div>
               <HpBar label="HP" value={fight.myHP} colorClass="bg-octagon-teal" />
             </div>
             <div className="rounded-lg border border-octagon-border bg-octagon-card p-4">
-              <div className="mb-2 flex items-center gap-2">
-                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: fight.opponent.color }} />
+              <div className="mb-2 flex items-center gap-3">
+                <FighterPortrait imageUrl={null} ringColor={fight.opponent.color} />
                 <p className="truncate font-semibold text-white">{fight.opponent.name}</p>
               </div>
               <HpBar label="HP" value={fight.oppHP} colorClass="bg-octagon-red" />
@@ -598,17 +740,17 @@ export default function FightPage() {
 
             <div className="rounded-lg border border-octagon-border bg-octagon-card p-4 text-left">
               <p className="mb-3 text-xs font-semibold uppercase text-gray-500">Ringkasan Ronde</p>
-              <div className="space-y-2">
+              <div className="space-y-2.5">
                 {fight.roundResults.map((r) => (
-                  <div key={r.round} className="flex items-center justify-between text-sm">
-                    <span className="text-gray-400">Ronde {r.round}</span>
-                    <span className="text-gray-200">
-                      {r.my_pct}–{r.opp_pct}
-                    </span>
-                    <span className={r.winner === 'my' ? 'text-octagon-teal' : 'text-octagon-red'}>
-                      {r.winner === 'my' ? fight.fighter!.name.split(' ')[0] : fight.opponent!.name.split(' ')[0]}
-                      {r.finish ? ` (${r.finish.toUpperCase()})` : ''}
-                    </span>
+                  <div key={r.round} className="space-y-1">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-400">Ronde {r.round}</span>
+                      <span className={r.winner === 'my' ? 'text-octagon-teal' : 'text-octagon-red'}>
+                        {r.winner === 'my' ? fight.fighter!.name.split(' ')[0] : fight.opponent!.name.split(' ')[0]}
+                        {r.finish ? ` (${r.finish.toUpperCase()})` : ''}
+                      </span>
+                    </div>
+                    <RoundSplitBar myPct={r.my_pct} oppPct={r.opp_pct} oppColor={fight.opponent!.color} compact />
                   </div>
                 ))}
               </div>
