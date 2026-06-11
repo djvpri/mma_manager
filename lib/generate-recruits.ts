@@ -17,13 +17,13 @@ export interface RecruitCandidate {
   cost: number
 }
 
-const FIRST_NAMES = [
+export const FIRST_NAMES = [
   'Andi', 'Bayu', 'Candra', 'Dimas', 'Eko', 'Fajar', 'Gilang', 'Hendra',
   'Irfan', 'Joko', 'Kurniawan', 'Lukman', 'Maulana', 'Naufal', 'Oscar',
   'Putra', 'Rizal', 'Surya', 'Taufik', 'Wahyu',
 ]
 
-const LAST_NAMES = [
+export const LAST_NAMES = [
   'Saputra', 'Pratama', 'Wijaya', 'Kusuma', 'Santoso', 'Hidayat',
   'Nugraha', 'Setiawan', 'Permana', 'Gunawan',
 ]
@@ -49,11 +49,11 @@ const PERSONALITIES: FighterPersonality[] = [
   'Disciplined', 'Hardworker', 'Perfectionist', 'Veteran', 'Raw Talent', 'Calculated',
 ]
 
-function randInt(min: number, max: number) {
+export function randInt(min: number, max: number) {
   return Math.floor(Math.random() * (max - min + 1)) + min
 }
 
-function pick<T>(arr: T[]): T {
+export function pick<T>(arr: T[]): T {
   return arr[randInt(0, arr.length - 1)]
 }
 

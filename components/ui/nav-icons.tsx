@@ -33,13 +33,25 @@ export function IconGym(props: React.SVGProps<SVGSVGElement>) {
   )
 }
 
-export function IconSchedule(props: React.SVGProps<SVGSVGElement>) {
+export function IconLeaderboard(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <rect x="3" y="4.5" width="18" height="16" rx="2" />
-      <line x1="3" y1="9.5" x2="21" y2="9.5" />
-      <line x1="8" y1="2.5" x2="8" y2="6.5" />
-      <line x1="16" y1="2.5" x2="16" y2="6.5" />
+      <path d="M7 4h10v5a5 5 0 0 1-10 0V4Z" />
+      <path d="M7 6H4a3 3 0 0 0 3 3" />
+      <path d="M17 6h3a3 3 0 0 1-3 3" />
+      <path d="M12 14v4" />
+      <path d="M8 21h8" />
+    </svg>
+  )
+}
+
+export function IconStaff(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <circle cx="9" cy="7" r="3" />
+      <circle cx="17" cy="7" r="3" />
+      <path d="M2 21c0-3.3 3-5.5 7-5.5s7 2.2 7 5.5" />
+      <path d="M14.5 15.7c3 .4 5.5 2.5 5.5 5.3" />
     </svg>
   )
 }
@@ -69,8 +81,9 @@ export const NAV_ITEMS = [
   { href: '/game/roster', label: 'Roster', icon: IconRoster },
   { href: '/game/fight', label: 'Fight Night', icon: IconFight },
   { href: '/game/gym', label: 'Gym', icon: IconGym },
-  { href: '/game/schedule', label: 'Jadwal', icon: IconSchedule },
+  { href: '/game/staff', label: 'Staf', icon: IconStaff },
   { href: '/game/recruit', label: 'Rekrutmen', icon: IconRecruit },
+  { href: '/game/leaderboard', label: 'Leaderboard', icon: IconLeaderboard },
 ]
 
 export function formatCurrency(value: number) {

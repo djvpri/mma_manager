@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase'
 import { useGameStore } from '@/store/game-store'
 import Avatar from '@/components/avatar/Avatar'
 import { generateRecruitPool, type RecruitCandidate } from '@/lib/generate-recruits'
+import { getPotentialLabel } from '@/lib/potential'
 
 const POOL_SIZE = 6
 
@@ -103,7 +104,11 @@ export default function RecruitPage() {
     }
 
     const newBalance = gym.balance - candidate.cost
-    const { error: balanceError } = await supabase.from('gyms').update({ balance: newBalance }).eq('id', gym.id)
+    const newExpense = gym.monthly_expense + candidate.salary_monthly
+    const { error: balanceError } = await supabase
+      .from('gyms')
+      .update({ balance: newBalance, monthly_expense: newExpense })
+      .eq('id', gym.id)
 
     if (balanceError) {
       setError(balanceError.message)
@@ -111,7 +116,7 @@ export default function RecruitPage() {
       return
     }
 
-    setGym({ ...gym, balance: newBalance })
+    setGym({ ...gym, balance: newBalance, monthly_expense: newExpense })
     setFighters([...fighters, newFighter])
     setPool((p) => p.filter((c) => c.id !== candidate.id))
     setSigningId(null)
@@ -172,6 +177,13 @@ export default function RecruitPage() {
                     </span>
                   </span>
                   <span className="text-xs text-gray-500">{candidate.personality}</span>
+                </div>
+
+                <div className="mt-1 flex items-center justify-between text-xs">
+                  <span className="text-gray-500">Potensi</span>
+                  <span className={`font-medium ${getPotentialLabel(candidate.potential).colorClass}`}>
+                    {getPotentialLabel(candidate.potential).label}
+                  </span>
                 </div>
 
                 <div className="mt-3 space-y-1.5">

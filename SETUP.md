@@ -84,8 +84,9 @@ mma-manager/
 │       ├── roster/               ← Fighter roster screen
 │       ├── fight/                ← Fight night screen
 │       ├── gym/                  ← Gym management screen
-│       ├── schedule/             ← Training schedule
-│       └── recruit/              ← Fighter recruitment
+│       ├── staff/                ← Staff management screen
+│       ├── recruit/              ← Fighter recruitment
+│       └── leaderboard/          ← Leaderboard antar gym
 ├── components/
 │   ├── ui/                       ← Shared UI components
 │   ├── roster/                   ← Roster-specific components
@@ -142,5 +143,14 @@ Semua tabel menggunakan **Row Level Security (RLS)** — setiap user hanya bisa 
 - [x] Navigasi utama (sidebar / bottom nav)
 - [x] Sistem rekrutmen fighter baru
 - [x] Advance week / simulasi waktu
-- [ ] Kalender pertarungan
-- [ ] Leaderboard multiplayer
+- [x] Hasil pertarungan tersimpan (rekor, purse, reputasi, riwayat)
+- [x] Masa pemulihan fighter pasca-tanding (jadwal siap bertanding per minggu)
+- [x] Leaderboard multiplayer (peringkat reputasi & total menang antar gym)
+- [x] Sistem cedera fighter (peluang cedera pasca-tanding, pemulihan tiap minggu)
+- [x] Manajemen staf gym (rekrut/pecat, mempengaruhi pengeluaran bulanan)
+- [x] Perkembangan atribut fighter (fokus latihan mingguan, dipercepat ruangan & staf)
+- [x] Sistem kontrak fighter (gaji masuk pengeluaran bulanan, perpanjangan kontrak, risiko pensiun)
+- [x] Sistem usia fighter (umur bertambah tiap 12 minggu, pensiun alami di usia veteran)
+- [x] Laporan mingguan setelah Advance Week (perkembangan atribut, cedera sembuh, pensiun, kontrak)
+- [x] Efek spesialisasi staf: Manajer Pertarungan (purse), Fisioterapis (risiko & pemulihan cedera), Ahli Gizi (pemulihan training load)
+- [x] Indikator potensi fighter (rating samar di kartu roster, kandidat rekrutmen, dan scouting report AI)

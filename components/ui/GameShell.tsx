@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react'
 import { useGameStore } from '@/store/game-store'
+import { syncLeaderboard } from '@/lib/leaderboard'
 import Sidebar from './Sidebar'
 import MobileHeader from './MobileHeader'
 import MobileNav from './MobileNav'
@@ -22,6 +23,7 @@ export default function GameShell({
   useEffect(() => {
     setGym(gym)
     setFighters(fighters)
+    syncLeaderboard(gym, fighters)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gym.id])
 

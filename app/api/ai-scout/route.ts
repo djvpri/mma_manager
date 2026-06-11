@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
+import { getPotentialLabel } from '@/lib/potential'
 
 export async function POST(req: NextRequest) {
   try {
@@ -12,6 +13,7 @@ Usia: ${fighter.age} tahun, Kelas: ${fighter.weight_class}
 Spesialisasi: ${fighter.specialty}, Kepribadian: ${fighter.personality}
 Rekor amatir: ${fighter.record.w}-${fighter.record.l}-${fighter.record.d}
 Atribut — Striking: ${fighter.attrs.striking}, Grappling: ${fighter.attrs.grappling}, Cardio: ${fighter.attrs.cardio}, Fight IQ: ${fighter.attrs.fight_iq}, Mental: ${fighter.attrs.mental}
+Potensi jangka panjang: ${getPotentialLabel(fighter.potential).label}
 
 Format: 3 bagian singkat — (1) Kekuatan utama, (2) Kelemahan/risiko, (3) Rekomendasi rekrutmen & gaya pengembangan. Total maks 120 kata.`
 

@@ -1,10 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import type { Fighter } from '@/types'
+import type { Fighter, FightResult } from '@/types'
 import Avatar from '@/components/avatar/Avatar'
 import { useGameStore } from '@/store/game-store'
 import { generateFighterAvatar } from '@/lib/ai-avatar'
+import { createClient } from '@/lib/supabase'
+import { formatCurrency } from '@/lib/format'
+import { getPotentialLabel } from '@/lib/potential'
 
 const STATUS_STYLES: Record<Fighter['status'], string> = {
   active: 'border-octagon-teal/30 bg-octagon-teal/15 text-octagon-teal',
@@ -30,11 +33,100 @@ const ATTR_LABELS: { key: keyof Fighter['attrs']; label: string }[] = [
   { key: 'mental', label: 'MNT' },
 ]
 
+const FOCUS_OPTIONS: { key: keyof Fighter['attrs']; label: string }[] = [
+  { key: 'striking', label: 'Striking' },
+  { key: 'grappling', label: 'Grappling' },
+  { key: 'cardio', label: 'Cardio' },
+  { key: 'fight_iq', label: 'Fight IQ' },
+  { key: 'mental', label: 'Mental' },
+]
+
 export default function FighterCard({ fighter }: { fighter: Fighter }) {
   const { record, attrs } = fighter
+  const renewalCost = Math.round((fighter.salary_monthly * 4) / 500_000) * 500_000
+  const newSalary = Math.round((fighter.salary_monthly * 1.1) / 100_000) * 100_000
+  const potentialLabel = getPotentialLabel(fighter.potential)
   const updateFighter = useGameStore((s) => s.updateFighter)
+  const gym = useGameStore((s) => s.gym)
+  const setGym = useGameStore((s) => s.setGym)
+  const seasonWeek = gym?.season_week ?? 1
   const [generating, setGenerating] = useState(false)
   const [genError, setGenError] = useState<string | null>(null)
+  const [showHistory, setShowHistory] = useState(false)
+  const [history, setHistory] = useState<FightResult[] | null>(null)
+  const [loadingHistory, setLoadingHistory] = useState(false)
+  const [savingFocus, setSavingFocus] = useState(false)
+  const [renewing, setRenewing] = useState(false)
+  const [renewError, setRenewError] = useState<string | null>(null)
+
+  async function handleToggleHistory() {
+    if (!showHistory && history === null) {
+      setLoadingHistory(true)
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('fight_results')
+        .select('*')
+        .eq('fighter_id', fighter.id)
+        .order('fight_date', { ascending: false })
+        .limit(5)
+      setHistory((data ?? []) as FightResult[])
+      setLoadingHistory(false)
+    }
+    setShowHistory((v) => !v)
+  }
+
+  async function handleFocusChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const value = e.target.value
+    const newFocus = (value === '' ? null : value) as Fighter['training_focus']
+    setSavingFocus(true)
+    const supabase = createClient()
+    const { error } = await supabase.from('fighters').update({ training_focus: newFocus }).eq('id', fighter.id)
+    if (!error) {
+      updateFighter(fighter.id, { training_focus: newFocus })
+    }
+    setSavingFocus(false)
+  }
+
+  async function handleRenewContract() {
+    if (!gym) return
+    setRenewError(null)
+
+    if (gym.balance < renewalCost) {
+      setRenewError('Saldo tidak cukup untuk perpanjang kontrak.')
+      return
+    }
+
+    setRenewing(true)
+    const supabase = createClient()
+
+    const { error: fighterError } = await supabase
+      .from('fighters')
+      .update({ contract_fights_left: 3, salary_monthly: newSalary })
+      .eq('id', fighter.id)
+
+    if (fighterError) {
+      setRenewError(fighterError.message)
+      setRenewing(false)
+      return
+    }
+
+    const newBalance = gym.balance - renewalCost
+    const newExpense = gym.monthly_expense - fighter.salary_monthly + newSalary
+    const { error: gymError } = await supabase
+      .from('gyms')
+      .update({ balance: newBalance, monthly_expense: newExpense })
+      .eq('id', gym.id)
+
+    if (gymError) {
+      setRenewError(gymError.message)
+      setRenewing(false)
+      return
+    }
+
+    updateFighter(fighter.id, { contract_fights_left: 3, salary_monthly: newSalary })
+    setGym({ ...gym, balance: newBalance, monthly_expense: newExpense })
+    setRenewing(false)
+  }
 
   async function handleGenerateAvatar() {
     setGenError(null)
@@ -71,7 +163,18 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
             <p className="truncate text-sm italic text-octagon-amber">&ldquo;{fighter.nickname}&rdquo;</p>
           )}
           <p className="mt-1 text-xs text-gray-400">
-            {fighter.weight_class} · {fighter.specialty} · {fighter.age} th
+            {fighter.weight_class} · {fighter.specialty} ·{' '}
+            <span
+              className={
+                fighter.age >= 38
+                  ? 'font-semibold text-octagon-red'
+                  : fighter.age >= 32
+                    ? 'font-semibold text-octagon-amber'
+                    : ''
+              }
+            >
+              {fighter.age} th
+            </span>
           </p>
         </div>
       </div>
@@ -86,6 +189,11 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
         <span className="text-xs text-gray-500">{fighter.personality}</span>
       </div>
 
+      <div className="mt-1 flex items-center justify-between text-xs">
+        <span className="text-gray-500">Potensi</span>
+        <span className={`font-medium ${potentialLabel.colorClass}`}>{potentialLabel.label}</span>
+      </div>
+
       <div className="mt-3 space-y-1.5">
         {ATTR_LABELS.map(({ key, label }) => (
           <div key={key} className="flex items-center gap-2">
@@ -98,7 +206,99 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
         ))}
       </div>
 
-      {fighter.injury && <p className="mt-3 text-xs text-octagon-red">⚠ Cedera: {fighter.injury}</p>}
+      {fighter.status === 'training' && (
+        <div className="mt-3 flex items-center justify-between gap-2 text-xs">
+          <label htmlFor={`focus-${fighter.id}`} className="text-gray-400">
+            Fokus Latihan
+          </label>
+          <select
+            id={`focus-${fighter.id}`}
+            value={fighter.training_focus ?? ''}
+            onChange={handleFocusChange}
+            disabled={savingFocus}
+            className="rounded-md border border-octagon-border bg-octagon-dark px-2 py-1 text-xs text-white disabled:opacity-50"
+          >
+            <option value="">Tidak ada</option>
+            {FOCUS_OPTIONS.map(({ key, label }) => (
+              <option key={key} value={key}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {fighter.injury && (
+        <p className="mt-3 text-xs text-octagon-red">
+          ⚠ Cedera: {fighter.injury}
+          {fighter.injury_weeks_left !== null && ` · sembuh dalam ${fighter.injury_weeks_left} minggu`}
+        </p>
+      )}
+      {fighter.next_fight_week !== null && fighter.next_fight_week > seasonWeek && (
+        <p className="mt-3 text-xs text-octagon-amber">📅 Siap bertanding minggu ke-{fighter.next_fight_week}</p>
+      )}
+
+      {fighter.status !== 'retired' && (
+        <div className="mt-3 text-xs text-gray-400">
+          Kontrak:{' '}
+          <span className={fighter.contract_fights_left <= 1 ? 'font-semibold text-octagon-red' : 'text-gray-200'}>
+            {fighter.contract_fights_left} pertarungan tersisa
+          </span>
+        </div>
+      )}
+
+      {fighter.status !== 'retired' && fighter.contract_fights_left <= 1 && (
+        <div className="mt-2 rounded-md border border-octagon-amber/30 bg-octagon-amber/10 p-2">
+          <p className="text-xs text-octagon-amber">
+            ⚠ Kontrak hampir habis — perpanjang atau berisiko fighter pensiun.
+          </p>
+          <button
+            onClick={handleRenewContract}
+            disabled={renewing || (gym ? gym.balance < renewalCost : true)}
+            className="mt-2 w-full rounded-md bg-octagon-amber px-3 py-1.5 text-xs font-semibold text-octagon-dark transition-colors hover:bg-octagon-amber/90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {renewing ? 'Memproses...' : `Perpanjang Kontrak (${formatCurrency(renewalCost)})`}
+          </button>
+          {renewError && <p className="mt-1 text-[10px] text-octagon-red">{renewError}</p>}
+        </div>
+      )}
+
+      <button
+        onClick={handleToggleHistory}
+        className="mt-3 w-full rounded-md border border-octagon-border px-3 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:border-octagon-teal hover:text-octagon-teal"
+      >
+        {loadingHistory ? 'Memuat riwayat...' : showHistory ? 'Sembunyikan Riwayat' : 'Riwayat Pertarungan'}
+      </button>
+
+      {showHistory && !loadingHistory && (
+        <div className="mt-2 space-y-1.5">
+          {history && history.length > 0 ? (
+            history.map((fr) => (
+              <div key={fr.id} className="flex items-center justify-between rounded-md bg-octagon-dark px-2.5 py-1.5 text-xs">
+                <div className="min-w-0">
+                  <p className="truncate text-gray-200">vs {fr.opponent_name}</p>
+                  <p className="text-gray-500">{new Date(fr.fight_date).toLocaleDateString('id-ID')}</p>
+                </div>
+                <span
+                  className={`shrink-0 font-semibold uppercase ${
+                    fr.overall_winner === 'my'
+                      ? 'text-octagon-teal'
+                      : fr.overall_winner === 'opp'
+                        ? 'text-octagon-red'
+                        : 'text-octagon-amber'
+                  }`}
+                >
+                  {fr.overall_winner === 'my' ? 'Menang' : fr.overall_winner === 'opp' ? 'Kalah' : 'Imbang'}
+                  {' · '}
+                  {fr.finish_method.toUpperCase()}
+                </span>
+              </div>
+            ))
+          ) : (
+            <p className="text-center text-xs text-gray-500">Belum ada riwayat pertarungan.</p>
+          )}
+        </div>
+      )}
 
       <button
         onClick={handleGenerateAvatar}

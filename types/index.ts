@@ -43,14 +43,6 @@ export interface FighterRecord {
   d: number
 }
 
-export interface Opponent {
-  name: string
-  attrs: FighterAttrs
-  record: FighterRecord
-  specialty: string
-  color: string
-}
-
 export interface Fighter {
   id: string
   gym_id: string
@@ -67,13 +59,13 @@ export interface Fighter {
   potential: number       // 0–100, hidden from player
   training_load: number   // 0–100
   injury: string | null
+  injury_weeks_left: number | null
   contract_fights_left: number
   salary_monthly: number
   avatar_seed: number
   avatar_url: string | null
-  next_fight_date: string | null
-  scheduled_week: number | null
-  scheduled_opponent: Opponent | null
+  next_fight_week: number | null
+  training_focus: keyof FighterAttrs | null
   created_at: string
 }
 
