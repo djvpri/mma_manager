@@ -41,7 +41,6 @@ export default function NegotiationPanel({
   const [finalOffer, setFinalOffer] = useState<ContractOffer | null>(null)
   const [counterOffer, setCounterOffer] = useState<ContractOffer | null>(null)
 
-  const salaryMin = Math.round((candidate.salary_monthly * 0.5) / 100_000) * 100_000
   const salaryMax = Math.round((candidate.salary_monthly * 1.8) / 100_000) * 100_000
   const winBonusMax = Math.round((candidate.salary_monthly * 2.5) / 100_000) * 100_000
   const bonusMax = Math.round((candidate.cost * 1.8) / 500_000) * 500_000
@@ -106,13 +105,16 @@ export default function NegotiationPanel({
             </div>
             <input
               type="range"
-              min={salaryMin}
+              min={0}
               max={salaryMax}
               step={100_000}
               value={offer.salary}
               onChange={(e) => setOffer((o) => ({ ...o, salary: Number(e.target.value) }))}
               className="w-full accent-octagon-red"
             />
+            <p className="mt-1 text-[10px] text-gray-500">
+              Petarung amatir tidak menuntut gaji tetap — opsional sebagai pemanis tawaran.
+            </p>
           </div>
 
           <div>
@@ -161,6 +163,9 @@ export default function NegotiationPanel({
               onChange={(e) => setOffer((o) => ({ ...o, bonus: Number(e.target.value) }))}
               className="w-full accent-octagon-red"
             />
+            <p className="mt-1 text-[10px] text-gray-500">
+              Petarung amatir tidak menuntut bonus tanda tangan — opsional sebagai pemanis tawaran.
+            </p>
           </div>
 
           <div>
