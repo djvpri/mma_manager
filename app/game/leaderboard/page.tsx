@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useGameStore } from '@/store/game-store'
-import { ALL_ATTR_KEYS } from '@/lib/attrs'
+import { overallRating } from '@/lib/attrs'
 import type { Championship, Fighter, WeightClass } from '@/types'
 
 // ─── Gym tier system ─────────────────────────────────────────────────────────
@@ -18,10 +18,6 @@ const GYM_TIERS = [
 
 function getGymTier(rep: number) {
   return GYM_TIERS.find((t) => rep >= t.min) ?? GYM_TIERS[GYM_TIERS.length - 1]
-}
-
-function overallRating(attrs: Fighter['attrs']): number {
-  return Math.round(ALL_ATTR_KEYS.reduce((s, k) => s + attrs[k], 0) / ALL_ATTR_KEYS.length)
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────

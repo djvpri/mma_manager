@@ -70,6 +70,10 @@ export const ATTR_NAME_LABELS: Record<keyof FighterAttrs, string> = ATTR_GROUPS.
   {} as Record<keyof FighterAttrs, string>
 )
 
+export function overallRating(attrs: FighterAttrs): number {
+  return Math.round(ALL_ATTR_KEYS.reduce((sum, k) => sum + attrs[k], 0) / ALL_ATTR_KEYS.length)
+}
+
 export function getCategoryAverages(attrs: FighterAttrs): { key: string; label: string; value: number }[] {
   return ATTR_GROUPS.map((g) => ({
     key: g.key,

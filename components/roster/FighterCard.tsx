@@ -8,7 +8,7 @@ import { generateFighterAvatar } from '@/lib/ai-avatar'
 import { createClient } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/format'
 import { getPotentialLabel } from '@/lib/potential'
-import { getCategoryAverages } from '@/lib/attrs'
+import { getCategoryAverages, overallRating } from '@/lib/attrs'
 
 const SCHEDULE_DAYS: { key: keyof WeeklySchedule; label: string }[] = [
   { key: 'mon', label: 'Sen' },
@@ -89,6 +89,43 @@ export default function FighterCard({ fighter, titleDefenses }: { fighter: Fight
   const [confirmingRelease, setConfirmingRelease] = useState(false)
   const [releasing, setReleasing] = useState(false)
   const [releaseError, setReleaseError] = useState<string | null>(null)
+  const [expanded, setExpanded] = useState(false)
+
+  const ovr = overallRating(attrs)
+  const ovrColorClass = ovr >= 75 ? 'text-octagon-teal' : ovr >= 60 ? 'text-octagon-amber' : 'text-gray-400'
+
+  const alerts: { key: string; text: string; className: string }[] = []
+  const ALERT_RED = 'border-octagon-red/40 bg-octagon-red/10 text-octagon-red'
+  const ALERT_AMBER = 'border-octagon-amber/40 bg-octagon-amber/10 text-octagon-amber'
+  const ALERT_TEAL = 'border-octagon-teal/40 bg-octagon-teal/10 text-octagon-teal'
+  const ALERT_YELLOW = 'border-yellow-500/40 bg-yellow-500/10 text-yellow-400'
+
+  if (isChampion) {
+    alerts.push({ key: 'champion', text: `🏆 Champion · ${titleDefenses}x defense`, className: ALERT_YELLOW })
+  }
+  if (fighter.title_shot_pending) {
+    alerts.push({ key: 'titleshot', text: '🏆 Title Shot Pending', className: ALERT_AMBER })
+  }
+  if (fighter.injury) {
+    alerts.push({
+      key: 'injury',
+      text: `⚠ ${fighter.injury}${fighter.injury_weeks_left !== null ? ` · ${fighter.injury_weeks_left}mg` : ''}`,
+      className: ALERT_RED,
+    })
+  }
+  if (fighter.next_fight_week !== null && fighter.next_fight_week > seasonWeek) {
+    alerts.push({
+      key: 'fight',
+      text: isInFightCamp ? `⚡ Fight Camp · ${weeksToFight}mg` : `📅 Wk ${fighter.next_fight_week} · ${weeksToFight}mg`,
+      className: isInFightCamp ? ALERT_TEAL : ALERT_AMBER,
+    })
+  }
+  if (fighter.status !== 'retired' && fighter.contract_fights_left <= 1) {
+    alerts.push({ key: 'contract', text: '⚠ Kontrak Hampir Habis', className: ALERT_AMBER })
+  }
+  if (fighter.status !== 'retired' && fighter.morale < 30) {
+    alerts.push({ key: 'morale', text: '😟 Morale Rendah', className: ALERT_RED })
+  }
 
   async function handleToggleHistory() {
     if (!showHistory && history === null) {
@@ -215,10 +252,11 @@ export default function FighterCard({ fighter, titleDefenses }: { fighter: Fight
 
   return (
     <div className="rounded-lg border border-octagon-border bg-octagon-card p-4">
+      {/* ── Compact: selalu tampil ──────────────────────────────────────── */}
       <div className="flex items-start gap-3">
         <Avatar
           imageUrl={fighter.avatar_url}
-          size={64}
+          size={56}
           className="shrink-0 overflow-hidden rounded-full bg-octagon-dark"
         />
         <div className="min-w-0 flex-1">
@@ -259,29 +297,15 @@ export default function FighterCard({ fighter, titleDefenses }: { fighter: Fight
             {record.w}-{record.l}-{record.d}
           </span>
         </span>
-        <span className="text-xs text-gray-500">{fighter.personality}</span>
-      </div>
-
-      <div className="mt-1 flex items-center justify-between text-xs">
-        <span className="text-gray-500">Potensi</span>
-        <span className={`font-medium ${potentialLabel.colorClass}`}>{potentialLabel.label}</span>
-      </div>
-
-      <div className="mt-3 space-y-1.5">
-        {getCategoryAverages(attrs).map(({ key, label, value }) => (
-          <div key={key} className="flex items-center gap-2">
-            <span className="w-8 text-[10px] font-medium text-gray-500">{label}</span>
-            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-octagon-dark">
-              <div className="h-full rounded-full bg-octagon-teal" style={{ width: `${value}%` }} />
-            </div>
-            <span className="w-6 text-right text-[10px] text-gray-400">{value}</span>
-          </div>
-        ))}
+        <div className="flex items-center gap-2 text-xs">
+          <span className={`font-bold ${ovrColorClass}`}>{ovr} OVR</span>
+          <span className={`font-medium ${potentialLabel.colorClass}`}>{potentialLabel.label}</span>
+        </div>
       </div>
 
       {fighter.status !== 'retired' && (
         <div className="mt-1.5 flex items-center gap-2">
-          <span className="w-8 text-[10px] font-medium text-gray-500">Morale</span>
+          <span className="w-10 text-[10px] font-medium text-gray-500">Morale</span>
           <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-octagon-dark">
             <div className={`h-full rounded-full ${moraleColorClass}`} style={{ width: `${fighter.morale}%` }} />
           </div>
@@ -289,222 +313,249 @@ export default function FighterCard({ fighter, titleDefenses }: { fighter: Fight
         </div>
       )}
 
-      {fighter.status === 'training' && (
-        <div className="mt-3">
-          <div className="mb-1.5 flex items-center justify-between">
-            <p className="text-[10px] font-medium text-gray-400">Jadwal Latihan</p>
-            {isInFightCamp && (
-              <span className="rounded border border-octagon-teal/40 bg-octagon-teal/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-octagon-teal">
-                Fight Camp
-              </span>
-            )}
-          </div>
-          <div className="grid grid-cols-3 gap-x-2 gap-y-2">
-            {SCHEDULE_DAYS.map(({ key, label }) => {
-              const schedule = fighter.weekly_schedule ?? DEFAULT_SCHEDULE
-              const session = schedule[key]
-              return (
-                <div key={key} className="flex flex-col gap-0.5">
-                  <div className="flex items-center gap-1">
-                    <span className={`h-1.5 w-1.5 rounded-full ${SESSION_DOT[session]}`} />
-                    <span className="text-[10px] text-gray-500">{label}</span>
-                  </div>
-                  <select
-                    value={session}
-                    onChange={(e) => handleScheduleChange(key, e.target.value as TrainingSession)}
-                    disabled={savingSchedule}
-                    className="w-full rounded border border-octagon-border bg-octagon-dark px-1 py-0.5 text-[10px] text-white disabled:opacity-50"
-                  >
-                    {SESSION_OPTIONS.map(({ value, label: sLabel }) => (
-                      <option key={value} value={value}>{sLabel}</option>
-                    ))}
-                  </select>
-                </div>
-              )
-            })}
-          </div>
-
-          <div className="mt-2 flex items-center justify-between">
-            <span className="text-[10px] font-medium text-gray-400">Intensitas</span>
-            <div className="flex gap-1">
-              {(['low', 'medium', 'high'] as TrainingIntensity[]).map((lvl) => {
-                const active = (fighter.training_intensity ?? 'medium') === lvl
-                const styles: Record<TrainingIntensity, string> = {
-                  low:    active ? 'border-blue-500 bg-blue-500/20 text-blue-300'   : 'border-octagon-border text-gray-500',
-                  medium: active ? 'border-octagon-amber bg-octagon-amber/20 text-octagon-amber' : 'border-octagon-border text-gray-500',
-                  high:   active ? 'border-octagon-red bg-octagon-red/20 text-octagon-red'   : 'border-octagon-border text-gray-500',
-                }
-                const labels: Record<TrainingIntensity, string> = { low: 'Rendah', medium: 'Sedang', high: 'Tinggi' }
-                return (
-                  <button
-                    key={lvl}
-                    onClick={() => handleIntensityChange(lvl)}
-                    disabled={savingIntensity}
-                    className={`rounded border px-2 py-0.5 text-[10px] font-medium transition-colors disabled:opacity-50 ${styles[lvl]}`}
-                  >
-                    {labels[lvl]}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {fighter.injury && (
-        <p className="mt-3 text-xs text-octagon-red">
-          ⚠ Cedera: {fighter.injury}
-          {fighter.injury_weeks_left !== null && ` · sembuh dalam ${fighter.injury_weeks_left} minggu`}
-        </p>
-      )}
-      {fighter.next_fight_week !== null && fighter.next_fight_week > seasonWeek && (
-        <p className={`mt-3 text-xs ${isInFightCamp ? 'font-semibold text-octagon-teal' : 'text-octagon-amber'}`}>
-          {isInFightCamp ? `⚡ Fight Camp · ${weeksToFight} minggu lagi` : `📅 Bertanding minggu ke-${fighter.next_fight_week} · ${weeksToFight} minggu lagi`}
-        </p>
-      )}
-
-      {fighter.status !== 'retired' && (
-        <div className="mt-3 space-y-1 text-xs text-gray-400">
-          <div className="flex items-center justify-between">
-            <span>Kontrak</span>
-            <span className={fighter.contract_fights_left <= 1 ? 'font-semibold text-octagon-red' : 'text-gray-200'}>
-              {fighter.contract_fights_left} pertarungan tersisa
+      {alerts.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {alerts.map((a) => (
+            <span key={a.key} className={`rounded border px-1.5 py-0.5 text-[10px] font-medium ${a.className}`}>
+              {a.text}
             </span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span>Win Bonus</span>
-            <span className="text-gray-200">{formatCurrency(fighter.win_bonus)}</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span>Bagi Hasil Purse</span>
-            <span className="text-gray-200">{fighter.purse_share_pct}%</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span>Klausul Buyout</span>
-            <span className="text-gray-200">{formatCurrency(fighter.buyout_clause)}</span>
-          </div>
-          {fighter.title_shot_clause && (
-            <div className="flex items-center justify-between">
-              <span>Win Streak</span>
-              <span className="text-gray-200">{fighter.win_streak}x</span>
-            </div>
-          )}
-        </div>
-      )}
-
-      {isChampion && (
-        <p className="mt-2 text-xs font-semibold text-yellow-400">
-          🏆 Juara Indonesia Championship kelas {fighter.weight_class} · {titleDefenses}x defense
-        </p>
-      )}
-
-      {fighter.title_shot_pending && (
-        <p className="mt-2 text-xs font-semibold text-octagon-amber">
-          🏆 Berhak menuntut Title Shot sesuai klausul kontrak.
-        </p>
-      )}
-
-      {fighter.status !== 'retired' && fighter.morale < 30 && (
-        <p className="mt-2 text-xs font-semibold text-octagon-red">
-          ⚠ Morale {fighter.name.split(' ')[0]} rendah — risiko fighter pergi saat kontrak habis meningkat.
-        </p>
-      )}
-
-      {fighter.status !== 'retired' && fighter.contract_fights_left <= 1 && (
-        <div className="mt-2 rounded-md border border-octagon-amber/30 bg-octagon-amber/10 p-2">
-          <p className="text-xs text-octagon-amber">
-            ⚠ Kontrak hampir habis — perpanjang atau berisiko fighter pensiun.
-          </p>
-          <button
-            onClick={handleRenewContract}
-            disabled={renewing || (gym ? gym.balance < renewalCost : true)}
-            className="mt-2 w-full rounded-md bg-octagon-amber px-3 py-1.5 text-xs font-semibold text-octagon-dark transition-colors hover:bg-octagon-amber/90 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {renewing ? 'Memproses...' : `Perpanjang Kontrak (${formatCurrency(renewalCost)})`}
-          </button>
-          {renewError && <p className="mt-1 text-[10px] text-octagon-red">{renewError}</p>}
+          ))}
         </div>
       )}
 
       <button
-        onClick={handleToggleHistory}
+        onClick={() => setExpanded((v) => !v)}
         className="mt-3 w-full rounded-md border border-octagon-border px-3 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:border-octagon-teal hover:text-octagon-teal"
       >
-        {loadingHistory ? 'Memuat riwayat...' : showHistory ? 'Sembunyikan Riwayat' : 'Riwayat Pertarungan'}
+        {expanded ? 'Sembunyikan Detail ▲' : 'Lihat Detail ▼'}
       </button>
 
-      {showHistory && !loadingHistory && (
-        <div className="mt-2 space-y-1.5">
-          {history && history.length > 0 ? (
-            history.map((fr) => (
-              <div key={fr.id} className="flex items-center justify-between rounded-md bg-octagon-dark px-2.5 py-1.5 text-xs">
-                <div className="min-w-0">
-                  <p className="truncate text-gray-200">vs {fr.opponent_name}</p>
-                  <p className="text-gray-500">{new Date(fr.fight_date).toLocaleDateString('id-ID')}</p>
+      {/* ── Detail: expand on demand ────────────────────────────────────── */}
+      {expanded && (
+        <div className="mt-3 space-y-3 border-t border-octagon-border pt-3">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-gray-500">Personality</span>
+            <span className="text-gray-300">{fighter.personality}</span>
+          </div>
+
+          <div className="space-y-1.5">
+            {getCategoryAverages(attrs).map(({ key, label, value }) => (
+              <div key={key} className="flex items-center gap-2">
+                <span className="w-8 text-[10px] font-medium text-gray-500">{label}</span>
+                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-octagon-dark">
+                  <div className="h-full rounded-full bg-octagon-teal" style={{ width: `${value}%` }} />
                 </div>
-                <span
-                  className={`shrink-0 font-semibold uppercase ${
-                    fr.overall_winner === 'my'
-                      ? 'text-octagon-teal'
-                      : fr.overall_winner === 'opp'
-                        ? 'text-octagon-red'
-                        : 'text-octagon-amber'
-                  }`}
-                >
-                  {fr.overall_winner === 'my' ? 'Menang' : fr.overall_winner === 'opp' ? 'Kalah' : 'Imbang'}
-                  {' · '}
-                  {fr.finish_method.toUpperCase()}
+                <span className="w-6 text-right text-[10px] text-gray-400">{value}</span>
+              </div>
+            ))}
+          </div>
+
+          {fighter.status === 'training' && (
+            <div>
+              <div className="mb-1.5 flex items-center justify-between">
+                <p className="text-[10px] font-medium text-gray-400">Jadwal Latihan</p>
+                {isInFightCamp && (
+                  <span className="rounded border border-octagon-teal/40 bg-octagon-teal/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-octagon-teal">
+                    Fight Camp
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-3 gap-x-2 gap-y-2">
+                {SCHEDULE_DAYS.map(({ key, label }) => {
+                  const schedule = fighter.weekly_schedule ?? DEFAULT_SCHEDULE
+                  const session = schedule[key]
+                  return (
+                    <div key={key} className="flex flex-col gap-0.5">
+                      <div className="flex items-center gap-1">
+                        <span className={`h-1.5 w-1.5 rounded-full ${SESSION_DOT[session]}`} />
+                        <span className="text-[10px] text-gray-500">{label}</span>
+                      </div>
+                      <select
+                        value={session}
+                        onChange={(e) => handleScheduleChange(key, e.target.value as TrainingSession)}
+                        disabled={savingSchedule}
+                        className="w-full rounded border border-octagon-border bg-octagon-dark px-1 py-0.5 text-[10px] text-white disabled:opacity-50"
+                      >
+                        {SESSION_OPTIONS.map(({ value, label: sLabel }) => (
+                          <option key={value} value={value}>{sLabel}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )
+                })}
+              </div>
+
+              <div className="mt-2 flex items-center justify-between">
+                <span className="text-[10px] font-medium text-gray-400">Intensitas</span>
+                <div className="flex gap-1">
+                  {(['low', 'medium', 'high'] as TrainingIntensity[]).map((lvl) => {
+                    const active = (fighter.training_intensity ?? 'medium') === lvl
+                    const styles: Record<TrainingIntensity, string> = {
+                      low:    active ? 'border-blue-500 bg-blue-500/20 text-blue-300'   : 'border-octagon-border text-gray-500',
+                      medium: active ? 'border-octagon-amber bg-octagon-amber/20 text-octagon-amber' : 'border-octagon-border text-gray-500',
+                      high:   active ? 'border-octagon-red bg-octagon-red/20 text-octagon-red'   : 'border-octagon-border text-gray-500',
+                    }
+                    const labels: Record<TrainingIntensity, string> = { low: 'Rendah', medium: 'Sedang', high: 'Tinggi' }
+                    return (
+                      <button
+                        key={lvl}
+                        onClick={() => handleIntensityChange(lvl)}
+                        disabled={savingIntensity}
+                        className={`rounded border px-2 py-0.5 text-[10px] font-medium transition-colors disabled:opacity-50 ${styles[lvl]}`}
+                      >
+                        {labels[lvl]}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {isChampion && (
+            <p className="text-xs font-semibold text-yellow-400">
+              🏆 Juara Indonesia Championship kelas {fighter.weight_class} · {titleDefenses}x defense
+            </p>
+          )}
+
+          {fighter.title_shot_pending && (
+            <p className="text-xs font-semibold text-octagon-amber">
+              🏆 Berhak menuntut Title Shot sesuai klausul kontrak.
+            </p>
+          )}
+
+          {fighter.status !== 'retired' && fighter.morale < 30 && (
+            <p className="text-xs font-semibold text-octagon-red">
+              ⚠ Morale {fighter.name.split(' ')[0]} rendah — risiko fighter pergi saat kontrak habis meningkat.
+            </p>
+          )}
+
+          {fighter.status !== 'retired' && (
+            <div className="space-y-1 text-xs text-gray-400">
+              <div className="flex items-center justify-between">
+                <span>Kontrak</span>
+                <span className={fighter.contract_fights_left <= 1 ? 'font-semibold text-octagon-red' : 'text-gray-200'}>
+                  {fighter.contract_fights_left} pertarungan tersisa
                 </span>
               </div>
-            ))
-          ) : (
-            <p className="text-center text-xs text-gray-500">Belum ada riwayat pertarungan.</p>
+              <div className="flex items-center justify-between">
+                <span>Win Bonus</span>
+                <span className="text-gray-200">{formatCurrency(fighter.win_bonus)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Bagi Hasil Purse</span>
+                <span className="text-gray-200">{fighter.purse_share_pct}%</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Klausul Buyout</span>
+                <span className="text-gray-200">{formatCurrency(fighter.buyout_clause)}</span>
+              </div>
+              {fighter.title_shot_clause && (
+                <div className="flex items-center justify-between">
+                  <span>Win Streak</span>
+                  <span className="text-gray-200">{fighter.win_streak}x</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {fighter.status !== 'retired' && fighter.contract_fights_left <= 1 && (
+            <div className="rounded-md border border-octagon-amber/30 bg-octagon-amber/10 p-2">
+              <p className="text-xs text-octagon-amber">
+                ⚠ Kontrak hampir habis — perpanjang atau berisiko fighter pensiun.
+              </p>
+              <button
+                onClick={handleRenewContract}
+                disabled={renewing || (gym ? gym.balance < renewalCost : true)}
+                className="mt-2 w-full rounded-md bg-octagon-amber px-3 py-1.5 text-xs font-semibold text-octagon-dark transition-colors hover:bg-octagon-amber/90 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {renewing ? 'Memproses...' : `Perpanjang Kontrak (${formatCurrency(renewalCost)})`}
+              </button>
+              {renewError && <p className="mt-1 text-[10px] text-octagon-red">{renewError}</p>}
+            </div>
+          )}
+
+          <button
+            onClick={handleToggleHistory}
+            className="w-full rounded-md border border-octagon-border px-3 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:border-octagon-teal hover:text-octagon-teal"
+          >
+            {loadingHistory ? 'Memuat riwayat...' : showHistory ? 'Sembunyikan Riwayat' : 'Riwayat Pertarungan'}
+          </button>
+
+          {showHistory && !loadingHistory && (
+            <div className="space-y-1.5">
+              {history && history.length > 0 ? (
+                history.map((fr) => (
+                  <div key={fr.id} className="flex items-center justify-between rounded-md bg-octagon-dark px-2.5 py-1.5 text-xs">
+                    <div className="min-w-0">
+                      <p className="truncate text-gray-200">vs {fr.opponent_name}</p>
+                      <p className="text-gray-500">{new Date(fr.fight_date).toLocaleDateString('id-ID')}</p>
+                    </div>
+                    <span
+                      className={`shrink-0 font-semibold uppercase ${
+                        fr.overall_winner === 'my'
+                          ? 'text-octagon-teal'
+                          : fr.overall_winner === 'opp'
+                            ? 'text-octagon-red'
+                            : 'text-octagon-amber'
+                      }`}
+                    >
+                      {fr.overall_winner === 'my' ? 'Menang' : fr.overall_winner === 'opp' ? 'Kalah' : 'Imbang'}
+                      {' · '}
+                      {fr.finish_method.toUpperCase()}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <p className="text-center text-xs text-gray-500">Belum ada riwayat pertarungan.</p>
+              )}
+            </div>
+          )}
+
+          <button
+            onClick={handleGenerateAvatar}
+            disabled={generating}
+            className="w-full rounded-md border border-octagon-border px-3 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:border-octagon-teal hover:text-octagon-teal disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {generating ? 'Membuat foto...' : fighter.avatar_url ? 'Buat Ulang Foto AI' : 'Generate Foto AI'}
+          </button>
+          {genError && <p className="text-[10px] text-octagon-red">{genError}</p>}
+
+          {fighter.status !== 'retired' && (
+            confirmingRelease ? (
+              <div className="rounded-md border border-octagon-red/30 bg-octagon-red/10 p-2">
+                <p className="text-xs text-octagon-red">
+                  Yakin putus kontrak {fighter.name}? Fighter akan keluar dari roster secara permanen.
+                  {buyoutCost > 0 && ` Gym akan membayar klausul buyout sebesar ${formatCurrency(buyoutCost)}.`}
+                </p>
+                <div className="mt-2 flex gap-2">
+                  <button
+                    onClick={handleReleaseFighter}
+                    disabled={releasing || (gym ? gym.balance < buyoutCost : false)}
+                    className="flex-1 rounded-md bg-octagon-red px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-octagon-red/90 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {releasing ? 'Memproses...' : 'Ya, Putus Kontrak'}
+                  </button>
+                  <button
+                    onClick={() => setConfirmingRelease(false)}
+                    disabled={releasing}
+                    className="flex-1 rounded-md border border-octagon-border px-3 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:border-octagon-teal hover:text-octagon-teal disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Batal
+                  </button>
+                </div>
+                {releaseError && <p className="mt-1 text-[10px] text-octagon-red">{releaseError}</p>}
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmingRelease(true)}
+                className="w-full rounded-md border border-octagon-border px-3 py-1.5 text-xs font-medium text-gray-500 transition-colors hover:border-octagon-red hover:text-octagon-red"
+              >
+                Putus Kontrak
+              </button>
+            )
           )}
         </div>
-      )}
-
-      <button
-        onClick={handleGenerateAvatar}
-        disabled={generating}
-        className="mt-3 w-full rounded-md border border-octagon-border px-3 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:border-octagon-teal hover:text-octagon-teal disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        {generating ? 'Membuat foto...' : fighter.avatar_url ? 'Buat Ulang Foto AI' : 'Generate Foto AI'}
-      </button>
-      {genError && <p className="mt-1 text-[10px] text-octagon-red">{genError}</p>}
-
-      {fighter.status !== 'retired' && (
-        confirmingRelease ? (
-          <div className="mt-3 rounded-md border border-octagon-red/30 bg-octagon-red/10 p-2">
-            <p className="text-xs text-octagon-red">
-              Yakin putus kontrak {fighter.name}? Fighter akan keluar dari roster secara permanen.
-              {buyoutCost > 0 && ` Gym akan membayar klausul buyout sebesar ${formatCurrency(buyoutCost)}.`}
-            </p>
-            <div className="mt-2 flex gap-2">
-              <button
-                onClick={handleReleaseFighter}
-                disabled={releasing || (gym ? gym.balance < buyoutCost : false)}
-                className="flex-1 rounded-md bg-octagon-red px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-octagon-red/90 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {releasing ? 'Memproses...' : 'Ya, Putus Kontrak'}
-              </button>
-              <button
-                onClick={() => setConfirmingRelease(false)}
-                disabled={releasing}
-                className="flex-1 rounded-md border border-octagon-border px-3 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:border-octagon-teal hover:text-octagon-teal disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Batal
-              </button>
-            </div>
-            {releaseError && <p className="mt-1 text-[10px] text-octagon-red">{releaseError}</p>}
-          </div>
-        ) : (
-          <button
-            onClick={() => setConfirmingRelease(true)}
-            className="mt-3 w-full rounded-md border border-octagon-border px-3 py-1.5 text-xs font-medium text-gray-500 transition-colors hover:border-octagon-red hover:text-octagon-red"
-          >
-            Putus Kontrak
-          </button>
-        )
       )}
     </div>
   )
