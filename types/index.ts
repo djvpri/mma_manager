@@ -26,6 +26,21 @@ export type Specialty =
   | 'Wrestler'
 
 export type TrainingSession = 'striking' | 'grappling' | 'cardio' | 'analytics' | 'mental' | 'sparring' | 'rest'
+export type SponsorCategory = 'apparel' | 'energy' | 'supplement' | 'local'
+
+export interface SponsorContract {
+  id: string
+  gym_id: string
+  brand_name: string
+  category: SponsorCategory
+  weekly_income: number
+  win_bonus: number
+  duration_weeks: number
+  weeks_remaining: number
+  satisfaction: number
+  status: 'active' | 'expired' | 'cancelled'
+  created_at: string
+}
 export type TrainingIntensity = 'low' | 'medium' | 'high'
 
 export type WeeklySchedule = {

@@ -383,12 +383,12 @@ export default function FightPage() {
     const tierConfig = EVENT_TIER_CONFIG[event?.tier ?? 'regional']
 
     const supabase = createClient()
-    const { data: staffData } = await supabase
-      .from('staff')
-      .select('specialty')
-      .eq('gym_id', gym.id)
-      .eq('is_hired', true)
-    const specialties = (staffData ?? []).map((s) => s.specialty)
+    const [staffRes, sponsorRes] = await Promise.all([
+      supabase.from('staff').select('specialty').eq('gym_id', gym.id).eq('is_hired', true),
+      supabase.from('sponsor_contracts').select('id, win_bonus, satisfaction').eq('gym_id', gym.id).eq('status', 'active'),
+    ])
+    const specialties = (staffRes.data ?? []).map((s) => s.specialty)
+    const activeSponsors = sponsorRes.data ?? []
 
     let purse = 3_000_000
     let reputationChange = 0
@@ -456,7 +456,10 @@ export default function FightPage() {
     if (titleShotTriggered) moraleChange += 10
     const newMorale = Math.max(0, Math.min(100, fighter.morale + moraleChange))
 
-    const newBalance = gym.balance + purse + commission - winBonusPaid - medicalCost - purseShare
+    const sponsorWinBonus = result.winner === 'my'
+      ? activeSponsors.reduce((sum, s) => sum + s.win_bonus, 0)
+      : 0
+    const newBalance = gym.balance + purse + commission + sponsorWinBonus - winBonusPaid - medicalCost - purseShare
     const newReputation = Math.max(0, Math.min(100, gym.reputation + reputationChange + reputationBonus))
     const newEvents = event
       ? gym.events.map((e) =>
@@ -509,6 +512,15 @@ export default function FightPage() {
     } else {
       if (fighterRes.data) updateFighter(fighter.id, fighterRes.data)
       if (gymRes.data) setGym(gymRes.data)
+
+      // Update satisfaction sponsor aktif berdasarkan hasil fight
+      if (activeSponsors.length > 0) {
+        const satDelta = result.winner === 'my' ? 5 : -8
+        for (const s of activeSponsors) {
+          const newSat = Math.max(0, Math.min(100, s.satisfaction + satDelta))
+          supabase.from('sponsor_contracts').update({ satisfaction: newSat }).eq('id', s.id).then()
+        }
+      }
 
       const state = useGameStore.getState()
       if (state.gym) syncLeaderboard(state.gym, state.fighters)
