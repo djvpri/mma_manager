@@ -82,7 +82,9 @@ export default function OnboardingPage() {
       return
     }
 
-    setGym(gym)
+    await supabase.from('gyms').update({ starters_seeded: true }).eq('id', gym.id)
+
+    setGym({ ...gym, starters_seeded: true })
     setFighters(fighters ?? [])
     router.push('/game/roster')
     router.refresh()
