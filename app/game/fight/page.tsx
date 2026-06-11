@@ -47,6 +47,14 @@ function randInt(min: number, max: number) {
   return Math.floor(Math.random() * (max - min + 1)) + min
 }
 
+const ROUND_DURATION_SEC = 5 * 60
+
+function formatClock(totalSec: number): string {
+  const m = Math.floor(totalSec / 60)
+  const s = totalSec % 60
+  return `${m}:${String(s).padStart(2, '0')}`
+}
+
 function generateOpponent(myFighter: Fighter): Opponent {
   const avg =
     (myFighter.attrs.striking +
@@ -190,6 +198,7 @@ export default function FightPage() {
     final: RoundResult
     isFightOver: boolean
   } | null>(null)
+  const [roundClock, setRoundClock] = useState(ROUND_DURATION_SEC)
 
   const seasonWeek = gym?.season_week ?? 1
   const notRetiredOrInjured = fighters.filter((f) => f.status !== 'retired' && f.status !== 'injured')
@@ -368,6 +377,7 @@ export default function FightPage() {
     const isFightOver = !!final.finish || newMyHP === 0 || newOppHP === 0 || fight.currentRound >= TOTAL_ROUNDS
 
     setAiNarration('')
+    setRoundClock(ROUND_DURATION_SEC)
     setAnimation({ ticks, index: 0, feed: [], final, isFightOver })
   }
 
@@ -379,6 +389,7 @@ export default function FightPage() {
     setOppHP(Math.max(0, fight.oppHP - dmgToOpp))
     addRoundResult(anim.final)
     setAiNarration(generateClosingLine(anim.isFightOver))
+    setRoundClock(0)
     setAnimation(null)
   }
 
@@ -386,6 +397,23 @@ export default function FightPage() {
     if (!animation) return
     finalizeRound(animation)
   }
+
+  // Jam ronde berjalan real-time mengikuti durasi animasi narasi (5:00 -> 0:00)
+  useEffect(() => {
+    if (!animation) return
+
+    const totalDurationMs = 300 + (animation.ticks.length - 1) * 1300
+    const startedAt = Date.now()
+
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - startedAt
+      const remaining = Math.max(0, ROUND_DURATION_SEC - Math.round((elapsed / totalDurationMs) * ROUND_DURATION_SEC))
+      setRoundClock(remaining)
+    }, 100)
+
+    return () => clearInterval(interval)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [animation !== null])
 
   // Putar narasi pertarungan tick demi tick, mengikuti kondisi HP secara live
   useEffect(() => {
@@ -593,6 +621,10 @@ export default function FightPage() {
                     })}
                   </div>
                 </div>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-gray-500">Waktu</p>
+                <p className="font-mono text-2xl font-bold text-white">{formatClock(roundClock)}</p>
               </div>
               <div className="text-right">
                 <p className="text-xs text-gray-500">Game Plan</p>
