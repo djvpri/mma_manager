@@ -160,6 +160,37 @@ function AttrCompareBar({
   )
 }
 
+function StatCompareBar({
+  label,
+  myVal,
+  oppVal,
+  oppColor,
+  unit = '',
+}: {
+  label: string
+  myVal: number
+  oppVal: number
+  oppColor: string
+  unit?: string
+}) {
+  const total = myVal + oppVal
+  const myPct = total > 0 ? (myVal / total) * 100 : 50
+  const oppPct = 100 - myPct
+  return (
+    <div>
+      <div className="mb-1 flex items-center justify-between text-xs">
+        <span className="font-semibold text-octagon-teal">{myVal}{unit}</span>
+        <span className="text-gray-500">{label}</span>
+        <span className="font-semibold" style={{ color: oppColor }}>{oppVal}{unit}</span>
+      </div>
+      <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-octagon-dark">
+        <div className="h-full bg-octagon-teal" style={{ width: `${myPct}%` }} />
+        <div className="h-full" style={{ width: `${oppPct}%`, backgroundColor: oppColor }} />
+      </div>
+    </div>
+  )
+}
+
 function OctagonBackground() {
   return (
     <svg
@@ -233,6 +264,11 @@ export default function FightPage() {
   const isFightOver =
     !!currentRoundResult &&
     (!!currentRoundResult.finish || fight.myHP <= 0 || fight.oppHP <= 0 || fight.currentRound >= TOTAL_ROUNDS)
+  const roundsWonMy = fight.roundResults.filter((r) => r.winner === 'my').length
+  const roundsWonOpp = fight.roundResults.filter((r) => r.winner === 'opp').length
+  const allTicks = fight.roundResults.flatMap((r) => r.ticks ?? [])
+  const totalDmgDealt = allTicks.reduce((sum, t) => sum + t.opp_dmg, 0)
+  const totalDmgTaken = allTicks.reduce((sum, t) => sum + t.my_dmg, 0)
 
   // Ambil saran corner dari AI saat masuk fase istirahat antar ronde
   useEffect(() => {
@@ -778,24 +814,20 @@ export default function FightPage() {
           </div>
 
           <div className="rounded-lg border border-octagon-border bg-octagon-card p-4">
-            <p className="mb-3 text-xs font-semibold uppercase text-gray-500">Statistik Fighter</p>
-            <div className="space-y-4">
-              {ATTR_GROUPS.map((group) => (
-                <div key={group.key}>
-                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600">{group.label}</p>
-                  <div className="space-y-3">
-                    {group.attrs.map(({ key, label }) => (
-                      <AttrCompareBar
-                        key={key}
-                        label={label}
-                        myVal={fight.fighter!.attrs[key]}
-                        oppVal={fight.opponent!.attrs[key]}
-                        oppColor={fight.opponent!.color}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ))}
+            <p className="mb-3 text-xs font-semibold uppercase text-gray-500">Statistik Pertandingan</p>
+            <div className="space-y-3">
+              <StatCompareBar
+                label="Ronde Dimenangkan"
+                myVal={roundsWonMy}
+                oppVal={roundsWonOpp}
+                oppColor={fight.opponent.color}
+              />
+              <StatCompareBar
+                label="Damage Dilayangkan"
+                myVal={totalDmgDealt}
+                oppVal={totalDmgTaken}
+                oppColor={fight.opponent.color}
+              />
             </div>
           </div>
 
