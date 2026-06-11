@@ -67,6 +67,17 @@ export function IconRecruit(props: React.SVGProps<SVGSVGElement>) {
   )
 }
 
+export function IconRefresh(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M3 12a9 9 0 0 1 15.4-6.4L21 8" />
+      <polyline points="21 3 21 8 16 8" />
+      <path d="M21 12a9 9 0 0 1-15.4 6.4L3 16" />
+      <polyline points="3 21 3 16 8 16" />
+    </svg>
+  )
+}
+
 export function IconLogout(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...props}>

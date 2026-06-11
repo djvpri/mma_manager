@@ -4,17 +4,37 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useGameStore } from '@/store/game-store'
 import { createClient } from '@/lib/supabase'
-import { NAV_ITEMS, IconLogout, formatCurrency } from './nav-icons'
+import { NAV_ITEMS, IconLogout, IconRefresh, formatCurrency } from './nav-icons'
 
 export default function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const gym = useGameStore((s) => s.gym)
+  const resetGame = useGameStore((s) => s.resetGame)
 
   async function handleLogout() {
     const supabase = createClient()
     await supabase.auth.signOut()
     router.push('/auth/login')
+    router.refresh()
+  }
+
+  async function handleNewGame() {
+    if (!gym) return
+    const confirmed = window.confirm(
+      'Yakin ingin memulai New Game? Semua data gym, fighter, staf, dan riwayat pertarungan akan dihapus permanen.'
+    )
+    if (!confirmed) return
+
+    const supabase = createClient()
+    await supabase.from('fight_results').delete().eq('gym_id', gym.id)
+    await supabase.from('fighters').delete().eq('gym_id', gym.id)
+    await supabase.from('staff').delete().eq('gym_id', gym.id)
+    await supabase.from('leaderboard').delete().eq('gym_id', gym.id)
+    await supabase.from('gyms').delete().eq('id', gym.id)
+
+    resetGame()
+    router.push('/onboarding')
     router.refresh()
   }
 
@@ -62,7 +82,14 @@ export default function Sidebar() {
         })}
       </nav>
 
-      <div className="border-t border-octagon-border px-3 py-3">
+      <div className="border-t border-octagon-border px-3 py-3 space-y-1">
+        <button
+          onClick={handleNewGame}
+          className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-gray-400 transition-colors hover:bg-white/5 hover:text-octagon-amber"
+        >
+          <IconRefresh className="h-5 w-5" />
+          New Game
+        </button>
         <button
           onClick={handleLogout}
           className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-gray-400 transition-colors hover:bg-white/5 hover:text-octagon-red"

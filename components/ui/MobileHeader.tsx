@@ -3,16 +3,36 @@
 import { useRouter } from 'next/navigation'
 import { useGameStore } from '@/store/game-store'
 import { createClient } from '@/lib/supabase'
-import { IconLogout, formatCurrency } from './nav-icons'
+import { IconLogout, IconRefresh, formatCurrency } from './nav-icons'
 
 export default function MobileHeader() {
   const router = useRouter()
   const gym = useGameStore((s) => s.gym)
+  const resetGame = useGameStore((s) => s.resetGame)
 
   async function handleLogout() {
     const supabase = createClient()
     await supabase.auth.signOut()
     router.push('/auth/login')
+    router.refresh()
+  }
+
+  async function handleNewGame() {
+    if (!gym) return
+    const confirmed = window.confirm(
+      'Yakin ingin memulai New Game? Semua data gym, fighter, staf, dan riwayat pertarungan akan dihapus permanen.'
+    )
+    if (!confirmed) return
+
+    const supabase = createClient()
+    await supabase.from('fight_results').delete().eq('gym_id', gym.id)
+    await supabase.from('fighters').delete().eq('gym_id', gym.id)
+    await supabase.from('staff').delete().eq('gym_id', gym.id)
+    await supabase.from('leaderboard').delete().eq('gym_id', gym.id)
+    await supabase.from('gyms').delete().eq('id', gym.id)
+
+    resetGame()
+    router.push('/onboarding')
     router.refresh()
   }
 
@@ -29,6 +49,13 @@ export default function MobileHeader() {
           <p className="text-[11px] text-gray-400">Saldo</p>
           <p className="text-xs font-semibold text-octagon-amber">{formatCurrency(gym?.balance ?? 0)}</p>
         </div>
+        <button
+          onClick={handleNewGame}
+          className="flex h-8 w-8 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-white/5 hover:text-octagon-amber"
+          aria-label="New Game"
+        >
+          <IconRefresh className="h-5 w-5" />
+        </button>
         <button
           onClick={handleLogout}
           className="flex h-8 w-8 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-white/5 hover:text-octagon-red"

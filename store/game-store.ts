@@ -40,6 +40,7 @@ interface GameStore {
   setFighters: (fighters: Fighter[]) => void
   updateFighter: (id: string, updates: Partial<Fighter>) => void
   removeFighter: (id: string) => void
+  resetGame: () => void
   setActiveNav: (nav: string) => void
 
   // fight actions
@@ -99,6 +100,7 @@ export const useGameStore = create<GameStore>()(
         set((s) => ({
           fighters: s.fighters.filter((f) => f.id !== id),
         })),
+      resetGame: () => set({ gym: null, fighters: [], fight: defaultFight, activeNav: 'roster' }),
       setActiveNav: (nav) => set({ activeNav: nav }),
 
       setFightFighter: (f) =>
