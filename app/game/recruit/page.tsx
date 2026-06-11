@@ -5,9 +5,9 @@ import { createClient } from '@/lib/supabase'
 import { useGameStore } from '@/store/game-store'
 import Avatar from '@/components/avatar/Avatar'
 import { getPotentialLabel } from '@/lib/potential'
-import { getCategoryAverages, ALL_ATTR_KEYS } from '@/lib/attrs'
+import { getCategoryAverages } from '@/lib/attrs'
 import { formatCurrency } from '@/lib/format'
-import { poolFighterToCandidate, scoutFee, requiredReputation } from '@/lib/pool-fighter'
+import { poolFighterToCandidate, requiredReputation } from '@/lib/pool-fighter'
 import NegotiationPanel from '@/components/recruit/NegotiationPanel'
 import type { ContractOffer } from '@/lib/negotiation'
 import type { Fighter, WeightClass } from '@/types'
@@ -19,22 +19,21 @@ const WEIGHT_CLASSES: WeightClass[] = [
 const PAGE_SIZE = 12
 
 export default function RecruitPage() {
-  const gym      = useGameStore((s) => s.gym)
-  const fighters = useGameStore((s) => s.fighters)
-  const setGym   = useGameStore((s) => s.setGym)
+  const gym         = useGameStore((s) => s.gym)
+  const fighters    = useGameStore((s) => s.fighters)
+  const setGym      = useGameStore((s) => s.setGym)
   const setFighters = useGameStore((s) => s.setFighters)
 
-  const [pool, setPool]           = useState<Fighter[]>([])
-  const [scouted, setScouted]     = useState<Set<string>>(new Set())
-  const [loading, setLoading]     = useState(true)
-  const [scoutingId, setScoutingId] = useState<string | null>(null)
+  const [pool, setPool]             = useState<Fighter[]>([])
+  const [loading, setLoading]       = useState(true)
+  const [aiLoadingId, setAiLoadingId] = useState<string | null>(null)
   const [signingId, setSigningId]   = useState<string | null>(null)
-  const [scoutTexts, setScoutTexts] = useState<Record<string, string>>({})
+  const [aiTexts, setAiTexts]       = useState<Record<string, string>>({})
   const [negotiatingId, setNegotiatingId] = useState<string | null>(null)
-  const [filterWC, setFilterWC]   = useState<WeightClass | 'all'>('all')
-  const [page, setPage]           = useState(1)
-  const [error, setError]         = useState<string | null>(null)
-  const [info, setInfo]           = useState<string | null>(null)
+  const [filterWC, setFilterWC]     = useState<WeightClass | 'all'>('all')
+  const [page, setPage]             = useState(1)
+  const [error, setError]           = useState<string | null>(null)
+  const [info, setInfo]             = useState<string | null>(null)
 
   useEffect(() => {
     if (!gym) return
@@ -45,12 +44,9 @@ export default function RecruitPage() {
   async function loadPool() {
     setLoading(true)
     const supabase = createClient()
-    const [poolRes, scoutedRes] = await Promise.all([
-      supabase.from('fighters').select('*').is('gym_id', null).eq('status', 'prospect').order('age'),
-      supabase.from('scouted_fighters').select('fighter_id').eq('gym_id', gym!.id),
-    ])
-    if (!poolRes.error) setPool((poolRes.data ?? []) as Fighter[])
-    if (!scoutedRes.error) setScouted(new Set((scoutedRes.data ?? []).map((r: {fighter_id: string}) => r.fighter_id)))
+    const { data, error: err } = await supabase
+      .from('fighters').select('*').is('gym_id', null).eq('status', 'prospect').order('age')
+    if (!err) setPool((data ?? []) as Fighter[])
     setLoading(false)
   }
 
@@ -62,37 +58,19 @@ export default function RecruitPage() {
   const visible = filtered.slice(0, page * PAGE_SIZE)
   const hasMore = visible.length < filtered.length
 
-  async function handleScoutFighter(fighter: Fighter) {
-    if (!gym) return
-    const fee = scoutFee(fighter)
-    if (gym.balance < fee) { setError(`Saldo tidak cukup untuk scout (biaya: ${formatCurrency(fee)})`); return }
-
-    setScoutingId(fighter.id)
-    const supabase = createClient()
-
-    const [, gymRes] = await Promise.all([
-      supabase.from('scouted_fighters').insert({ gym_id: gym.id, fighter_id: fighter.id }),
-      supabase.from('gyms').update({ balance: gym.balance - fee }).eq('id', gym.id).select().single(),
-    ])
-
-    if (gymRes.data) setGym(gymRes.data)
-    setScouted((prev) => new Set([...prev, fighter.id]))
-    setScoutingId(null)
-  }
-
   async function handleAiScout(fighter: Fighter) {
-    setScoutingId(fighter.id)
+    setAiLoadingId(fighter.id)
     try {
       const res = await fetch('/api/ai-scout', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fighter: poolFighterToCandidate(fighter) }),
       })
       const data = await res.json()
-      setScoutTexts((m) => ({ ...m, [fighter.id]: data.text ?? 'Gagal memuat report.' }))
+      setAiTexts((m) => ({ ...m, [fighter.id]: data.text ?? 'Gagal memuat report.' }))
     } catch {
-      setScoutTexts((m) => ({ ...m, [fighter.id]: 'Gagal memuat report.' }))
+      setAiTexts((m) => ({ ...m, [fighter.id]: 'Gagal memuat report.' }))
     } finally {
-      setScoutingId(null)
+      setAiLoadingId(null)
     }
   }
 
@@ -128,11 +106,6 @@ export default function RecruitPage() {
     setInfo(`${fighter.name} resmi bergabung dengan ${gym.name}!`)
   }
 
-  function handleWalkAway(fighter: Fighter) {
-    setNegotiatingId(null)
-    setInfo(`${fighter.name} pergi mencari tawaran lain.`)
-  }
-
   if (!gym) return <p className="text-sm text-gray-400">Memuat...</p>
 
   return (
@@ -146,7 +119,6 @@ export default function RecruitPage() {
         </p>
       </header>
 
-      {/* Filter */}
       <div className="flex flex-wrap gap-2">
         <button
           onClick={() => { setFilterWC('all'); setPage(1) }}
@@ -155,9 +127,7 @@ export default function RecruitPage() {
           Semua
         </button>
         {WEIGHT_CLASSES.map((wc) => (
-          <button
-            key={wc}
-            onClick={() => { setFilterWC(wc); setPage(1) }}
+          <button key={wc} onClick={() => { setFilterWC(wc); setPage(1) }}
             className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${filterWC === wc ? 'border-octagon-red bg-octagon-red/20 text-white' : 'border-octagon-border text-gray-400 hover:border-gray-500'}`}
           >
             {wc}
@@ -166,7 +136,7 @@ export default function RecruitPage() {
       </div>
 
       {error && <p className="text-sm text-octagon-red">{error}</p>}
-      {info && <p className="text-sm text-octagon-teal">{info}</p>}
+      {info  && <p className="text-sm text-octagon-teal">{info}</p>}
 
       {loading ? (
         <p className="text-sm text-gray-400">Memuat database fighter...</p>
@@ -178,16 +148,13 @@ export default function RecruitPage() {
         <>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {visible.map((fighter) => {
-              const isScoutedFighter = scouted.has(fighter.id)
-              const reqRep = requiredReputation(fighter)
+              const reqRep   = requiredReputation(fighter)
               const canRecruit = gym.reputation >= reqRep
-              const candidate = poolFighterToCandidate(fighter)
-              const potLabel = getPotentialLabel(fighter.potential)
-              const fee = scoutFee(fighter)
+              const candidate  = poolFighterToCandidate(fighter)
+              const potLabel   = getPotentialLabel(fighter.potential)
 
               return (
-                <div
-                  key={fighter.id}
+                <div key={fighter.id}
                   className={`rounded-lg border bg-octagon-card p-4 ${!canRecruit ? 'opacity-60' : 'border-octagon-border'}`}
                 >
                   <div className="flex items-start gap-3">
@@ -210,26 +177,17 @@ export default function RecruitPage() {
 
                   <div className="mt-1 flex items-center justify-between text-xs">
                     <span className="text-gray-500">Potensi</span>
-                    {isScoutedFighter
-                      ? <span className={`font-medium ${potLabel.colorClass}`}>{potLabel.label}</span>
-                      : <span className="font-medium text-gray-600">??? (belum di-scout)</span>
-                    }
+                    <span className={`font-medium ${potLabel.colorClass}`}>{potLabel.label}</span>
                   </div>
 
-                  {/* Stat bars */}
                   <div className="mt-3 space-y-1.5">
                     {getCategoryAverages(fighter.attrs).map(({ key, label, value }) => (
                       <div key={key} className="flex items-center gap-2">
                         <span className="w-8 text-[10px] font-medium text-gray-500">{label}</span>
                         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-octagon-dark">
-                          {isScoutedFighter
-                            ? <div className="h-full rounded-full bg-octagon-teal" style={{ width: `${value}%` }} />
-                            : <div className="h-full rounded-full bg-gray-700" style={{ width: '40%' }} />
-                          }
+                          <div className="h-full rounded-full bg-octagon-teal" style={{ width: `${value}%` }} />
                         </div>
-                        <span className="w-6 text-right text-[10px] text-gray-400">
-                          {isScoutedFighter ? value : '?'}
-                        </span>
+                        <span className="w-6 text-right text-[10px] text-gray-400">{value}</span>
                       </div>
                     ))}
                   </div>
@@ -240,35 +198,24 @@ export default function RecruitPage() {
                     </p>
                   )}
 
-                  {scoutTexts[fighter.id] && (
+                  {aiTexts[fighter.id] && (
                     <p className="mt-3 whitespace-pre-line rounded-md border border-octagon-border bg-octagon-dark p-2 text-xs text-gray-300">
-                      {scoutTexts[fighter.id]}
+                      {aiTexts[fighter.id]}
                     </p>
                   )}
 
                   <div className="mt-3 flex gap-2">
-                    {!isScoutedFighter ? (
-                      <button
-                        onClick={() => handleScoutFighter(fighter)}
-                        disabled={scoutingId === fighter.id || !canRecruit || gym.balance < fee}
-                        className="flex-1 rounded-md border border-octagon-border px-3 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:border-octagon-amber hover:text-octagon-amber disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {scoutingId === fighter.id ? 'Memproses...' : `Scout (${formatCurrency(fee)})`}
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => handleAiScout(fighter)}
-                        disabled={scoutingId === fighter.id}
-                        className="flex-1 rounded-md border border-octagon-border px-3 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:border-octagon-teal hover:text-octagon-teal disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {scoutingId === fighter.id ? 'Memuat...' : 'Scouting AI'}
-                      </button>
-                    )}
+                    <button
+                      onClick={() => handleAiScout(fighter)}
+                      disabled={aiLoadingId === fighter.id}
+                      className="flex-1 rounded-md border border-octagon-border px-3 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:border-octagon-teal hover:text-octagon-teal disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {aiLoadingId === fighter.id ? 'Memuat...' : 'Scouting AI'}
+                    </button>
                     <button
                       onClick={() => setNegotiatingId((id) => id === fighter.id ? null : fighter.id)}
-                      disabled={!isScoutedFighter || !canRecruit || signingId === fighter.id}
+                      disabled={!canRecruit || signingId === fighter.id}
                       className="flex-1 rounded-md bg-octagon-red px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-octagon-red/90 disabled:cursor-not-allowed disabled:opacity-40"
-                      title={!isScoutedFighter ? 'Scout dulu sebelum rekrut' : undefined}
                     >
                       {negotiatingId === fighter.id ? 'Tutup' : 'Nego Kontrak'}
                     </button>
@@ -283,7 +230,7 @@ export default function RecruitPage() {
                       signing={signingId === fighter.id}
                       onCancel={() => setNegotiatingId(null)}
                       onAccept={(offer) => handleSignContract(fighter, offer)}
-                      onWalkAway={() => handleWalkAway(fighter)}
+                      onWalkAway={() => { setNegotiatingId(null); setInfo(`${fighter.name} pergi mencari tawaran lain.`) }}
                     />
                   )}
                 </div>
