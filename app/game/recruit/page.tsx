@@ -91,7 +91,7 @@ export default function RecruitPage() {
         age: candidate.age,
         hometown: candidate.hometown,
         weight_class: candidate.weight_class,
-        status: 'prospect',
+        status: 'training',
         specialty: candidate.specialty,
         personality: candidate.personality,
         attrs: candidate.attrs,
