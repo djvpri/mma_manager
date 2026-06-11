@@ -117,7 +117,7 @@ export default function GymPage() {
           <p className="mt-1 text-lg font-bold text-octagon-teal">{gym.reputation}/100</p>
         </div>
         <div className="rounded-lg border border-octagon-border bg-octagon-card p-4">
-          <p className="text-xs text-gray-400">Pemasukan / Pengeluaran</p>
+          <p className="text-xs text-gray-400">Pemasukan / Pengeluaran per Minggu</p>
           <p className="mt-1 text-sm font-semibold text-white">
             {formatCurrency(gym.monthly_income)} / {formatCurrency(gym.monthly_expense)}
           </p>

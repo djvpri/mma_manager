@@ -209,7 +209,7 @@ export default function RecruitPage() {
                 </div>
 
                 <div className="mt-3 flex items-center justify-between text-sm">
-                  <span className="text-xs text-gray-400">Perkiraan gaji/bulan</span>
+                  <span className="text-xs text-gray-400">Perkiraan gaji/minggu</span>
                   <span className="font-medium text-white">{formatCurrency(candidate.salary_monthly)}</span>
                 </div>
                 <div className="mt-1 flex items-center justify-between text-sm">

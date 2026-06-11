@@ -135,7 +135,7 @@ export default function StaffPage() {
           <p className="text-sm text-gray-400">
             Saldo: <span className="font-semibold text-octagon-amber">{formatCurrency(gym.balance)}</span>
             {' · '}
-            Pengeluaran/bulan: <span className="font-semibold text-white">{formatCurrency(gym.monthly_expense)}</span>
+            Pengeluaran/minggu: <span className="font-semibold text-white">{formatCurrency(gym.monthly_expense)}</span>
           </p>
         </div>
         <button
@@ -168,7 +168,7 @@ export default function StaffPage() {
                   {member.role} · {member.specialty}
                 </p>
                 <div className="mt-3 flex items-center justify-between text-sm">
-                  <span className="text-xs text-gray-400">Gaji/bulan</span>
+                  <span className="text-xs text-gray-400">Gaji/minggu</span>
                   <span className="font-medium text-white">{formatCurrency(member.salary)}</span>
                 </div>
                 <button
@@ -207,7 +207,7 @@ export default function StaffPage() {
                     {candidate.role} · {candidate.specialty}
                   </p>
                   <div className="mt-3 flex items-center justify-between text-sm">
-                    <span className="text-xs text-gray-400">Gaji/bulan</span>
+                    <span className="text-xs text-gray-400">Gaji/minggu</span>
                     <span className="font-medium text-white">{formatCurrency(candidate.salary)}</span>
                   </div>
                   <div className="mt-1 flex items-center justify-between text-sm">

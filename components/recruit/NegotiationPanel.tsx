@@ -50,7 +50,7 @@ export default function NegotiationPanel({
     setRound(nextRound)
     setLog((l) => [
       ...l,
-      `Tawaranmu: ${formatCurrency(offer.salary)}/bulan, bonus ${formatCurrency(offer.bonus)}, kontrak ${offer.contractLength}x.`,
+      `Tawaranmu: ${formatCurrency(offer.salary)}/minggu, bonus ${formatCurrency(offer.bonus)}, kontrak ${offer.contractLength}x.`,
       result.message,
     ])
 
@@ -97,7 +97,7 @@ export default function NegotiationPanel({
         <>
           <div>
             <div className="mb-1 flex items-center justify-between text-[10px] text-gray-400">
-              <span>Gaji Bulanan</span>
+              <span>Gaji Mingguan</span>
               <span className="font-semibold text-white">{formatCurrency(offer.salary)}</span>
             </div>
             <input
@@ -183,7 +183,7 @@ export default function NegotiationPanel({
         <div className="space-y-2">
           <p className="text-xs font-semibold text-octagon-teal">Kesepakatan tercapai!</p>
           <p className="text-[11px] text-gray-300">
-            Gaji {formatCurrency(finalOffer.salary)}/bulan · Bonus tanda tangan {formatCurrency(finalOffer.bonus)} ·
+            Gaji {formatCurrency(finalOffer.salary)}/minggu · Bonus tanda tangan {formatCurrency(finalOffer.bonus)} ·
             Kontrak {finalOffer.contractLength}x pertarungan
           </p>
           {insufficientBalance && (
