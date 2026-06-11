@@ -181,7 +181,7 @@ export const useGameStore = create<GameStore>()(
         set((s) => ({ fight: { ...defaultFight, fighter: s.fight.fighter } })),
     }),
     {
-      name: 'mma-manager-game',
+      name: 'mma-manager-game-v2',
       partialize: (s) => ({ gym: s.gym, fighters: s.fighters }),
     }
   )

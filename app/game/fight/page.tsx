@@ -330,7 +330,7 @@ export default function FightPage() {
   )
   // Fighter yang terdaftar di salah satu event minggu ini (via slots)
   const registeredThisWeek = todaysEvents.flatMap((e) =>
-    e.slots.filter((s) => s.fighter_id !== null).map((s) => s.fighter_id!)
+    (e.slots ?? []).filter((s) => s.fighter_id !== null).map((s) => s.fighter_id!)
   )
   const eligibleFighters = cooldownReady.filter((f) => registeredThisWeek.includes(f.id))
   const unscheduledFighters = cooldownReady.filter((f) => !registeredThisWeek.includes(f.id))
@@ -382,8 +382,8 @@ export default function FightPage() {
     const result = calculateFightResult(fight.roundResults)
     const isFinish = result.method !== 'decision'
     // Cari event & slot fighter ini
-    const event = gym.events.find((e) => e.slots.some((s) => s.fighter_id === fighter.id)) ?? null
-    const slot  = event?.slots.find((s) => s.fighter_id === fighter.id) ?? null
+    const event = gym.events.find((e) => (e.slots ?? []).some((s) => s.fighter_id === fighter.id)) ?? null
+    const slot  = event?.slots?.find((s) => s.fighter_id === fighter.id) ?? null
     const tierConfig = EVENT_TIER_CONFIG[event?.tier ?? 'regional']
     const slotPurseMult = slot?.purse_mult ?? 1.0
 
@@ -471,7 +471,7 @@ export default function FightPage() {
       ? gym.events.map((e) =>
           e.id !== event.id ? e : {
             ...e,
-            slots: e.slots.map((s) =>
+            slots: (e.slots ?? []).map((s) =>
               s.fighter_id === fighter.id ? { ...s, fighter_id: null, opponent: null } : s
             ),
           }
@@ -558,9 +558,9 @@ export default function FightPage() {
 
     // Cari lawan yang sudah di-booking di event slot
     const eventForFighter = todaysEvents.find((e) =>
-      e.slots.some((s) => s.fighter_id === fighter.id)
+      (e.slots ?? []).some((s) => s.fighter_id === fighter.id)
     )
-    const slot = eventForFighter?.slots.find((s) => s.fighter_id === fighter.id)
+    const slot = eventForFighter?.slots?.find((s) => s.fighter_id === fighter.id)
     const bookedOpponent = slot?.opponent
 
     // Gunakan lawan yang sudah di-booking, atau fallback ke generate random
