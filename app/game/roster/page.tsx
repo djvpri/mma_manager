@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { useGameStore } from '@/store/game-store'
 import FighterCard from '@/components/roster/FighterCard'
@@ -15,11 +16,15 @@ export default function RosterPage() {
   const setGym = useGameStore((s) => s.setGym)
   const setFighters = useGameStore((s) => s.setFighters)
 
+  const router = useRouter()
   const [advancing, setAdvancing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [report, setReport] = useState<WeeklyReport | null>(null)
 
   const activeFighters = fighters.filter((f) => f.status !== 'retired')
+  const pendingFight = gym
+    ? activeFighters.find((f) => f.next_fight_week === gym.season_week) ?? null
+    : null
 
   async function handleAdvanceWeek() {
     if (!gym) return
@@ -82,21 +87,36 @@ export default function RosterPage() {
       </header>
 
       {gym && (
-        <div className="mb-6 rounded-lg border border-octagon-border bg-octagon-card p-4">
+        <div className={`mb-6 rounded-lg border bg-octagon-card p-4 ${pendingFight ? 'border-octagon-amber/50' : 'border-octagon-border'}`}>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-sm font-semibold text-white">Minggu ke-{gym.season_week}</p>
-              <p className="text-xs text-gray-400">
-                Saldo akan bertambah/berkurang sesuai pemasukan-pengeluaran, dan training load fighter akan pulih.
-              </p>
+              {pendingFight ? (
+                <p className="text-xs text-octagon-amber">
+                  ⚡ {pendingFight.name} dijadwalkan bertanding minggu ini — selesaikan fight night dulu!
+                </p>
+              ) : (
+                <p className="text-xs text-gray-400">
+                  Saldo akan bertambah/berkurang sesuai pemasukan-pengeluaran, dan training load fighter akan pulih.
+                </p>
+              )}
             </div>
-            <button
-              onClick={handleAdvanceWeek}
-              disabled={advancing}
-              className="shrink-0 rounded-md bg-octagon-red px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-octagon-red/90 disabled:opacity-50"
-            >
-              {advancing ? 'Memproses...' : `Lanjut ke Minggu ${gym.season_week + 1}`}
-            </button>
+            {pendingFight ? (
+              <button
+                onClick={() => router.push('/game/fight')}
+                className="shrink-0 rounded-md bg-octagon-amber px-4 py-2 text-sm font-semibold text-black transition-colors hover:bg-octagon-amber/90"
+              >
+                Fight Night →
+              </button>
+            ) : (
+              <button
+                onClick={handleAdvanceWeek}
+                disabled={advancing}
+                className="shrink-0 rounded-md bg-octagon-red px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-octagon-red/90 disabled:opacity-50"
+              >
+                {advancing ? 'Memproses...' : `Lanjut ke Minggu ${gym.season_week + 1}`}
+              </button>
+            )}
           </div>
         </div>
       )}
