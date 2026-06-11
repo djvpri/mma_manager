@@ -67,6 +67,16 @@ export function IconRecruit(props: React.SVGProps<SVGSVGElement>) {
   )
 }
 
+export function IconFinance(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="M3 10h18" />
+      <path d="M7 15h4" />
+    </svg>
+  )
+}
+
 export function IconRefresh(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -92,6 +102,7 @@ export const NAV_ITEMS = [
   { href: '/game/roster', label: 'Roster', icon: IconRoster },
   { href: '/game/fight', label: 'Fight Night', icon: IconFight },
   { href: '/game/gym', label: 'Gym', icon: IconGym },
+  { href: '/game/finance', label: 'Keuangan', icon: IconFinance },
   { href: '/game/staff', label: 'Staf', icon: IconStaff },
   { href: '/game/recruit', label: 'Rekrutmen', icon: IconRecruit },
   { href: '/game/leaderboard', label: 'Leaderboard', icon: IconLeaderboard },
