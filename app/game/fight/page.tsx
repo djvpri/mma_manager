@@ -302,12 +302,24 @@ export default function FightPage() {
     const newTrainingLoad = Math.min(100, fighter.training_load + 25)
     const newContractFightsLeft = Math.max(0, fighter.contract_fights_left - 1)
     const newNextFightWeek = gym.season_week + randInt(1, 3)
-    const newBalance = gym.balance + purse
-    const newReputation = Math.max(0, Math.min(100, gym.reputation + reputationChange))
     const finishRound = fight.roundResults.find((r) => r.finish)?.round ?? null
     // Fisioterapis: kurangi risiko cedera pasca-tanding
     const injuryReduction = specialties.includes('Pemulihan Cedera') ? 0.3 : 0
     const injury = rollInjury(result.winner, isFinish, injuryReduction)
+
+    // Win bonus dibayar ke fighter (mengurangi balance gym) tiap kali menang
+    const winBonusPaid = result.winner === 'my' ? fighter.win_bonus : 0
+    const newWinStreak = result.winner === 'my' ? fighter.win_streak + 1 : 0
+    const titleShotTriggered =
+      fighter.title_shot_clause && !fighter.title_shot_pending && newWinStreak >= 3
+
+    let reputationBonus = 0
+    if (titleShotTriggered) {
+      reputationBonus = 8
+    }
+
+    const newBalance = gym.balance + purse - winBonusPaid
+    const newReputation = Math.max(0, Math.min(100, gym.reputation + reputationChange + reputationBonus))
 
     const [insertRes, fighterRes, gymRes] = await Promise.all([
       supabase.from('fight_results').insert({
@@ -329,6 +341,8 @@ export default function FightPage() {
           training_load: newTrainingLoad,
           contract_fights_left: newContractFightsLeft,
           next_fight_week: newNextFightWeek,
+          win_streak: newWinStreak,
+          ...(titleShotTriggered ? { title_shot_pending: true } : {}),
           ...(injury
             ? { status: 'injured', injury: injury.name, injury_weeks_left: injury.weeks }
             : {}),
@@ -356,7 +370,7 @@ export default function FightPage() {
       if (state.gym) syncLeaderboard(state.gym, state.fighters)
     }
 
-    setFightResultSummary(purse, reputationChange, newRecord, injury)
+    setFightResultSummary(purse, reputationChange + reputationBonus, newRecord, injury, winBonusPaid, titleShotTriggered)
     setSavingResult(false)
   }
 
@@ -949,10 +963,24 @@ export default function FightPage() {
                       {fight.fightSummary.newRecord.w}-{fight.fightSummary.newRecord.l}-{fight.fightSummary.newRecord.d}
                     </span>
                   </div>
+                  {fight.fightSummary.winBonusPaid > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-400">Win Bonus untuk {fight.fighter!.name.split(' ')[0]}</span>
+                      <span className="font-semibold text-octagon-red">
+                        -{formatCurrency(fight.fightSummary.winBonusPaid)}
+                      </span>
+                    </div>
+                  )}
                   {fight.fightSummary.injury && (
                     <div className="mt-2 rounded-md bg-octagon-red/10 px-3 py-2 text-octagon-red">
                       ⚠ {fight.fighter!.name.split(' ')[0]} mengalami {fight.fightSummary.injury.name} — pulih
                       dalam {fight.fightSummary.injury.weeks} minggu.
+                    </div>
+                  )}
+                  {fight.fightSummary.titleShotTriggered && (
+                    <div className="mt-2 rounded-md bg-octagon-amber/10 px-3 py-2 text-octagon-amber">
+                      🏆 {fight.fighter!.name.split(' ')[0]} menang 3x beruntun dan menuntut Title Shot sesuai
+                      klausul kontrak! Reputasi gym naik tambahan.
                     </div>
                   )}
                 </div>

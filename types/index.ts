@@ -77,6 +77,11 @@ export interface Fighter {
   injury_weeks_left: number | null
   contract_fights_left: number
   salary_monthly: number
+  win_bonus: number
+  title_shot_clause: boolean
+  buyout_clause: number
+  win_streak: number
+  title_shot_pending: boolean
   avatar_seed: number
   avatar_url: string | null
   next_fight_week: number | null

@@ -30,6 +30,9 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
   const { record, attrs } = fighter
   const renewalCost = Math.round((fighter.salary_monthly * 4) / 500_000) * 500_000
   const newSalary = Math.round((fighter.salary_monthly * 1.1) / 100_000) * 100_000
+  const newWinBonus = Math.round((fighter.win_bonus * 1.1) / 100_000) * 100_000
+  const isUnderContract = fighter.status !== 'retired' && fighter.contract_fights_left > 0
+  const buyoutCost = isUnderContract ? fighter.buyout_clause : 0
   const potentialLabel = getPotentialLabel(fighter.potential)
   const updateFighter = useGameStore((s) => s.updateFighter)
   const removeFighter = useGameStore((s) => s.removeFighter)
@@ -90,7 +93,7 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
 
     const { error: fighterError } = await supabase
       .from('fighters')
-      .update({ contract_fights_left: 3, salary_monthly: newSalary })
+      .update({ contract_fights_left: 3, salary_monthly: newSalary, win_bonus: newWinBonus })
       .eq('id', fighter.id)
 
     if (fighterError) {
@@ -112,7 +115,7 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
       return
     }
 
-    updateFighter(fighter.id, { contract_fights_left: 3, salary_monthly: newSalary })
+    updateFighter(fighter.id, { contract_fights_left: 3, salary_monthly: newSalary, win_bonus: newWinBonus })
     setGym({ ...gym, balance: newBalance, monthly_expense: newExpense })
     setRenewing(false)
   }
@@ -120,6 +123,12 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
   async function handleReleaseFighter() {
     if (!gym) return
     setReleaseError(null)
+
+    if (buyoutCost > 0 && gym.balance < buyoutCost) {
+      setReleaseError(`Saldo tidak cukup untuk membayar klausul buyout (${formatCurrency(buyoutCost)}).`)
+      return
+    }
+
     setReleasing(true)
     const supabase = createClient()
 
@@ -130,10 +139,11 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
       return
     }
 
+    const newBalance = gym.balance - buyoutCost
     const newExpense = Math.max(0, gym.monthly_expense - fighter.salary_monthly)
     const { error: gymError } = await supabase
       .from('gyms')
-      .update({ monthly_expense: newExpense })
+      .update({ balance: newBalance, monthly_expense: newExpense })
       .eq('id', gym.id)
 
     if (gymError) {
@@ -142,7 +152,7 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
       return
     }
 
-    setGym({ ...gym, monthly_expense: newExpense })
+    setGym({ ...gym, balance: newBalance, monthly_expense: newExpense })
     removeFighter(fighter.id)
   }
 
@@ -260,12 +270,34 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
       )}
 
       {fighter.status !== 'retired' && (
-        <div className="mt-3 text-xs text-gray-400">
-          Kontrak:{' '}
-          <span className={fighter.contract_fights_left <= 1 ? 'font-semibold text-octagon-red' : 'text-gray-200'}>
-            {fighter.contract_fights_left} pertarungan tersisa
-          </span>
+        <div className="mt-3 space-y-1 text-xs text-gray-400">
+          <div className="flex items-center justify-between">
+            <span>Kontrak</span>
+            <span className={fighter.contract_fights_left <= 1 ? 'font-semibold text-octagon-red' : 'text-gray-200'}>
+              {fighter.contract_fights_left} pertarungan tersisa
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span>Win Bonus</span>
+            <span className="text-gray-200">{formatCurrency(fighter.win_bonus)}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span>Klausul Buyout</span>
+            <span className="text-gray-200">{formatCurrency(fighter.buyout_clause)}</span>
+          </div>
+          {fighter.title_shot_clause && (
+            <div className="flex items-center justify-between">
+              <span>Win Streak</span>
+              <span className="text-gray-200">{fighter.win_streak}x</span>
+            </div>
+          )}
         </div>
+      )}
+
+      {fighter.title_shot_pending && (
+        <p className="mt-2 text-xs font-semibold text-octagon-amber">
+          🏆 Berhak menuntut Title Shot sesuai klausul kontrak.
+        </p>
       )}
 
       {fighter.status !== 'retired' && fighter.contract_fights_left <= 1 && (
@@ -334,11 +366,12 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
         <div className="mt-3 rounded-md border border-octagon-red/30 bg-octagon-red/10 p-2">
           <p className="text-xs text-octagon-red">
             Yakin putus kontrak {fighter.name}? Fighter akan keluar dari roster secara permanen.
+            {buyoutCost > 0 && ` Gym akan membayar klausul buyout sebesar ${formatCurrency(buyoutCost)}.`}
           </p>
           <div className="mt-2 flex gap-2">
             <button
               onClick={handleReleaseFighter}
-              disabled={releasing}
+              disabled={releasing || (gym ? gym.balance < buyoutCost : false)}
               className="flex-1 rounded-md bg-octagon-red px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-octagon-red/90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {releasing ? 'Memproses...' : 'Ya, Putus Kontrak'}

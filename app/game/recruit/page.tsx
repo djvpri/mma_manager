@@ -99,7 +99,12 @@ export default function RecruitPage() {
         potential: candidate.potential,
         avatar_seed: candidate.avatar_seed,
         salary_monthly: offer.salary,
+        win_bonus: offer.winBonus,
         contract_fights_left: offer.contractLength,
+        title_shot_clause: offer.titleShotClause,
+        buyout_clause: offer.buyoutClause,
+        win_streak: 0,
+        title_shot_pending: false,
       })
       .select()
       .single()

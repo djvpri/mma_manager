@@ -42,7 +42,10 @@ export default function NegotiationPanel({
 
   const salaryMin = Math.round((candidate.salary_monthly * 0.5) / 100_000) * 100_000
   const salaryMax = Math.round((candidate.salary_monthly * 1.8) / 100_000) * 100_000
+  const winBonusMax = Math.round((candidate.salary_monthly * 2.5) / 100_000) * 100_000
   const bonusMax = Math.round((candidate.cost * 1.8) / 500_000) * 500_000
+  const buyoutMin = Math.round((candidate.salary_monthly * 2) / 500_000) * 500_000
+  const buyoutMax = Math.round((candidate.salary_monthly * 15) / 500_000) * 500_000
 
   function handleSubmit() {
     const nextRound = round + 1
@@ -50,7 +53,7 @@ export default function NegotiationPanel({
     setRound(nextRound)
     setLog((l) => [
       ...l,
-      `Tawaranmu: ${formatCurrency(offer.salary)}/minggu, bonus ${formatCurrency(offer.bonus)}, kontrak ${offer.contractLength}x.`,
+      `Tawaranmu: ${formatCurrency(offer.salary)}/minggu, win bonus ${formatCurrency(offer.winBonus)}, bonus tanda tangan ${formatCurrency(offer.bonus)}, kontrak ${offer.contractLength}x${offer.titleShotClause ? ', dengan klausul Title Shot' : ''}.`,
       result.message,
     ])
 
@@ -97,7 +100,7 @@ export default function NegotiationPanel({
         <>
           <div>
             <div className="mb-1 flex items-center justify-between text-[10px] text-gray-400">
-              <span>Gaji Mingguan</span>
+              <span>Base Purse (Gaji Mingguan)</span>
               <span className="font-semibold text-white">{formatCurrency(offer.salary)}</span>
             </div>
             <input
@@ -107,6 +110,22 @@ export default function NegotiationPanel({
               step={100_000}
               value={offer.salary}
               onChange={(e) => setOffer((o) => ({ ...o, salary: Number(e.target.value) }))}
+              className="w-full accent-octagon-red"
+            />
+          </div>
+
+          <div>
+            <div className="mb-1 flex items-center justify-between text-[10px] text-gray-400">
+              <span>Win Bonus (per kemenangan)</span>
+              <span className="font-semibold text-white">{formatCurrency(offer.winBonus)}</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={winBonusMax}
+              step={100_000}
+              value={offer.winBonus}
+              onChange={(e) => setOffer((o) => ({ ...o, winBonus: Number(e.target.value) }))}
               className="w-full accent-octagon-red"
             />
           </div>
@@ -150,6 +169,38 @@ export default function NegotiationPanel({
             </div>
           </div>
 
+          <div>
+            <div className="mb-1 flex items-center justify-between text-[10px] text-gray-400">
+              <span>Klausul Buyout</span>
+              <span className="font-semibold text-white">{formatCurrency(offer.buyoutClause)}</span>
+            </div>
+            <input
+              type="range"
+              min={buyoutMin}
+              max={buyoutMax}
+              step={500_000}
+              value={offer.buyoutClause}
+              onChange={(e) => setOffer((o) => ({ ...o, buyoutClause: Number(e.target.value) }))}
+              className="w-full accent-octagon-red"
+            />
+            <p className="mt-1 text-[10px] text-gray-500">
+              Biaya yang harus dibayar gym jika memutus kontrak {candidate.name.split(' ')[0]} sebelum kontrak berakhir.
+            </p>
+          </div>
+
+          <label className="flex items-center justify-between gap-2 rounded-md border border-octagon-border px-2.5 py-2 text-[10px] text-gray-300">
+            <span>
+              Klausul Title Shot
+              <span className="block text-gray-500">Menang 3x beruntun → berhak menuntut laga juara.</span>
+            </span>
+            <input
+              type="checkbox"
+              checked={offer.titleShotClause}
+              onChange={(e) => setOffer((o) => ({ ...o, titleShotClause: e.target.checked }))}
+              className="h-4 w-4 shrink-0 accent-octagon-red"
+            />
+          </label>
+
           <div className="flex gap-2">
             {counterOffer && (
               <button
@@ -183,8 +234,10 @@ export default function NegotiationPanel({
         <div className="space-y-2">
           <p className="text-xs font-semibold text-octagon-teal">Kesepakatan tercapai!</p>
           <p className="text-[11px] text-gray-300">
-            Gaji {formatCurrency(finalOffer.salary)}/minggu · Bonus tanda tangan {formatCurrency(finalOffer.bonus)} ·
-            Kontrak {finalOffer.contractLength}x pertarungan
+            Base Purse {formatCurrency(finalOffer.salary)}/minggu · Win bonus {formatCurrency(finalOffer.winBonus)} ·
+            Bonus tanda tangan {formatCurrency(finalOffer.bonus)} · Kontrak {finalOffer.contractLength}x pertarungan ·
+            Buyout {formatCurrency(finalOffer.buyoutClause)}
+            {finalOffer.titleShotClause ? ' · Klausul Title Shot' : ''}
           </p>
           {insufficientBalance && (
             <p className="text-[10px] text-octagon-red">Saldo tidak cukup untuk membayar bonus tanda tangan.</p>
