@@ -10,6 +10,7 @@ export interface WeeklyReport {
   growth: { name: string; attr: string; from: number; to: number }[]
   contractWarnings: string[]
   birthdays: string[]
+  randomEvents: string[]
 }
 
 export function buildWeeklyReport(
@@ -17,7 +18,8 @@ export function buildWeeklyReport(
   next: Fighter[],
   prevBalance: number,
   newBalance: number,
-  newWeek: number
+  newWeek: number,
+  randomEvents: string[] = []
 ): WeeklyReport {
   const prevById = new Map(prev.map((f) => [f.id, f]))
   const retirements: WeeklyReport['retirements'] = []
@@ -64,5 +66,6 @@ export function buildWeeklyReport(
     growth,
     contractWarnings,
     birthdays,
+    randomEvents,
   }
 }

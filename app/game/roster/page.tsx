@@ -105,9 +105,12 @@ export default function RosterPage() {
       return
     }
 
-    const [gymRes, fightersRes] = await Promise.all([
+    const newWeek = gym.season_week + 1
+
+    const [gymRes, fightersRes, newsRes] = await Promise.all([
       supabase.from('gyms').select('*').eq('id', gym.id).single(),
       supabase.from('fighters').select('*').eq('gym_id', gym.id).order('created_at'),
+      supabase.from('fighter_news').select('message').eq('gym_id', gym.id).eq('season_week', newWeek),
     ])
 
     if (gymRes.error) setError(gymRes.error.message)
@@ -122,7 +125,8 @@ export default function RosterPage() {
           newFighters,
           prevBalance,
           gymRes.data?.balance ?? prevBalance,
-          gymRes.data?.season_week ?? gym.season_week + 1
+          gymRes.data?.season_week ?? newWeek,
+          (newsRes.data ?? []).map((n) => n.message as string)
         )
       )
     }
@@ -247,6 +251,17 @@ export default function RosterPage() {
               <ul className="mt-1 space-y-0.5 text-xs text-octagon-amber">
                 {report.birthdays.map((name, i) => (
                   <li key={i}>🎂 {name} merayakan ulang tahun minggu ini. Moral sedikit meningkat.</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {report.randomEvents.length > 0 && (
+            <div className="mt-2">
+              <p className="text-xs font-semibold text-gray-300">Kejadian Minggu Ini</p>
+              <ul className="mt-1 space-y-0.5 text-xs text-gray-300">
+                {report.randomEvents.map((msg, i) => (
+                  <li key={i}>{msg}</li>
                 ))}
               </ul>
             </div>
