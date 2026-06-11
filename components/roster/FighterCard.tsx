@@ -73,6 +73,8 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
   const gym = useGameStore((s) => s.gym)
   const setGym = useGameStore((s) => s.setGym)
   const seasonWeek = gym?.season_week ?? 1
+  const weeksToFight = fighter.next_fight_week !== null ? fighter.next_fight_week - seasonWeek : null
+  const isInFightCamp = weeksToFight !== null && weeksToFight >= 1 && weeksToFight <= 4
   const [generating, setGenerating] = useState(false)
   const [genError, setGenError] = useState<string | null>(null)
   const [showHistory, setShowHistory] = useState(false)
@@ -293,7 +295,14 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
 
       {fighter.status === 'training' && (
         <div className="mt-3">
-          <p className="mb-1.5 text-[10px] font-medium text-gray-400">Jadwal Latihan</p>
+          <div className="mb-1.5 flex items-center justify-between">
+            <p className="text-[10px] font-medium text-gray-400">Jadwal Latihan</p>
+            {isInFightCamp && (
+              <span className="rounded border border-octagon-teal/40 bg-octagon-teal/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-octagon-teal">
+                Fight Camp
+              </span>
+            )}
+          </div>
           <div className="grid grid-cols-3 gap-x-2 gap-y-2">
             {SCHEDULE_DAYS.map(({ key, label }) => {
               const schedule = fighter.weekly_schedule ?? DEFAULT_SCHEDULE
@@ -353,7 +362,9 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
         </p>
       )}
       {fighter.next_fight_week !== null && fighter.next_fight_week > seasonWeek && (
-        <p className="mt-3 text-xs text-octagon-amber">📅 Siap bertanding minggu ke-{fighter.next_fight_week}</p>
+        <p className={`mt-3 text-xs ${isInFightCamp ? 'font-semibold text-octagon-teal' : 'text-octagon-amber'}`}>
+          {isInFightCamp ? `⚡ Fight Camp · ${weeksToFight} minggu lagi` : `📅 Bertanding minggu ke-${fighter.next_fight_week} · ${weeksToFight} minggu lagi`}
+        </p>
       )}
 
       {fighter.status !== 'retired' && (
