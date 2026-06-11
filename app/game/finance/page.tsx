@@ -39,6 +39,8 @@ export default function FinancePage() {
   const staffSalaries = (staff ?? []).reduce((sum, s) => sum + s.salary, 0)
 
   const netCurrent = gym.monthly_income - gym.monthly_expense
+  const commissionRate = 0.1 + (gym.reputation / 100) * 0.1
+  const hasFisioterapis = (staff ?? []).some((s) => s.specialty === 'Pemulihan Cedera')
 
   return (
     <div className="space-y-6">
@@ -116,6 +118,29 @@ export default function FinancePage() {
             <span className="text-gray-200">Total pengeluaran</span>
             <span className="text-octagon-red">{formatCurrency(gym.monthly_expense)}</span>
           </div>
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-octagon-border bg-octagon-card p-4">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-400">Cash Flow Pertandingan</h2>
+        <div className="mt-3 space-y-2 text-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-gray-300">
+              Komisi Promotor ({Math.round(commissionRate * 100)}% dari purse, naik seiring reputasi)
+            </span>
+            <span className="text-octagon-teal">+{Math.round(commissionRate * 100)}%</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-gray-300">
+              Biaya Medis (per cedera, {formatCurrency(1_000_000)}/minggu pemulihan
+              {hasFisioterapis ? ', didiskon 30% oleh Fisioterapis' : ''})
+            </span>
+            <span className="text-octagon-red">{hasFisioterapis ? '-70%' : '-100%'}</span>
+          </div>
+          <p className="text-xs text-gray-500">
+            Komisi dan biaya medis dihitung per pertandingan, tidak termasuk dalam pemasukan/pengeluaran mingguan
+            di atas. Lihat ringkasan di layar hasil pertarungan.
+          </p>
         </div>
       </div>
 

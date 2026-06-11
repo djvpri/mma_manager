@@ -294,6 +294,10 @@ export default function FightPage() {
       purse = Math.round((purse * 1.15) / 100_000) * 100_000
     }
 
+    // Komisi Promotor: potongan 10-20% dari purse, naik seiring reputasi gym
+    const commissionRate = 0.1 + (gym.reputation / 100) * 0.1
+    const commission = Math.round((purse * commissionRate) / 100_000) * 100_000
+
     const newRecord = {
       w: fighter.record.w + (result.winner === 'my' ? 1 : 0),
       l: fighter.record.l + (result.winner === 'opp' ? 1 : 0),
@@ -318,7 +322,11 @@ export default function FightPage() {
       reputationBonus = 8
     }
 
-    const newBalance = gym.balance + purse - winBonusPaid
+    // Biaya Medis: upkeep cost saat fighter cedera, didiskon Fisioterapis
+    const medicalDiscount = specialties.includes('Pemulihan Cedera') ? 0.3 : 0
+    const medicalCost = injury ? Math.round(injury.weeks * 1_000_000 * (1 - medicalDiscount)) : 0
+
+    const newBalance = gym.balance + purse + commission - winBonusPaid - medicalCost
     const newReputation = Math.max(0, Math.min(100, gym.reputation + reputationChange + reputationBonus))
 
     const [insertRes, fighterRes, gymRes] = await Promise.all([
@@ -370,7 +378,16 @@ export default function FightPage() {
       if (state.gym) syncLeaderboard(state.gym, state.fighters)
     }
 
-    setFightResultSummary(purse, reputationChange + reputationBonus, newRecord, injury, winBonusPaid, titleShotTriggered)
+    setFightResultSummary(
+      purse,
+      reputationChange + reputationBonus,
+      newRecord,
+      injury,
+      winBonusPaid,
+      titleShotTriggered,
+      commission,
+      medicalCost
+    )
     setSavingResult(false)
   }
 
@@ -942,6 +959,14 @@ export default function FightPage() {
                       +{formatCurrency(fight.fightSummary.purse)}
                     </span>
                   </div>
+                  {fight.fightSummary.commission > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-400">Komisi Promotor</span>
+                      <span className="font-semibold text-octagon-amber">
+                        +{formatCurrency(fight.fightSummary.commission)}
+                      </span>
+                    </div>
+                  )}
                   <div className="flex items-center justify-between">
                     <span className="text-gray-400">Reputasi Gym</span>
                     <span
@@ -968,6 +993,14 @@ export default function FightPage() {
                       <span className="text-gray-400">Win Bonus untuk {fight.fighter!.name.split(' ')[0]}</span>
                       <span className="font-semibold text-octagon-red">
                         -{formatCurrency(fight.fightSummary.winBonusPaid)}
+                      </span>
+                    </div>
+                  )}
+                  {fight.fightSummary.medicalCost > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-400">Biaya Medis</span>
+                      <span className="font-semibold text-octagon-red">
+                        -{formatCurrency(fight.fightSummary.medicalCost)}
                       </span>
                     </div>
                   )}

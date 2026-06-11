@@ -33,6 +33,8 @@ interface FightState {
     injury: { name: string; weeks: number } | null
     winBonusPaid: number
     titleShotTriggered: boolean
+    commission: number
+    medicalCost: number
   } | null
 }
 
@@ -68,7 +70,9 @@ interface GameStore {
     newRecord: Fighter['record'],
     injury: { name: string; weeks: number } | null,
     winBonusPaid: number,
-    titleShotTriggered: boolean
+    titleShotTriggered: boolean,
+    commission: number,
+    medicalCost: number
   ) => void
   advanceRound: () => void
   resetFight: () => void
@@ -137,12 +141,30 @@ export const useGameStore = create<GameStore>()(
         set((s) => ({ fight: { ...s.fight, aiNarration: text } })),
       setAiLoading: (loading) =>
         set((s) => ({ fight: { ...s.fight, aiLoading: loading } })),
-      setFightResultSummary: (purse, reputationChange, newRecord, injury, winBonusPaid, titleShotTriggered) =>
+      setFightResultSummary: (
+        purse,
+        reputationChange,
+        newRecord,
+        injury,
+        winBonusPaid,
+        titleShotTriggered,
+        commission,
+        medicalCost
+      ) =>
         set((s) => ({
           fight: {
             ...s.fight,
             resultSaved: true,
-            fightSummary: { purse, reputationChange, newRecord, injury, winBonusPaid, titleShotTriggered },
+            fightSummary: {
+              purse,
+              reputationChange,
+              newRecord,
+              injury,
+              winBonusPaid,
+              titleShotTriggered,
+              commission,
+              medicalCost,
+            },
           },
         })),
       advanceRound: () =>
