@@ -192,7 +192,7 @@ function generateTicks(
     return { text: `${line}.`, my_dmg: myDmg, opp_dmg: oppDmg }
   })
 
-  if (finish) {
+  if (finish && finish !== 'decision') {
     exchanges[exchanges.length - 1].text = FINISH_LINES[finish](winnerName, loserName)
   }
 
