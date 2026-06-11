@@ -7,6 +7,7 @@ import { useGameStore } from '@/store/game-store'
 import { generateFighterAvatar } from '@/lib/ai-avatar'
 import { createClient } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/format'
+import { getPotentialLabel } from '@/lib/potential'
 
 const STATUS_STYLES: Record<Fighter['status'], string> = {
   active: 'border-octagon-teal/30 bg-octagon-teal/15 text-octagon-teal',
@@ -44,6 +45,7 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
   const { record, attrs } = fighter
   const renewalCost = Math.round((fighter.salary_monthly * 4) / 500_000) * 500_000
   const newSalary = Math.round((fighter.salary_monthly * 1.1) / 100_000) * 100_000
+  const potentialLabel = getPotentialLabel(fighter.potential)
   const updateFighter = useGameStore((s) => s.updateFighter)
   const gym = useGameStore((s) => s.gym)
   const setGym = useGameStore((s) => s.setGym)
@@ -185,6 +187,11 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
           </span>
         </span>
         <span className="text-xs text-gray-500">{fighter.personality}</span>
+      </div>
+
+      <div className="mt-1 flex items-center justify-between text-xs">
+        <span className="text-gray-500">Potensi</span>
+        <span className={`font-medium ${potentialLabel.colorClass}`}>{potentialLabel.label}</span>
       </div>
 
       <div className="mt-3 space-y-1.5">
