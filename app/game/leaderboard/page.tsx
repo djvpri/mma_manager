@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useGameStore } from '@/store/game-store'
 import { overallRating } from '@/lib/attrs'
+import FighterDetailModal from '@/components/roster/FighterDetailModal'
 import type { Championship, Fighter, WeightClass } from '@/types'
 
 // ─── Gym tier system ─────────────────────────────────────────────────────────
@@ -49,6 +50,7 @@ export default function LeaderboardPage() {
     () => fighters.find((f) => f.status !== 'retired')?.weight_class ?? 'Flyweight'
   )
   const [error, setError]           = useState<string | null>(null)
+  const [selectedFighter, setSelectedFighter] = useState<Fighter | null>(null)
 
   // Gym leaderboard
   useEffect(() => {
@@ -81,7 +83,7 @@ export default function LeaderboardPage() {
     setPool(null)
     const supabase = createClient()
     supabase.from('fighters')
-      .select('id,name,age,weight_class,specialty,attrs,record,gym_id,status,personality')
+      .select('id,name,nickname,age,birth_week,hometown,weight_class,specialty,attrs,record,gym_id,status,personality,avatar_url')
       .eq('weight_class', selectedWC)
       .neq('status', 'retired')
       .limit(150)
@@ -104,6 +106,12 @@ export default function LeaderboardPage() {
 
   // Champion fighter id untuk weight class yang dipilih (badge 🏆)
   const championForWC = champions?.find((c) => c.weight_class === selectedWC)
+
+  function gymLabelFor(f: Fighter) {
+    if (f.gym_id === gym!.id) return gym!.name
+    if (f.gym_id === null) return 'Free Agent'
+    return gymNameMap.get(f.gym_id) ?? 'Gym Lain'
+  }
 
   const myTier = getGymTier(gym.reputation)
 
@@ -243,12 +251,13 @@ export default function LeaderboardPage() {
                     const isMyFighter = f.gym_id === gym.id
                     const isFreeAgent = f.gym_id === null
                     const ovr         = overallRating(f.attrs)
-                    const gymLabel    = isMyFighter ? gym.name : isFreeAgent ? 'Free Agent' : (gymNameMap.get(f.gym_id ?? '') ?? 'Gym Lain')
+                    const gymLabel    = gymLabelFor(f)
                     const isChampion  = championForWC?.champion_fighter_id === f.id
 
                     return (
                       <tr key={f.id}
-                        className={`border-b border-octagon-border last:border-0 ${isMyFighter ? 'bg-octagon-red/10' : ''}`}
+                        onClick={() => setSelectedFighter(f)}
+                        className={`cursor-pointer border-b border-octagon-border last:border-0 transition-colors hover:bg-octagon-dark/50 ${isMyFighter ? 'bg-octagon-red/10' : ''}`}
                       >
                         <td className="px-3 py-3">
                           <span className={`font-bold ${i < 3 ? ['text-yellow-400','text-gray-300','text-amber-600'][i] : 'text-gray-500'}`}>
@@ -340,6 +349,14 @@ export default function LeaderboardPage() {
             </table>
           </div>
         )
+      )}
+
+      {selectedFighter && (
+        <FighterDetailModal
+          fighter={selectedFighter}
+          gymLabel={gymLabelFor(selectedFighter)}
+          onClose={() => setSelectedFighter(null)}
+        />
       )}
     </div>
   )

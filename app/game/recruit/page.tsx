@@ -9,6 +9,7 @@ import { getCategoryAverages } from '@/lib/attrs'
 import { formatCurrency } from '@/lib/format'
 import { poolFighterToCandidate, requiredReputation } from '@/lib/pool-fighter'
 import NegotiationPanel from '@/components/recruit/NegotiationPanel'
+import FighterDetailModal from '@/components/roster/FighterDetailModal'
 import type { ContractOffer } from '@/lib/negotiation'
 import type { Fighter, WeightClass } from '@/types'
 
@@ -34,6 +35,7 @@ export default function RecruitPage() {
   const [page, setPage]             = useState(1)
   const [error, setError]           = useState<string | null>(null)
   const [info, setInfo]             = useState<string | null>(null)
+  const [selectedFighter, setSelectedFighter] = useState<Fighter | null>(null)
 
   useEffect(() => {
     if (!gym) return
@@ -157,10 +159,13 @@ export default function RecruitPage() {
                 <div key={fighter.id}
                   className={`rounded-lg border bg-octagon-card p-4 ${!canRecruit ? 'opacity-60' : 'border-octagon-border'}`}
                 >
-                  <div className="flex items-start gap-3">
+                  <div
+                    onClick={() => setSelectedFighter(fighter)}
+                    className="flex cursor-pointer items-start gap-3"
+                  >
                     <Avatar size={56} className="shrink-0 overflow-hidden rounded-full bg-octagon-dark" />
                     <div className="min-w-0 flex-1">
-                      <h3 className="truncate font-semibold text-white">{fighter.name}</h3>
+                      <h3 className="truncate font-semibold text-white hover:underline">{fighter.name}</h3>
                       <p className="truncate text-sm italic text-octagon-amber">&ldquo;{fighter.nickname}&rdquo;</p>
                       <p className="mt-0.5 text-xs text-gray-400">
                         {fighter.weight_class} · {fighter.specialty} · {fighter.age} th
@@ -249,6 +254,13 @@ export default function RecruitPage() {
             </div>
           )}
         </>
+      )}
+
+      {selectedFighter && (
+        <FighterDetailModal
+          fighter={selectedFighter}
+          onClose={() => setSelectedFighter(null)}
+        />
       )}
     </div>
   )
