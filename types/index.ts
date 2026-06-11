@@ -113,6 +113,7 @@ export interface Gym {
   monthly_income: number
   monthly_expense: number
   season_week: number
+  last_sponsor_week: number | null
   rooms: GymRooms
   created_at: string
 }
