@@ -221,7 +221,7 @@ function generateFallbackOpponent(targetWins: number): MmaEvent['slots'][0]['opp
   const baseAttr = 50 + targetWins * 1.5
   const attrs = Object.fromEntries(
     ALL_ATTR_KEYS.map((k) => [k, Math.max(40, Math.min(90, Math.round(baseAttr + randInt(-10,10))))])
-  ) as Fighter['attrs']
+  ) as unknown as Fighter['attrs']
 
   return {
     name:      `Fighter #${randInt(100,999)}`,
