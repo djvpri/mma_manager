@@ -1,4 +1,4 @@
-import type { Fighter, FighterAttrs, GamePlan, CornerAdvice, RoundResult, FinishMethod } from '@/types'
+import type { Fighter, FighterAttrs, GamePlan, CornerAdvice, RoundResult, RoundTick, FinishMethod } from '@/types'
 
 export interface FightConfig {
   myFighter: Fighter
@@ -60,53 +60,26 @@ export function simulateRound(config: FightConfig): RoundResult {
       : roll < 0.5 ? 'ko' : 'tko'
   }
 
+  const dmgToOpp = Math.round(myPct * 0.25)
+  const dmgToMe = Math.round((100 - myPct) * 0.25)
+
+  const myFirst = myFighter.name.split(' ')[0]
+  const oppFirst = opponent.name.split(' ')[0]
+  const winnerName = winner === 'my' ? myFirst : oppFirst
+  const loserName = winner === 'my' ? oppFirst : myFirst
+
+  const ticks = generateTicks(roundNum, myFirst, oppFirst, gamePlan, dmgToMe, dmgToOpp, finish, winnerName, loserName)
+
   return {
     round: roundNum,
     winner,
     my_pct: myPct,
     opp_pct: 100 - myPct,
-    events: generateEvents(myFighter.name, opponent.name, gamePlan, winner),
+    events: ticks.map((t) => t.text),
     finish,
     corner_advice: cornerAdvice,
+    ticks,
   }
-}
-
-function generateEvents(
-  myName: string,
-  oppName: string,
-  gamePlan: GamePlan,
-  winner: 'my' | 'opp'
-): string[] {
-  const first = myName.split(' ')[0]
-  const oFirst = oppName.split(' ')[0]
-  const pools: Record<GamePlan, string[]> = {
-    pressure: [
-      `${first} menekan terus ke pagar, memaksa ${oFirst} bertahan`,
-      `Volume striking ${first} luar biasa — jab-cross-hook tanpa henti`,
-      `${first} membungkam ${oFirst} dengan kombinasi ke badan`,
-    ],
-    counter: [
-      `${first} menunggu sabar — counter mendarat bersih ke rahang ${oFirst}`,
-      `Footwork ${first} elegan, bergeser lalu membalas dengan uppercut`,
-      `${oFirst} maju — dan berjalan masuk ke cross keras ${first}`,
-    ],
-    grapple: [
-      `Double-leg takedown berhasil! ${first} membanting ${oFirst} ke canvas`,
-      `${first} mengontrol di half-guard, siku menghujam tulang rusuk`,
-      `Rear naked choke dikunci — ${oFirst} berjuang keras untuk lepas`,
-    ],
-    technical: [
-      `Jab ${first} mengena enam kali tanpa dibalas — poin bersih`,
-      `${first} mengontrol jarak dengan sempurna, ${oFirst} tidak bisa masuk`,
-      `Kombinasi terukur dari ${first} — setiap serangan efisien`,
-    ],
-  }
-  const events = pools[gamePlan]
-  const result = [events[Math.floor(Math.random() * events.length)]]
-  if (winner === 'opp') {
-    result.push(`${oFirst} membalas dengan serangan balik yang keras`)
-  }
-  return result
 }
 
 function pick<T>(arr: T[]): T {
@@ -121,19 +94,42 @@ const NARRATION_OPENERS: ((round: number) => string)[] = [
   (round) => `Wasit memberi aba-aba, dan ronde ${round} pun pecah dengan pertukaran pukulan cepat.`,
 ]
 
-function dominantLines(winnerName: string): string[] {
-  return [
-    `${winnerName} benar-benar mengambil alih kendali ronde ini, nyaris tanpa perlawanan berarti dari lawannya.`,
-    `Dominasi ${winnerName} terlihat jelas — setiap pertukaran dimenangkan dengan telak.`,
-    `${winnerName} tampil seperti petarung kelas dunia di ronde ini, mengontrol tempo dari awal hingga akhir.`,
-  ]
+function exchangeLines(attacker: string, defender: string, gamePlan: GamePlan): string[] {
+  const pools: Record<GamePlan, string[]> = {
+    pressure: [
+      `${attacker} terus menekan maju, memaksa ${defender} merapat ke pagar`,
+      `Kombinasi jab-cross-hook dari ${attacker} mendarat telak ke kepala ${defender}`,
+      `${attacker} memburu dengan pukulan ke badan, ${defender} mulai kehabisan ruang`,
+      `Overhand keras dari ${attacker} nyaris merobohkan ${defender}`,
+    ],
+    counter: [
+      `${attacker} menunggu sabar lalu membalas dengan counter bersih ke rahang ${defender}`,
+      `${defender} maju ceroboh — dan langsung disambut cross keras dari ${attacker}`,
+      `Footwork ${attacker} membuka sudut untuk uppercut tajam`,
+      `${attacker} slip lalu membalas dengan hook yang mengejutkan ${defender}`,
+    ],
+    grapple: [
+      `${attacker} berhasil takedown dan langsung mengambil posisi dominan di atas`,
+      `Dari posisi atas, ${attacker} menghujamkan siku-siku keras ke ${defender}`,
+      `${attacker} mengejar leher, ${defender} berjuang keras mempertahankan posisi`,
+      `Ground and pound dari ${attacker} membuat ${defender} kesulitan bertahan`,
+    ],
+    technical: [
+      `Jab terukur ${attacker} mengena beruntun tanpa dibalas`,
+      `${attacker} mengontrol jarak dengan sempurna, ${defender} kesulitan masuk`,
+      `Kombinasi efisien dari ${attacker} menambah poin bersih di mata juri`,
+      `Leg kick dari ${attacker} mulai membuat ${defender} pincang`,
+    ],
+  }
+  return pools[gamePlan]
 }
 
-function closeLines(myFirst: string, oppFirst: string): string[] {
+function evenExchangeLines(myFirst: string, oppFirst: string): string[] {
   return [
-    `Ronde ini berjalan sangat ketat — ${myFirst} dan ${oppFirst} silih berganti mendominasi momen demi momen.`,
-    `Sulit menentukan siapa yang lebih unggul; ${myFirst} dan ${oppFirst} sama-sama memberikan perlawanan sengit.`,
-    `Juri pasti kesulitan mencatat skor ronde ini — pertarungan berjalan begitu berimbang.`,
+    `${myFirst} dan ${oppFirst} saling baku hantam di tengah oktagon, sama-sama tak mau mundur`,
+    `Pertukaran pukulan cepat — keduanya terlihat sama kuat di momen ini`,
+    `${myFirst} mencoba masuk, ${oppFirst} membalas — sama-sama mendarat pukulan keras`,
+    `Clinch di pagar, keduanya berebut posisi tanpa ada yang dominan`,
   ]
 }
 
@@ -158,29 +154,53 @@ const FIGHT_END_CLOSERS: string[] = [
   'Kedua petarung saling merangkul di tengah oktagon, menghormati perjuangan masing-masing.',
 ]
 
-export function generateNarration(
-  result: RoundResult,
-  myName: string,
-  oppName: string,
-  isFightOver: boolean
-): string {
-  const myFirst = myName.split(' ')[0]
-  const oppFirst = oppName.split(' ')[0]
-  const winnerName = result.winner === 'my' ? myFirst : oppFirst
-  const loserName = result.winner === 'my' ? oppFirst : myFirst
-  const margin = Math.abs(result.my_pct - result.opp_pct)
+const EXCHANGE_TICKS = 4
 
-  const sentences: string[] = [pick(NARRATION_OPENERS)(result.round)]
-  sentences.push(...result.events.map((e) => `${e}.`))
-  sentences.push(margin >= 25 ? pick(dominantLines(winnerName)) : pick(closeLines(myFirst, oppFirst)))
+// Bagi `total` menjadi `parts` angka non-negatif yang jumlahnya tetap `total`.
+function splitTotal(total: number, parts: number): number[] {
+  if (total <= 0) return Array(parts).fill(0)
+  const cuts = Array.from({ length: parts - 1 }, () => Math.random()).sort((a, b) => a - b)
+  const points = [0, ...cuts, 1]
+  const result = points.slice(1).map((p, i) => Math.round((p - points[i]) * total))
+  const sum = result.reduce((a, b) => a + b, 0)
+  result[result.length - 1] += total - sum
+  return result
+}
 
-  if (result.finish && result.finish !== 'decision') {
-    sentences.push(FINISH_LINES[result.finish](winnerName, loserName))
-  } else {
-    sentences.push(pick(isFightOver ? FIGHT_END_CLOSERS : ROUND_CLOSERS))
+function generateTicks(
+  roundNum: number,
+  myFirst: string,
+  oppFirst: string,
+  gamePlan: GamePlan,
+  dmgToMe: number,
+  dmgToOpp: number,
+  finish: FinishMethod | null,
+  winnerName: string,
+  loserName: string
+): RoundTick[] {
+  const opener: RoundTick = { text: pick(NARRATION_OPENERS)(roundNum), my_dmg: 0, opp_dmg: 0 }
+
+  const myDmgParts = splitTotal(dmgToMe, EXCHANGE_TICKS)
+  const oppDmgParts = splitTotal(dmgToOpp, EXCHANGE_TICKS)
+
+  const exchanges: RoundTick[] = myDmgParts.map((myDmg, i) => {
+    const oppDmg = oppDmgParts[i]
+    let line: string
+    if (oppDmg > myDmg) line = pick(exchangeLines(myFirst, oppFirst, gamePlan))
+    else if (myDmg > oppDmg) line = pick(exchangeLines(oppFirst, myFirst, gamePlan))
+    else line = pick(evenExchangeLines(myFirst, oppFirst))
+    return { text: `${line}.`, my_dmg: myDmg, opp_dmg: oppDmg }
+  })
+
+  if (finish) {
+    exchanges[exchanges.length - 1].text = FINISH_LINES[finish](winnerName, loserName)
   }
 
-  return sentences.join(' ')
+  return [opener, ...exchanges]
+}
+
+export function generateClosingLine(isFightOver: boolean): string {
+  return pick(isFightOver ? FIGHT_END_CLOSERS : ROUND_CLOSERS)
 }
 
 export function calculateFightResult(rounds: RoundResult[]): {

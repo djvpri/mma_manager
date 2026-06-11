@@ -124,6 +124,12 @@ export interface FightResult {
   created_at: string
 }
 
+export interface RoundTick {
+  text: string
+  my_dmg: number
+  opp_dmg: number
+}
+
 export interface RoundResult {
   round: number
   winner: 'my' | 'opp'
@@ -132,6 +138,7 @@ export interface RoundResult {
   events: string[]
   finish: FinishMethod | null
   corner_advice: CornerAdvice | null
+  ticks?: RoundTick[]
 }
 
 export interface GameState {

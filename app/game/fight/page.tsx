@@ -4,12 +4,12 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Avatar from '@/components/avatar/Avatar'
 import { useGameStore } from '@/store/game-store'
-import { simulateRound, calculateFightResult, rollInjury, generateNarration } from '@/lib/fight-engine'
+import { simulateRound, calculateFightResult, rollInjury, generateClosingLine } from '@/lib/fight-engine'
 import { getAICornerAdvice } from '@/lib/ai-corner'
 import { createClient } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/format'
 import { syncLeaderboard } from '@/lib/leaderboard'
-import type { Fighter, FighterAttrs, GamePlan, CornerAdvice, Specialty } from '@/types'
+import type { Fighter, FighterAttrs, GamePlan, CornerAdvice, Specialty, RoundResult, RoundTick } from '@/types'
 
 const TOTAL_ROUNDS = 3
 
@@ -183,6 +183,13 @@ export default function FightPage() {
   const [saveError, setSaveError] = useState<string | null>(null)
   const [flashMy, setFlashMy] = useState(false)
   const [flashOpp, setFlashOpp] = useState(false)
+  const [animation, setAnimation] = useState<{
+    ticks: RoundTick[]
+    index: number
+    feed: string[]
+    final: RoundResult
+    isFightOver: boolean
+  } | null>(null)
 
   const seasonWeek = gym?.season_week ?? 1
   const notRetiredOrInjured = fighters.filter((f) => f.status !== 'retired' && f.status !== 'injured')
@@ -347,34 +354,69 @@ export default function FightPage() {
       roundNum: fight.currentRound,
     })
 
-    const dmgToOpp = Math.round(result.my_pct * 0.25)
-    const dmgToMe = Math.round(result.opp_pct * 0.25)
+    const ticks = result.ticks ?? []
+    const dmgToMe = ticks.reduce((sum, t) => sum + t.my_dmg, 0)
+    const dmgToOpp = ticks.reduce((sum, t) => sum + t.opp_dmg, 0)
     const newMyHP = Math.max(0, fight.myHP - dmgToMe)
     const newOppHP = Math.max(0, fight.oppHP - dmgToOpp)
-    setMyHP(newMyHP)
-    setOppHP(newOppHP)
-
-    const BIG_HIT = 15
-    if (dmgToMe >= BIG_HIT) {
-      setFlashMy(true)
-      setTimeout(() => setFlashMy(false), 600)
-    }
-    if (dmgToOpp >= BIG_HIT) {
-      setFlashOpp(true)
-      setTimeout(() => setFlashOpp(false), 600)
-    }
 
     const knockedOut = (newMyHP === 0 || newOppHP === 0) && !result.finish
     const final = knockedOut
       ? { ...result, winner: (newOppHP === 0 ? 'my' : 'opp') as 'my' | 'opp', finish: 'tko' as const }
       : result
 
-    addRoundResult(final)
-
     const isFightOver = !!final.finish || newMyHP === 0 || newOppHP === 0 || fight.currentRound >= TOTAL_ROUNDS
-    const narration = generateNarration(final, fight.fighter.name, fight.opponent.name, isFightOver)
-    setAiNarration(narration)
+
+    setAiNarration('')
+    setAnimation({ ticks, index: 0, feed: [], final, isFightOver })
   }
+
+  function finalizeRound(anim: NonNullable<typeof animation>) {
+    const remaining = anim.ticks.slice(anim.index)
+    const dmgToMe = remaining.reduce((sum, t) => sum + t.my_dmg, 0)
+    const dmgToOpp = remaining.reduce((sum, t) => sum + t.opp_dmg, 0)
+    setMyHP(Math.max(0, fight.myHP - dmgToMe))
+    setOppHP(Math.max(0, fight.oppHP - dmgToOpp))
+    addRoundResult(anim.final)
+    setAiNarration(generateClosingLine(anim.isFightOver))
+    setAnimation(null)
+  }
+
+  function handleSkipAnimation() {
+    if (!animation) return
+    finalizeRound(animation)
+  }
+
+  // Putar narasi pertarungan tick demi tick, mengikuti kondisi HP secara live
+  useEffect(() => {
+    if (!animation) return
+
+    if (animation.index >= animation.ticks.length) {
+      finalizeRound(animation)
+      return
+    }
+
+    const tick = animation.ticks[animation.index]
+    const BIG_HIT = 6
+    const delay = animation.index === 0 ? 300 : 1300
+
+    const timer = setTimeout(() => {
+      if (tick.my_dmg > 0) setMyHP(Math.max(0, fight.myHP - tick.my_dmg))
+      if (tick.opp_dmg > 0) setOppHP(Math.max(0, fight.oppHP - tick.opp_dmg))
+      if (tick.my_dmg >= BIG_HIT) {
+        setFlashMy(true)
+        setTimeout(() => setFlashMy(false), 600)
+      }
+      if (tick.opp_dmg >= BIG_HIT) {
+        setFlashOpp(true)
+        setTimeout(() => setFlashOpp(false), 600)
+      }
+      setAnimation((a) => (a ? { ...a, index: a.index + 1, feed: [...a.feed, tick.text] } : a))
+    }, delay)
+
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [animation])
 
   function handleAfterRound() {
     setFightPhase(isFightOver ? 'result' : 'corner')
@@ -584,7 +626,25 @@ export default function FightPage() {
             </div>
           </div>
 
-          {currentRoundResult ? (
+          {animation ? (
+            <div className="rounded-lg border border-octagon-border bg-octagon-card p-4">
+              <p className="mb-2 text-sm font-semibold text-white">Ronde {fight.currentRound} berlangsung...</p>
+              <ul className="space-y-1.5 text-sm text-gray-300">
+                {animation.feed.map((line, i) => (
+                  <li key={i}>• {line}</li>
+                ))}
+              </ul>
+              {animation.index < animation.ticks.length && (
+                <p className="mt-2 animate-pulse text-sm text-gray-500">● ● ●</p>
+              )}
+              <button
+                onClick={handleSkipAnimation}
+                className="mt-4 rounded-md border border-octagon-border px-4 py-2 text-xs font-semibold text-gray-400 transition-colors hover:bg-white/5"
+              >
+                Lewati
+              </button>
+            </div>
+          ) : currentRoundResult ? (
             <div className="rounded-lg border border-octagon-border bg-octagon-card p-4">
               <p className="mb-2 text-sm font-semibold text-white">
                 Ronde {currentRoundResult.round}:{' '}
