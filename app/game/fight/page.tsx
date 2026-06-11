@@ -14,6 +14,7 @@ import {
   sumFightStats,
 } from '@/lib/fight-engine'
 import { getAICornerAdvice } from '@/lib/ai-corner'
+import { getPreFightInterview } from '@/lib/ai-interview'
 import { createClient } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/format'
 import { syncLeaderboard } from '@/lib/leaderboard'
@@ -304,6 +305,8 @@ export default function FightPage() {
   const resetFight = useGameStore((s) => s.resetFight)
 
   const [selectedFighterId, setSelectedFighterId] = useState<string | null>(fight.fighter?.id ?? null)
+  const [interviewText, setInterviewText] = useState<string | null>(null)
+  const [interviewLoading, setInterviewLoading] = useState(false)
   const [savingResult, setSavingResult] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [flashMy, setFlashMy] = useState(false)
@@ -335,6 +338,13 @@ export default function FightPage() {
   )
   const eligibleFighters = cooldownReady.filter((f) => registeredThisWeek.includes(f.id))
   const unscheduledFighters = cooldownReady.filter((f) => !registeredThisWeek.includes(f.id))
+
+  // Wawancara pra-pertandingan: hanya untuk fighter terpilih di event tier nasional/championship
+  const selectedFighter = eligibleFighters.find((f) => f.id === selectedFighterId) ?? null
+  const selectedSlot = selectedFighter
+    ? todaysEvents.flatMap((e) => e.slots ?? []).find((s) => s.fighter_id === selectedFighter.id)
+    : null
+  const showInterview = todaysEvent?.tier === 'national' && !!selectedFighter && !!selectedSlot?.opponent
   const currentRoundResult = fight.roundResults.find((r) => r.round === fight.currentRound)
   const isFightOver =
     !!currentRoundResult &&
@@ -345,6 +355,11 @@ export default function FightPage() {
       ? animation.ticks.slice(0, animation.index)
       : []
   const { my: liveMyStats, opp: liveOppStats } = aggregateTickStats(liveTicks)
+
+  // Reset wawancara pra-pertandingan saat ganti fighter terpilih
+  useEffect(() => {
+    setInterviewText(null)
+  }, [selectedFighterId])
 
   // Ambil saran corner dari AI saat masuk fase istirahat antar ronde
   useEffect(() => {
@@ -559,6 +574,19 @@ export default function FightPage() {
       purseShare
     )
     setSavingResult(false)
+  }
+
+  async function handleWatchInterview() {
+    if (!selectedFighter || !selectedSlot?.opponent || !todaysEvent) return
+    setInterviewLoading(true)
+    const text = await getPreFightInterview(
+      selectedFighter,
+      selectedSlot.opponent.name,
+      selectedSlot.opponent.specialty,
+      todaysEvent.name
+    )
+    setInterviewText(text)
+    setInterviewLoading(false)
   }
 
   function handleStartFight() {
@@ -780,6 +808,29 @@ export default function FightPage() {
                   </p>
                 </button>
               ))}
+            </div>
+          )}
+
+          {showInterview && (
+            <div className="rounded-lg border border-octagon-amber/30 bg-octagon-card p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-octagon-amber">
+                🎤 Wawancara Pra-Pertandingan
+              </p>
+              <p className="mt-1 text-xs text-gray-400">
+                {selectedFighter?.name} vs {selectedSlot?.opponent?.name} — {todaysEvent?.name}
+              </p>
+
+              {interviewText ? (
+                <p className="mt-3 whitespace-pre-line text-sm italic text-gray-200">&ldquo;{interviewText}&rdquo;</p>
+              ) : (
+                <button
+                  onClick={handleWatchInterview}
+                  disabled={interviewLoading}
+                  className="mt-3 rounded-md border border-octagon-border px-3 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:border-octagon-amber hover:text-octagon-amber disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {interviewLoading ? 'Memuat...' : 'Tonton Wawancara'}
+                </button>
+              )}
             </div>
           )}
 
