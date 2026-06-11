@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useGameStore } from '@/store/game-store'
 import { ALL_ATTR_KEYS } from '@/lib/attrs'
-import type { Fighter, WeightClass } from '@/types'
+import type { Championship, Fighter, WeightClass } from '@/types'
 
 // ─── Gym tier system ─────────────────────────────────────────────────────────
 
@@ -45,9 +45,10 @@ export default function LeaderboardPage() {
   const gym     = useGameStore((s) => s.gym)
   const fighters = useGameStore((s) => s.fighters)
 
-  const [tab, setTab]               = useState<'gym' | 'fighter'>('gym')
+  const [tab, setTab]               = useState<'gym' | 'fighter' | 'champions'>('gym')
   const [entries, setEntries]       = useState<LeaderboardEntry[] | null>(null)
   const [poolFighters, setPool]     = useState<Fighter[] | null>(null)
+  const [champions, setChampions]   = useState<Championship[] | null>(null)
   const [selectedWC, setSelectedWC] = useState<WeightClass>('Flyweight')
   const [error, setError]           = useState<string | null>(null)
 
@@ -63,6 +64,18 @@ export default function LeaderboardPage() {
         else setEntries((data ?? []) as LeaderboardEntry[])
       })
   }, [])
+
+  // Champions: load gelar juara per weight class
+  useEffect(() => {
+    if (tab !== 'champions' || champions !== null) return
+    const supabase = createClient()
+    supabase.from('championships').select('*')
+      .then(({ data }) => {
+        const rows = (data ?? []) as Championship[]
+        rows.sort((a, b) => WEIGHT_CLASSES.indexOf(a.weight_class) - WEIGHT_CLASSES.indexOf(b.weight_class))
+        setChampions(rows)
+      })
+  }, [tab, champions])
 
   // Fighter rankings: load pool + player fighters untuk weight class terpilih
   useEffect(() => {
@@ -102,13 +115,13 @@ export default function LeaderboardPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 rounded-lg border border-octagon-border bg-octagon-card p-1">
-        {(['gym','fighter'] as const).map((t) => (
+        {(['gym','fighter','champions'] as const).map((t) => (
           <button key={t} onClick={() => setTab(t)}
             className={`flex-1 rounded-md py-1.5 text-sm font-medium transition-colors ${
               tab === t ? 'bg-octagon-red text-white' : 'text-gray-400 hover:text-gray-200'
             }`}
           >
-            {t === 'gym' ? '🏋️ Ranking Gym' : '🥊 Ranking Fighter'}
+            {t === 'gym' ? '🏋️ Ranking Gym' : t === 'fighter' ? '🥊 Ranking Fighter' : '🏆 Champions'}
           </button>
         ))}
       </div>
@@ -273,6 +286,55 @@ export default function LeaderboardPage() {
             </div>
           )}
         </div>
+      )}
+
+      {/* ── TAB: CHAMPIONS ───────────────────────────────────────────── */}
+      {tab === 'champions' && (
+        champions === null ? (
+          <p className="text-sm text-gray-400">Memuat...</p>
+        ) : (
+          <div className="overflow-hidden rounded-lg border border-octagon-border bg-octagon-card">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-octagon-border text-left text-xs uppercase text-gray-500">
+                  <th className="px-3 py-3">Kelas</th>
+                  <th className="px-3 py-3">Champion</th>
+                  <th className="px-3 py-3 hidden sm:table-cell">Gym</th>
+                  <th className="px-3 py-3 text-right">Defenses</th>
+                </tr>
+              </thead>
+              <tbody>
+                {champions.map((c) => {
+                  const isMe   = c.champion_gym_id === gym.id
+                  const vacant = !c.champion_fighter_id
+
+                  return (
+                    <tr key={c.weight_class}
+                      className={`border-b border-octagon-border last:border-0 ${isMe ? 'bg-octagon-red/10' : ''}`}
+                    >
+                      <td className="px-3 py-3 font-semibold text-white">{c.weight_class}</td>
+                      <td className="px-3 py-3">
+                        {vacant ? (
+                          <span className="text-gray-500 italic">Vacant</span>
+                        ) : (
+                          <span className={`font-semibold ${isMe ? 'text-octagon-red' : 'text-yellow-400'}`}>
+                            🏆 {c.champion_name}{isMe && ' ★'}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3 py-3 hidden text-gray-300 sm:table-cell">
+                        {c.champion_gym_name ?? '—'}
+                      </td>
+                      <td className="px-3 py-3 text-right text-gray-300">
+                        {vacant ? '—' : c.title_defenses}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )
       )}
     </div>
   )

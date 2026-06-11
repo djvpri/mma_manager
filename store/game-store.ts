@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Fighter, Gym, GamePlan, CornerAdvice, RoundResult } from '@/types'
+import type { TitleFightResult } from '@/lib/championship'
 
 interface FightState {
   fighter: Fighter | null
@@ -33,6 +34,7 @@ interface FightState {
     injury: { name: string; weeks: number } | null
     winBonusPaid: number
     titleShotTriggered: boolean
+    titleBeltResult: TitleFightResult
     commission: number
     medicalCost: number
     moraleChange: number
@@ -73,6 +75,7 @@ interface GameStore {
     injury: { name: string; weeks: number } | null,
     winBonusPaid: number,
     titleShotTriggered: boolean,
+    titleBeltResult: TitleFightResult,
     commission: number,
     medicalCost: number,
     moraleChange: number,
@@ -152,6 +155,7 @@ export const useGameStore = create<GameStore>()(
         injury,
         winBonusPaid,
         titleShotTriggered,
+        titleBeltResult,
         commission,
         medicalCost,
         moraleChange,
@@ -168,6 +172,7 @@ export const useGameStore = create<GameStore>()(
               injury,
               winBonusPaid,
               titleShotTriggered,
+              titleBeltResult,
               commission,
               medicalCost,
               moraleChange,

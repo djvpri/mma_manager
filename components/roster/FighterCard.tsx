@@ -58,7 +58,8 @@ const STATUS_LABELS: Record<Fighter['status'], string> = {
   retired: 'Pensiun',
 }
 
-export default function FighterCard({ fighter }: { fighter: Fighter }) {
+export default function FighterCard({ fighter, titleDefenses }: { fighter: Fighter; titleDefenses?: number }) {
+  const isChampion = titleDefenses !== undefined
   const { record, attrs } = fighter
   const renewalCost = Math.round((fighter.salary_monthly * 4) / 500_000) * 500_000
   const newSalary = Math.round((fighter.salary_monthly * 1.1) / 100_000) * 100_000
@@ -222,7 +223,9 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
         />
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
-            <h3 className="truncate font-semibold text-white">{fighter.name}</h3>
+            <h3 className="truncate font-semibold text-white">
+              {isChampion && '🏆 '}{fighter.name}
+            </h3>
             <span
               className={`shrink-0 rounded border px-2 py-0.5 text-[10px] font-medium uppercase ${STATUS_STYLES[fighter.status]}`}
             >
@@ -387,6 +390,12 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
             </div>
           )}
         </div>
+      )}
+
+      {isChampion && (
+        <p className="mt-2 text-xs font-semibold text-yellow-400">
+          🏆 Juara Indonesia Championship kelas {fighter.weight_class} · {titleDefenses}x defense
+        </p>
       )}
 
       {fighter.title_shot_pending && (

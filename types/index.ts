@@ -180,6 +180,17 @@ export interface Gym {
   created_at: string
 }
 
+export interface Championship {
+  weight_class: WeightClass
+  champion_fighter_id: string | null
+  champion_gym_id: string | null
+  champion_gym_name: string | null
+  champion_name: string | null
+  title_defenses: number
+  won_at_week: number | null
+  updated_at: string
+}
+
 export interface Staff {
   id: string
   gym_id: string

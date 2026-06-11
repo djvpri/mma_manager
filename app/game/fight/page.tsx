@@ -17,6 +17,7 @@ import { getAICornerAdvice } from '@/lib/ai-corner'
 import { createClient } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/format'
 import { syncLeaderboard } from '@/lib/leaderboard'
+import { isTitleFight, resolveTitleFight } from '@/lib/championship'
 import { ATTR_GROUPS, ALL_ATTR_KEYS } from '@/lib/attrs'
 import { EVENT_TIER_CONFIG, EVENT_TIER_BADGE_CLASS } from '@/lib/generate-events'
 import type { Fighter, FighterAttrs, GamePlan, CornerAdvice, Specialty, RoundResult, RoundTick, FightStats, EventTier } from '@/types'
@@ -516,6 +517,8 @@ export default function FightPage() {
         .single(),
     ])
 
+    let titleBeltResult: Awaited<ReturnType<typeof resolveTitleFight>> = null
+
     if (insertRes.error || fighterRes.error || gymRes.error) {
       setSaveError(
         insertRes.error?.message || fighterRes.error?.message || gymRes.error?.message || 'Gagal menyimpan hasil pertarungan.'
@@ -533,6 +536,11 @@ export default function FightPage() {
         }
       }
 
+      // Title fight: update gelar juara per weight class
+      if (isTitleFight(event, slot)) {
+        titleBeltResult = await resolveTitleFight(fighter, gym, result.winner === 'my')
+      }
+
       const state = useGameStore.getState()
       if (state.gym) syncLeaderboard(state.gym, state.fighters)
     }
@@ -544,6 +552,7 @@ export default function FightPage() {
       injury,
       winBonusPaid,
       titleShotTriggered,
+      titleBeltResult,
       commission,
       medicalCost,
       moraleChange,
@@ -1300,6 +1309,24 @@ export default function FightPage() {
                     <div className="mt-2 rounded-md bg-octagon-amber/10 px-3 py-2 text-octagon-amber">
                       🏆 {fight.fighter!.name.split(' ')[0]} menang 3x beruntun dan menuntut Title Shot sesuai
                       klausul kontrak! Reputasi gym naik tambahan.
+                    </div>
+                  )}
+                  {fight.fightSummary.titleBeltResult === 'won' && (
+                    <div className="mt-2 rounded-md bg-yellow-500/10 px-3 py-2 font-semibold text-yellow-400">
+                      🏆 JUARA BARU! {fight.fighter!.name.split(' ')[0]} merebut gelar Indonesia Championship
+                      kelas {fight.fighter!.weight_class}!
+                    </div>
+                  )}
+                  {fight.fightSummary.titleBeltResult === 'defended' && (
+                    <div className="mt-2 rounded-md bg-yellow-500/10 px-3 py-2 font-semibold text-yellow-400">
+                      🏆 GELAR DIPERTAHANKAN! {fight.fighter!.name.split(' ')[0]} berhasil mempertahankan
+                      gelar juara kelas {fight.fighter!.weight_class}.
+                    </div>
+                  )}
+                  {fight.fightSummary.titleBeltResult === 'lost' && (
+                    <div className="mt-2 rounded-md bg-octagon-red/10 px-3 py-2 font-semibold text-octagon-red">
+                      💔 GELAR LEPAS! {fight.fighter!.name.split(' ')[0]} gagal mempertahankan gelar juara
+                      kelas {fight.fighter!.weight_class}. Title kini vacant.
                     </div>
                   )}
                 </div>

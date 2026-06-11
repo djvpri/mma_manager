@@ -8,7 +8,7 @@ import { useGameStore } from '@/store/game-store'
 import FighterCard from '@/components/roster/FighterCard'
 import { buildWeeklyReport, type WeeklyReport } from '@/lib/weekly-report'
 import { formatCurrency } from '@/lib/format'
-import type { Fighter, Gym } from '@/types'
+import type { Championship, Fighter, Gym } from '@/types'
 
 export default function RosterPage() {
   const fighters = useGameStore((s) => s.fighters)
@@ -34,6 +34,16 @@ export default function RosterPage() {
   }, [])
   const [error, setError] = useState<string | null>(null)
   const [report, setReport] = useState<WeeklyReport | null>(null)
+  const [championships, setChampionships] = useState<Championship[]>([])
+
+  // Cek gelar juara yang dipegang fighter di gym ini
+  useEffect(() => {
+    if (!gym) return
+    const supabase = createClient()
+    supabase.from('championships').select('*').eq('champion_gym_id', gym.id).then(({ data }) => {
+      setChampionships((data ?? []) as Championship[])
+    })
+  }, [gym?.id])
 
   const activeFighters = fighters.filter((f) => f.status !== 'retired')
   // Semua event minggu ini — bisa lebih dari satu (beda weight class)
@@ -224,9 +234,12 @@ export default function RosterPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {activeFighters.map((fighter) => (
-            <FighterCard key={fighter.id} fighter={fighter} />
-          ))}
+          {activeFighters.map((fighter) => {
+            const belt = championships.find((c) => c.champion_fighter_id === fighter.id)
+            return (
+              <FighterCard key={fighter.id} fighter={fighter} titleDefenses={belt?.title_defenses} />
+            )
+          })}
         </div>
       )}
     </div>
