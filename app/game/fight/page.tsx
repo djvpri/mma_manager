@@ -298,6 +298,9 @@ export default function FightPage() {
     const commissionRate = 0.1 + (gym.reputation / 100) * 0.1
     const commission = Math.round((purse * commissionRate) / 100_000) * 100_000
 
+    // Bagi Hasil Purse: persentase purse yang jadi hak fighter sesuai kontrak
+    const purseShare = Math.round((purse * fighter.purse_share_pct) / 100 / 100_000) * 100_000
+
     const newRecord = {
       w: fighter.record.w + (result.winner === 'my' ? 1 : 0),
       l: fighter.record.l + (result.winner === 'opp' ? 1 : 0),
@@ -338,7 +341,7 @@ export default function FightPage() {
     if (titleShotTriggered) moraleChange += 10
     const newMorale = Math.max(0, Math.min(100, fighter.morale + moraleChange))
 
-    const newBalance = gym.balance + purse + commission - winBonusPaid - medicalCost
+    const newBalance = gym.balance + purse + commission - winBonusPaid - medicalCost - purseShare
     const newReputation = Math.max(0, Math.min(100, gym.reputation + reputationChange + reputationBonus))
 
     const [insertRes, fighterRes, gymRes] = await Promise.all([
@@ -400,7 +403,8 @@ export default function FightPage() {
       titleShotTriggered,
       commission,
       medicalCost,
-      moraleChange
+      moraleChange,
+      purseShare
     )
     setSavingResult(false)
   }
@@ -1007,6 +1011,16 @@ export default function FightPage() {
                       <span className="text-gray-400">Win Bonus untuk {fight.fighter!.name.split(' ')[0]}</span>
                       <span className="font-semibold text-octagon-red">
                         -{formatCurrency(fight.fightSummary.winBonusPaid)}
+                      </span>
+                    </div>
+                  )}
+                  {fight.fightSummary.purseShare > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-400">
+                        Bagi Hasil Purse ({fight.fighter!.purse_share_pct}%) untuk {fight.fighter!.name.split(' ')[0]}
+                      </span>
+                      <span className="font-semibold text-octagon-red">
+                        -{formatCurrency(fight.fightSummary.purseShare)}
                       </span>
                     </div>
                   )}

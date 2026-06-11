@@ -11,6 +11,7 @@ import {
   MIN_CONTRACT_LENGTH,
   MAX_CONTRACT_LENGTH,
   MAX_NEGOTIATION_ROUNDS,
+  MAX_PURSE_SHARE_PCT,
 } from '@/lib/negotiation'
 
 interface NegotiationPanelProps {
@@ -53,7 +54,7 @@ export default function NegotiationPanel({
     setRound(nextRound)
     setLog((l) => [
       ...l,
-      `Tawaranmu: ${formatCurrency(offer.salary)}/minggu, win bonus ${formatCurrency(offer.winBonus)}, bonus tanda tangan ${formatCurrency(offer.bonus)}, kontrak ${offer.contractLength}x${offer.titleShotClause ? ', dengan klausul Title Shot' : ''}.`,
+      `Tawaranmu: ${formatCurrency(offer.salary)}/minggu, win bonus ${formatCurrency(offer.winBonus)}, bagi hasil purse ${offer.purseSharePct}%, bonus tanda tangan ${formatCurrency(offer.bonus)}, kontrak ${offer.contractLength}x${offer.titleShotClause ? ', dengan klausul Title Shot' : ''}.`,
       result.message,
     ])
 
@@ -126,6 +127,22 @@ export default function NegotiationPanel({
               step={100_000}
               value={offer.winBonus}
               onChange={(e) => setOffer((o) => ({ ...o, winBonus: Number(e.target.value) }))}
+              className="w-full accent-octagon-red"
+            />
+          </div>
+
+          <div>
+            <div className="mb-1 flex items-center justify-between text-[10px] text-gray-400">
+              <span>Bagi Hasil Purse (per pertarungan)</span>
+              <span className="font-semibold text-white">{offer.purseSharePct}%</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={MAX_PURSE_SHARE_PCT}
+              step={1}
+              value={offer.purseSharePct}
+              onChange={(e) => setOffer((o) => ({ ...o, purseSharePct: Number(e.target.value) }))}
               className="w-full accent-octagon-red"
             />
           </div>
@@ -235,8 +252,8 @@ export default function NegotiationPanel({
           <p className="text-xs font-semibold text-octagon-teal">Kesepakatan tercapai!</p>
           <p className="text-[11px] text-gray-300">
             Base Purse {formatCurrency(finalOffer.salary)}/minggu · Win bonus {formatCurrency(finalOffer.winBonus)} ·
-            Bonus tanda tangan {formatCurrency(finalOffer.bonus)} · Kontrak {finalOffer.contractLength}x pertarungan ·
-            Buyout {formatCurrency(finalOffer.buyoutClause)}
+            Bagi hasil purse {finalOffer.purseSharePct}% · Bonus tanda tangan {formatCurrency(finalOffer.bonus)} ·
+            Kontrak {finalOffer.contractLength}x pertarungan · Buyout {formatCurrency(finalOffer.buyoutClause)}
             {finalOffer.titleShotClause ? ' · Klausul Title Shot' : ''}
           </p>
           {insufficientBalance && (

@@ -100,6 +100,7 @@ export default function RecruitPage() {
         avatar_seed: candidate.avatar_seed,
         salary_monthly: offer.salary,
         win_bonus: offer.winBonus,
+        purse_share_pct: offer.purseSharePct,
         contract_fights_left: offer.contractLength,
         title_shot_clause: offer.titleShotClause,
         buyout_clause: offer.buyoutClause,

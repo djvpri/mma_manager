@@ -78,6 +78,7 @@ export interface Fighter {
   contract_fights_left: number
   salary_monthly: number
   win_bonus: number
+  purse_share_pct: number // 0-30, persentase purse yang jadi hak fighter tiap pertandingan
   title_shot_clause: boolean
   buyout_clause: number
   win_streak: number

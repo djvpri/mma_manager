@@ -41,6 +41,9 @@ export default function FinancePage() {
   const netCurrent = gym.monthly_income - gym.monthly_expense
   const commissionRate = 0.1 + (gym.reputation / 100) * 0.1
   const hasFisioterapis = (staff ?? []).some((s) => s.specialty === 'Pemulihan Cedera')
+  const purseShares = activeFighters.map((f) => f.purse_share_pct)
+  const purseShareRange =
+    purseShares.length > 0 ? { min: Math.min(...purseShares), max: Math.max(...purseShares) } : null
 
   return (
     <div className="space-y-6">
@@ -137,9 +140,15 @@ export default function FinancePage() {
             </span>
             <span className="text-octagon-red">{hasFisioterapis ? '-70%' : '-100%'}</span>
           </div>
+          <div className="flex items-center justify-between">
+            <span className="text-gray-300">Bagi Hasil Purse (sesuai kontrak tiap fighter)</span>
+            <span className="text-octagon-red">
+              {purseShareRange ? `-${purseShareRange.min}% s/d -${purseShareRange.max}%` : '-'}
+            </span>
+          </div>
           <p className="text-xs text-gray-500">
-            Komisi dan biaya medis dihitung per pertandingan, tidak termasuk dalam pemasukan/pengeluaran mingguan
-            di atas. Lihat ringkasan di layar hasil pertarungan.
+            Komisi, biaya medis, dan bagi hasil purse dihitung per pertandingan, tidak termasuk dalam
+            pemasukan/pengeluaran mingguan di atas. Lihat ringkasan di layar hasil pertarungan.
           </p>
         </div>
       </div>

@@ -295,6 +295,10 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
             <span className="text-gray-200">{formatCurrency(fighter.win_bonus)}</span>
           </div>
           <div className="flex items-center justify-between">
+            <span>Bagi Hasil Purse</span>
+            <span className="text-gray-200">{fighter.purse_share_pct}%</span>
+          </div>
+          <div className="flex items-center justify-between">
             <span>Klausul Buyout</span>
             <span className="text-gray-200">{formatCurrency(fighter.buyout_clause)}</span>
           </div>
