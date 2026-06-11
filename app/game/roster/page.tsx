@@ -100,20 +100,12 @@ export default function RosterPage() {
 
   return (
     <div>
-      <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Roster Fighter</h1>
-          <p className="text-sm text-gray-400">
-            {gym ? `${gym.name} — ` : ''}
-            {activeFighters.length} fighter terdaftar
-          </p>
-        </div>
-        <Link
-          href="/game/recruit"
-          className="inline-block rounded-md bg-octagon-red px-4 py-2 text-center text-sm font-semibold text-white transition-colors hover:bg-octagon-red/90"
-        >
-          + Rekrut Fighter
-        </Link>
+      <header className="mb-6">
+        <h1 className="text-2xl font-bold text-white">Roster Fighter</h1>
+        <p className="text-sm text-gray-400">
+          {gym ? `${gym.name} — ` : ''}
+          {activeFighters.length} fighter terdaftar
+        </p>
       </header>
 
       {gym && (
