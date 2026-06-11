@@ -43,19 +43,22 @@ export default function EventsPage() {
     (f) => f.status !== 'retired' && f.status !== 'injured'
   )
 
+  // Filter: hanya event format baru (punya slots & promotion)
+  const validEvents = gym.events.filter((e) => Array.isArray(e.slots) && e.promotion)
+
   // Semua fighter yang sudah terdaftar di event apapun
   const registeredFighterIds = new Set(
-    gym.events.flatMap((e) => e.slots.map((s) => s.fighter_id).filter(Boolean)) as string[]
+    validEvents.flatMap((e) => e.slots.map((s) => s.fighter_id).filter(Boolean)) as string[]
   )
 
   // Upcoming events: minggu ini + 3 ke depan
-  const upcomingEvents = gym.events
+  const upcomingEvents = validEvents
     .filter((e) => e.week >= seasonWeek && e.week <= seasonWeek + 3)
     .sort((a, b) => a.week - b.week)
 
   // Fighter yang eligible untuk event tertentu
   function getEligibleFighters(event: MmaEvent): Fighter[] {
-    const promoCfg = PROMOTION_CONFIG[event.promotion]
+    const promoCfg = PROMOTION_CONFIG[event.promotion] ?? PROMOTION_CONFIG.lokal
     return activeFighters.filter((f) => {
       if (f.weight_class !== event.weight_class) return false
       if (f.record.w < promoCfg.minWins) return false

@@ -152,8 +152,10 @@ export async function ensureEventsForUpcomingWeeks(gym: Gym): Promise<Gym> {
   const newEvents = generateUpcomingEvents(gym)
   if (newEvents.length === 0) return gym
 
-  // Bersihkan event lama (sudah lewat > 1 minggu)
-  const pruned = gym.events.filter((e) => e.week >= gym.season_week - 1)
+  // Bersihkan event lama + event format lama (tanpa slots)
+  const pruned = gym.events.filter(
+    (e) => e.week >= gym.season_week - 1 && Array.isArray(e.slots) && e.promotion
+  )
   const events = [...pruned, ...newEvents].sort((a, b) => a.week - b.week)
 
   const supabase = createClient()
