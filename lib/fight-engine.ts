@@ -6,6 +6,10 @@ export interface FightConfig {
   gamePlan: GamePlan
   cornerAdvice: CornerAdvice
   roundNum: number
+  myStamina: number
+  oppStamina: number
+  myMental: number
+  oppMental: number
 }
 
 const GAME_PLAN_MODS: Record<GamePlan, [number, number]> = {
@@ -23,7 +27,7 @@ const CORNER_MODS: Record<CornerAdvice, [number, number]> = {
 }
 
 export function simulateRound(config: FightConfig): RoundResult {
-  const { myFighter, opponent, gamePlan, cornerAdvice, roundNum } = config
+  const { myFighter, opponent, gamePlan, cornerAdvice, roundNum, myStamina, oppStamina, myMental, oppMental } = config
   const a = myFighter.attrs
   const o = opponent.attrs
 
@@ -35,10 +39,11 @@ export function simulateRound(config: FightConfig): RoundResult {
   myScore *= mm * cm
   opScore *= om * co
 
-  // Cardio decay
-  const fatigue = 1 - (roundNum - 1) * 0.04
-  myScore *= Math.max(0.75, fatigue + (a.cardio - 80) * 0.003)
-  opScore *= Math.max(0.75, fatigue + (o.cardio - 80) * 0.003)
+  // Stamina & mental yang sudah terkuras dari ronde sebelumnya menggerus performa
+  myScore *= 0.85 + (myStamina / 100) * 0.15
+  opScore *= 0.85 + (oppStamina / 100) * 0.15
+  myScore *= 0.92 + (myMental / 100) * 0.08
+  opScore *= 0.92 + (oppMental / 100) * 0.08
 
   // ±12% variance
   myScore *= 0.88 + Math.random() * 0.24
@@ -48,11 +53,16 @@ export function simulateRound(config: FightConfig): RoundResult {
   const myPct = Math.round((myScore / total) * 100)
   const winner = myScore > opScore ? 'my' : 'opp'
 
-  // Finish chance
-  let finish: FinishMethod | null = null
-  const finishChance = winner === 'my'
+  // Finish chance — makin besar jika lawan kehabisan stamina/mental
+  let finishChance = winner === 'my'
     ? Math.max(0, (myScore - opScore) / total * 1.8 - 0.1)
     : 0
+  if (winner === 'my') {
+    if (oppStamina < 30) finishChance += (30 - oppStamina) * 0.01
+    if (oppMental < 40) finishChance += (40 - oppMental) * 0.01
+  }
+
+  let finish: FinishMethod | null = null
   if (Math.random() < finishChance * 1.2) {
     const roll = Math.random()
     finish = gamePlan === 'grapple'
@@ -70,6 +80,9 @@ export function simulateRound(config: FightConfig): RoundResult {
 
   const ticks = generateTicks(roundNum, myFirst, oppFirst, gamePlan, dmgToMe, dmgToOpp, finish, winnerName, loserName)
 
+  const myFinished = finish !== null && winner === 'opp'
+  const oppFinished = finish !== null && winner === 'my'
+
   return {
     round: roundNum,
     winner,
@@ -79,7 +92,56 @@ export function simulateRound(config: FightConfig): RoundResult {
     finish,
     corner_advice: cornerAdvice,
     ticks,
+    my_stamina: clamp(myStamina - myStaminaLoss(gamePlan, cornerAdvice, a.cardio), 0, 100),
+    opp_stamina: clamp(oppStamina - oppStaminaLoss(o.cardio), 0, 100),
+    my_mental: clamp(myMental + mentalChange(winner === 'my', dmgToMe, myFinished, a.mental), 0, 100),
+    opp_mental: clamp(oppMental + mentalChange(winner === 'opp', dmgToOpp, oppFinished, o.mental), 0, 100),
   }
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value))
+}
+
+const GAME_PLAN_STAMINA_COST: Record<GamePlan, number> = {
+  pressure: 14,
+  counter: 9,
+  grapple: 12,
+  technical: 8,
+}
+
+const CORNER_STAMINA_COST: Record<CornerAdvice, number> = {
+  push: 4,
+  patient: -3,
+  takedown: 2,
+  striking: 2,
+}
+
+function myStaminaLoss(gamePlan: GamePlan, cornerAdvice: CornerAdvice, cardio: number): number {
+  const base = GAME_PLAN_STAMINA_COST[gamePlan] + CORNER_STAMINA_COST[cornerAdvice]
+  const cardioRelief = (cardio - 70) * 0.08
+  const variance = Math.random() * 4 - 2
+  return Math.max(3, Math.round(base - cardioRelief + variance))
+}
+
+function oppStaminaLoss(cardio: number): number {
+  const base = 10
+  const cardioRelief = (cardio - 70) * 0.08
+  const variance = Math.random() * 4 - 2
+  return Math.max(3, Math.round(base - cardioRelief + variance))
+}
+
+// Perubahan mental setelah satu ronde: menang menambah, kalah/kena hit besar/finish mengurangi.
+// Atribut mental yang tinggi meredam penurunan (lebih tahan banting).
+function mentalChange(won: boolean, dmgTaken: number, gotFinished: boolean, mental: number): number {
+  let change = won ? 2 + Math.floor(Math.random() * 4) : -(2 + Math.floor(Math.random() * 4))
+  if (dmgTaken >= 12) change -= 5
+  if (gotFinished) change -= 15
+  if (change < 0) {
+    const resilience = clamp((mental - 50) * 0.006, -0.3, 0.3)
+    change = Math.round(change * (1 - resilience))
+  }
+  return change
 }
 
 function pick<T>(arr: T[]): T {

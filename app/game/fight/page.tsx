@@ -215,6 +215,7 @@ export default function FightPage() {
   const addRoundResult = useGameStore((s) => s.addRoundResult)
   const setMyHP = useGameStore((s) => s.setMyHP)
   const setOppHP = useGameStore((s) => s.setOppHP)
+  const setFightVitals = useGameStore((s) => s.setFightVitals)
   const setAiCornerText = useGameStore((s) => s.setAiCornerText)
   const setAiNarration = useGameStore((s) => s.setAiNarration)
   const setAiLoading = useGameStore((s) => s.setAiLoading)
@@ -235,6 +236,7 @@ export default function FightPage() {
     feed: string[]
     final: RoundResult
     isFightOver: boolean
+    newVitals: { myStamina: number; oppStamina: number; myMental: number; oppMental: number }
   } | null>(null)
   const [roundClock, setRoundClock] = useState(ROUND_DURATION_SEC)
 
@@ -380,8 +382,15 @@ export default function FightPage() {
   function handleStartFight() {
     const fighter = eligibleFighters.find((f) => f.id === selectedFighterId)
     if (!fighter) return
+    const opponent = generateOpponent(fighter)
     setFightFighter(fighter)
-    setOpponent(generateOpponent(fighter))
+    setOpponent(opponent)
+    setFightVitals({
+      myStamina: fighter.attrs.cardio,
+      oppStamina: opponent.attrs.cardio,
+      myMental: fighter.attrs.mental,
+      oppMental: opponent.attrs.mental,
+    })
     setFightPhase('gameplan')
   }
 
@@ -399,6 +408,10 @@ export default function FightPage() {
       gamePlan: fight.gamePlan,
       cornerAdvice: fight.cornerAdvice,
       roundNum: fight.currentRound,
+      myStamina: fight.myStamina,
+      oppStamina: fight.oppStamina,
+      myMental: fight.myMental,
+      oppMental: fight.oppMental,
     })
 
     const ticks = result.ticks ?? []
@@ -414,9 +427,16 @@ export default function FightPage() {
 
     const isFightOver = !!final.finish || newMyHP === 0 || newOppHP === 0 || fight.currentRound >= TOTAL_ROUNDS
 
+    const newVitals = {
+      myStamina: result.my_stamina ?? fight.myStamina,
+      oppStamina: result.opp_stamina ?? fight.oppStamina,
+      myMental: result.my_mental ?? fight.myMental,
+      oppMental: result.opp_mental ?? fight.oppMental,
+    }
+
     setAiNarration('')
     setRoundClock(ROUND_DURATION_SEC)
-    setAnimation({ ticks, index: 0, feed: [], final, isFightOver })
+    setAnimation({ ticks, index: 0, feed: [], final, isFightOver, newVitals })
   }
 
   function finalizeRound(anim: NonNullable<typeof animation>) {
@@ -425,6 +445,7 @@ export default function FightPage() {
     const dmgToOpp = remaining.reduce((sum, t) => sum + t.opp_dmg, 0)
     setMyHP(Math.max(0, fight.myHP - dmgToMe))
     setOppHP(Math.max(0, fight.oppHP - dmgToOpp))
+    setFightVitals(anim.newVitals)
     addRoundResult(anim.final)
     setAiNarration(generateClosingLine(anim.isFightOver))
     setRoundClock(0)
@@ -681,7 +702,11 @@ export default function FightPage() {
                 <FighterPortrait imageUrl={fight.fighter.avatar_url} ringColor="#1D9E75" />
                 <p className="truncate font-semibold text-white">{fight.fighter.name}</p>
               </div>
-              <HpBar label="HP" value={fight.myHP} colorClass="bg-octagon-teal" />
+              <div className="space-y-2">
+                <HpBar label="HP" value={fight.myHP} colorClass="bg-octagon-teal" />
+                <HpBar label="Stamina" value={fight.myStamina} colorClass="bg-octagon-amber" />
+                <HpBar label="Mental" value={fight.myMental} colorClass="bg-purple-400" />
+              </div>
             </div>
             <div
               className={`rounded-lg border p-4 transition-colors duration-500 ${
@@ -692,7 +717,11 @@ export default function FightPage() {
                 <FighterPortrait imageUrl={null} ringColor={fight.opponent.color} />
                 <p className="truncate font-semibold text-white">{fight.opponent.name}</p>
               </div>
-              <HpBar label="HP" value={fight.oppHP} colorClass="bg-octagon-red" />
+              <div className="space-y-2">
+                <HpBar label="HP" value={fight.oppHP} colorClass="bg-octagon-red" />
+                <HpBar label="Stamina" value={fight.oppStamina} colorClass="bg-octagon-amber" />
+                <HpBar label="Mental" value={fight.oppMental} colorClass="bg-purple-400" />
+              </div>
             </div>
           </div>
 
@@ -805,14 +834,22 @@ export default function FightPage() {
                 <FighterPortrait imageUrl={fight.fighter.avatar_url} ringColor="#1D9E75" />
                 <p className="truncate font-semibold text-white">{fight.fighter.name}</p>
               </div>
-              <HpBar label="HP" value={fight.myHP} colorClass="bg-octagon-teal" />
+              <div className="space-y-2">
+                <HpBar label="HP" value={fight.myHP} colorClass="bg-octagon-teal" />
+                <HpBar label="Stamina" value={fight.myStamina} colorClass="bg-octagon-amber" />
+                <HpBar label="Mental" value={fight.myMental} colorClass="bg-purple-400" />
+              </div>
             </div>
             <div className="rounded-lg border border-octagon-border bg-octagon-card p-4">
               <div className="mb-2 flex items-center gap-3">
                 <FighterPortrait imageUrl={null} ringColor={fight.opponent.color} />
                 <p className="truncate font-semibold text-white">{fight.opponent.name}</p>
               </div>
-              <HpBar label="HP" value={fight.oppHP} colorClass="bg-octagon-red" />
+              <div className="space-y-2">
+                <HpBar label="HP" value={fight.oppHP} colorClass="bg-octagon-red" />
+                <HpBar label="Stamina" value={fight.oppStamina} colorClass="bg-octagon-amber" />
+                <HpBar label="Mental" value={fight.oppMental} colorClass="bg-purple-400" />
+              </div>
             </div>
           </div>
 

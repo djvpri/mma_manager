@@ -139,6 +139,10 @@ export interface RoundResult {
   finish: FinishMethod | null
   corner_advice: CornerAdvice | null
   ticks?: RoundTick[]
+  my_stamina?: number
+  opp_stamina?: number
+  my_mental?: number
+  opp_mental?: number
 }
 
 export interface GameState {

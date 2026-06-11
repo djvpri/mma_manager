@@ -18,6 +18,10 @@ interface FightState {
   roundResults: RoundResult[]
   myHP: number
   oppHP: number
+  myStamina: number
+  oppStamina: number
+  myMental: number
+  oppMental: number
   aiCornerText: string
   aiNarration: string
   aiLoading: boolean
@@ -52,6 +56,7 @@ interface GameStore {
   addRoundResult: (result: RoundResult) => void
   setMyHP: (hp: number) => void
   setOppHP: (hp: number) => void
+  setFightVitals: (vitals: { myStamina: number; oppStamina: number; myMental: number; oppMental: number }) => void
   setAiCornerText: (text: string) => void
   setAiNarration: (text: string) => void
   setAiLoading: (loading: boolean) => void
@@ -75,6 +80,10 @@ const defaultFight: FightState = {
   roundResults: [],
   myHP: 100,
   oppHP: 100,
+  myStamina: 100,
+  oppStamina: 100,
+  myMental: 100,
+  oppMental: 100,
   aiCornerText: '',
   aiNarration: '',
   aiLoading: false,
@@ -117,6 +126,7 @@ export const useGameStore = create<GameStore>()(
         set((s) => ({ fight: { ...s.fight, roundResults: [...s.fight.roundResults, result] } })),
       setMyHP: (hp) => set((s) => ({ fight: { ...s.fight, myHP: hp } })),
       setOppHP: (hp) => set((s) => ({ fight: { ...s.fight, oppHP: hp } })),
+      setFightVitals: (vitals) => set((s) => ({ fight: { ...s.fight, ...vitals } })),
       setAiCornerText: (text) =>
         set((s) => ({ fight: { ...s.fight, aiCornerText: text } })),
       setAiNarration: (text) =>
