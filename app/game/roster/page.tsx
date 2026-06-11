@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
@@ -8,7 +8,7 @@ import { useGameStore } from '@/store/game-store'
 import FighterCard from '@/components/roster/FighterCard'
 import { buildWeeklyReport, type WeeklyReport } from '@/lib/weekly-report'
 import { formatCurrency } from '@/lib/format'
-import type { Fighter } from '@/types'
+import type { Fighter, Gym } from '@/types'
 
 export default function RosterPage() {
   const fighters = useGameStore((s) => s.fighters)
@@ -18,6 +18,17 @@ export default function RosterPage() {
 
   const router = useRouter()
   const [advancing, setAdvancing] = useState(false)
+
+  // Refresh gym dari Supabase setiap kali halaman ini dimuat,
+  // agar event.fighter_ids selalu mencerminkan hasil fight terbaru
+  useEffect(() => {
+    if (!gym) return
+    const supabase = createClient()
+    supabase.from('gyms').select('*').eq('id', gym.id).single().then(({ data }) => {
+      if (data) setGym(data as Gym)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const [error, setError] = useState<string | null>(null)
   const [report, setReport] = useState<WeeklyReport | null>(null)
 
