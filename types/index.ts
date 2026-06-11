@@ -97,7 +97,7 @@ export interface FighterRecord {
 
 export interface Fighter {
   id: string
-  gym_id: string
+  gym_id: string | null   // null = free agent di pool
   name: string
   nickname: string
   age: number
