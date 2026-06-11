@@ -7,6 +7,18 @@ import { useGameStore } from '@/store/game-store'
 
 const CITIES = ['Jakarta', 'Bandung', 'Surabaya', 'Medan', 'Bali', 'Yogyakarta']
 
+const MIN_BALANCE = 50_000_000
+const MAX_BALANCE = 500_000_000
+const BALANCE_STEP = 10_000_000
+
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat('id-ID', {
+    style: 'currency',
+    currency: 'IDR',
+    maximumFractionDigits: 0,
+  }).format(value)
+}
+
 export default function OnboardingPage() {
   const router = useRouter()
   const setGym = useGameStore((s) => s.setGym)
@@ -14,6 +26,7 @@ export default function OnboardingPage() {
 
   const [name, setName] = useState('')
   const [city, setCity] = useState(CITIES[0])
+  const [balance, setBalance] = useState(MIN_BALANCE)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [checking, setChecking] = useState(true)
@@ -60,7 +73,7 @@ export default function OnboardingPage() {
 
     const { data: gym, error: gymError } = await supabase
       .from('gyms')
-      .insert({ user_id: user.id, name: name.trim() || 'Garuda MMA', city })
+      .insert({ user_id: user.id, name: name.trim() || 'Garuda MMA', city, balance })
       .select()
       .single()
 
@@ -116,6 +129,29 @@ export default function OnboardingPage() {
                 </option>
               ))}
             </select>
+          </div>
+
+          <div>
+            <div className="mb-1 flex items-center justify-between">
+              <label className="block text-xs font-medium text-gray-400">Saldo Awal</label>
+              <span className="text-sm font-semibold text-octagon-amber">{formatCurrency(balance)}</span>
+            </div>
+            <input
+              type="range"
+              min={MIN_BALANCE}
+              max={MAX_BALANCE}
+              step={BALANCE_STEP}
+              value={balance}
+              onChange={(e) => setBalance(Number(e.target.value))}
+              className="w-full accent-octagon-red"
+            />
+            <div className="mt-1 flex justify-between text-[10px] text-gray-500">
+              <span>{formatCurrency(MIN_BALANCE)}</span>
+              <span>{formatCurrency(MAX_BALANCE)}</span>
+            </div>
+            <p className="mt-1 text-xs text-gray-400">
+              Saldo lebih besar mempermudah awal permainan, namun reputasi & pemasukan tetap dimulai dari nol.
+            </p>
           </div>
 
           {error && <p className="text-sm text-octagon-red">{error}</p>}
