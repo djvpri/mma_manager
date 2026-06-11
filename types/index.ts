@@ -118,6 +118,7 @@ export interface FighterRecord {
 export interface Fighter {
   id: string
   gym_id: string | null   // null = free agent di pool
+  is_cpu?: boolean         // true = roster CPU gym, dikontrol simulasi
   name: string
   nickname: string
   age: number

@@ -56,16 +56,16 @@ export default function LeaderboardPage() {
     supabase.from('leaderboard').select('*')
       .order('reputation', { ascending: false })
       .order('total_wins',  { ascending: false })
-      .limit(50)
+      .limit(60)
       .then(({ data, error: e }) => {
         if (e) setError(e.message)
         else setEntries((data ?? []) as LeaderboardEntry[])
       })
   }, [])
 
-  // Champions: load gelar juara per weight class
+  // Champions: load gelar juara per weight class (on-mount, dipakai juga untuk badge di Ranking Fighter)
   useEffect(() => {
-    if (tab !== 'champions' || champions !== null) return
+    if (champions !== null) return
     const supabase = createClient()
     supabase.from('championships').select('*')
       .then(({ data }) => {
@@ -73,7 +73,7 @@ export default function LeaderboardPage() {
         rows.sort((a, b) => WEIGHT_CLASSES.indexOf(a.weight_class) - WEIGHT_CLASSES.indexOf(b.weight_class))
         setChampions(rows)
       })
-  }, [tab, champions])
+  }, [champions])
 
   // Fighter rankings: load pool + player fighters untuk weight class terpilih
   useEffect(() => {
@@ -98,6 +98,12 @@ export default function LeaderboardPage() {
         .sort((a, b) => overallRating(b.attrs) - overallRating(a.attrs))
         .slice(0, 25)
     : []
+
+  // Map gym_id -> nama gym (untuk label CPU gym di Ranking Fighter)
+  const gymNameMap = new Map((entries ?? []).map((e) => [e.gym_id, e.gym_name]))
+
+  // Champion fighter id untuk weight class yang dipilih (badge 🏆)
+  const championForWC = champions?.find((c) => c.weight_class === selectedWC)
 
   const myTier = getGymTier(gym.reputation)
 
@@ -237,7 +243,8 @@ export default function LeaderboardPage() {
                     const isMyFighter = f.gym_id === gym.id
                     const isFreeAgent = f.gym_id === null
                     const ovr         = overallRating(f.attrs)
-                    const gymLabel    = isMyFighter ? gym.name : isFreeAgent ? 'Free Agent' : 'Gym Lain'
+                    const gymLabel    = isMyFighter ? gym.name : isFreeAgent ? 'Free Agent' : (gymNameMap.get(f.gym_id ?? '') ?? 'Gym Lain')
+                    const isChampion  = championForWC?.champion_fighter_id === f.id
 
                     return (
                       <tr key={f.id}
@@ -250,7 +257,7 @@ export default function LeaderboardPage() {
                         </td>
                         <td className="px-3 py-3">
                           <p className={`font-semibold ${isMyFighter ? 'text-octagon-red' : 'text-white'}`}>
-                            {f.name}{isMyFighter && ' ★'}
+                            {isChampion && '🏆 '}{f.name}{isMyFighter && ' ★'}
                           </p>
                           <p className="text-xs text-gray-500">{f.specialty} · {f.age} th</p>
                         </td>

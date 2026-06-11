@@ -189,23 +189,36 @@ export function getBestAvailableSlot(event: MmaEvent, fighterWins: number): Even
   return null
 }
 
-/** Fetch opponent dari pool (weight class sama, wins mirip). */
+/** Fetch opponent dari pool free agent + roster CPU gym (weight class sama, wins mirip). */
 export async function fetchPoolOpponent(
   weightClass: WeightClass,
   targetWins: number
 ): Promise<MmaEvent['slots'][0]['opponent']> {
   const supabase = createClient()
-  const { data } = await supabase
-    .from('fighters')
-    .select('name, attrs, record, specialty')
-    .is('gym_id', null)
-    .eq('status', 'prospect')
-    .eq('weight_class', weightClass)
-    .limit(30)
+  const [{ data: poolData }, { data: cpuData }] = await Promise.all([
+    supabase
+      .from('fighters')
+      .select('name, attrs, record, specialty')
+      .is('gym_id', null)
+      .eq('status', 'prospect')
+      .eq('weight_class', weightClass)
+      .limit(30),
+    supabase
+      .from('fighters')
+      .select('name, attrs, record, specialty')
+      .eq('is_cpu', true)
+      .eq('status', 'active')
+      .eq('weight_class', weightClass)
+      .limit(30),
+  ])
 
-  if (!data || data.length === 0) return generateFallbackOpponent(targetWins)
+  const pool = [
+    ...((poolData ?? []) as Pick<Fighter, 'name' | 'attrs' | 'record' | 'specialty'>[]),
+    ...((cpuData ?? []) as Pick<Fighter, 'name' | 'attrs' | 'record' | 'specialty'>[]),
+  ]
 
-  const pool = data as Pick<Fighter, 'name' | 'attrs' | 'record' | 'specialty'>[]
+  if (pool.length === 0) return generateFallbackOpponent(targetWins)
+
   const similar = pool.filter((f) => Math.abs(f.record.w - targetWins) <= 4)
   const chosen  = similar.length > 0 ? pick(similar) : pick(pool)
 
