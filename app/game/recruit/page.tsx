@@ -7,6 +7,8 @@ import Avatar from '@/components/avatar/Avatar'
 import { generateRecruitPool, type RecruitCandidate } from '@/lib/generate-recruits'
 import { getPotentialLabel } from '@/lib/potential'
 import { getCategoryAverages } from '@/lib/attrs'
+import type { ContractOffer } from '@/lib/negotiation'
+import NegotiationPanel from '@/components/recruit/NegotiationPanel'
 
 const POOL_SIZE = 6
 
@@ -28,7 +30,9 @@ export default function RecruitPage() {
   const [signingId, setSigningId] = useState<string | null>(null)
   const [scoutingId, setScoutingId] = useState<string | null>(null)
   const [scoutTexts, setScoutTexts] = useState<Record<string, string>>({})
+  const [negotiatingId, setNegotiatingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [info, setInfo] = useState<string | null>(null)
 
   if (!gym) {
     return <p className="text-sm text-gray-400">Memuat data gym...</p>
@@ -36,8 +40,16 @@ export default function RecruitPage() {
 
   function handleRefresh() {
     setError(null)
+    setInfo(null)
     setScoutTexts({})
+    setNegotiatingId(null)
     setPool(generateRecruitPool(POOL_SIZE))
+  }
+
+  function handleWalkAway(candidate: RecruitCandidate) {
+    setNegotiatingId(null)
+    setInfo(`${candidate.name} pergi mencari tawaran lain.`)
+    setPool((p) => p.filter((c) => c.id !== candidate.id))
   }
 
   async function handleScout(candidate: RecruitCandidate) {
@@ -57,12 +69,13 @@ export default function RecruitPage() {
     }
   }
 
-  async function handleRecruit(candidate: RecruitCandidate) {
+  async function handleSignContract(candidate: RecruitCandidate, offer: ContractOffer) {
     if (!gym) return
     setError(null)
+    setInfo(null)
 
-    if (gym.balance < candidate.cost) {
-      setError('Saldo tidak cukup untuk merekrut fighter ini.')
+    if (gym.balance < offer.bonus) {
+      setError('Saldo tidak cukup untuk membayar bonus tanda tangan.')
       return
     }
 
@@ -85,7 +98,8 @@ export default function RecruitPage() {
         record: candidate.record,
         potential: candidate.potential,
         avatar_seed: candidate.avatar_seed,
-        salary_monthly: candidate.salary_monthly,
+        salary_monthly: offer.salary,
+        contract_fights_left: offer.contractLength,
       })
       .select()
       .single()
@@ -96,8 +110,8 @@ export default function RecruitPage() {
       return
     }
 
-    const newBalance = gym.balance - candidate.cost
-    const newExpense = gym.monthly_expense + candidate.salary_monthly
+    const newBalance = gym.balance - offer.bonus
+    const newExpense = gym.monthly_expense + offer.salary
     const { error: balanceError } = await supabase
       .from('gyms')
       .update({ balance: newBalance, monthly_expense: newExpense })
@@ -112,6 +126,7 @@ export default function RecruitPage() {
     setGym({ ...gym, balance: newBalance, monthly_expense: newExpense })
     setFighters([...fighters, newFighter])
     setPool((p) => p.filter((c) => c.id !== candidate.id))
+    setNegotiatingId(null)
     setSigningId(null)
   }
 
@@ -133,6 +148,7 @@ export default function RecruitPage() {
       </header>
 
       {error && <p className="text-sm text-octagon-red">{error}</p>}
+      {info && <p className="text-sm text-octagon-teal">{info}</p>}
 
       {pool.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-octagon-border bg-octagon-card py-16 text-center">
@@ -144,7 +160,6 @@ export default function RecruitPage() {
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {pool.map((candidate) => {
-            const canAfford = gym.balance >= candidate.cost
             return (
               <div key={candidate.id} className="rounded-lg border border-octagon-border bg-octagon-card p-4">
                 <div className="flex items-start gap-3">
@@ -194,11 +209,11 @@ export default function RecruitPage() {
                 </div>
 
                 <div className="mt-3 flex items-center justify-between text-sm">
-                  <span className="text-xs text-gray-400">Gaji/bulan</span>
+                  <span className="text-xs text-gray-400">Perkiraan gaji/bulan</span>
                   <span className="font-medium text-white">{formatCurrency(candidate.salary_monthly)}</span>
                 </div>
                 <div className="mt-1 flex items-center justify-between text-sm">
-                  <span className="text-xs text-gray-400">Biaya kontrak</span>
+                  <span className="text-xs text-gray-400">Perkiraan bonus tanda tangan</span>
                   <span className="font-semibold text-octagon-amber">{formatCurrency(candidate.cost)}</span>
                 </div>
 
@@ -217,13 +232,26 @@ export default function RecruitPage() {
                     {scoutingId === candidate.id ? 'Memuat...' : 'Scouting Report AI'}
                   </button>
                   <button
-                    onClick={() => handleRecruit(candidate)}
-                    disabled={!canAfford || signingId === candidate.id}
+                    onClick={() => setNegotiatingId((id) => (id === candidate.id ? null : candidate.id))}
+                    disabled={signingId === candidate.id}
                     className="flex-1 rounded-md bg-octagon-red px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-octagon-red/90 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {signingId === candidate.id ? 'Memproses...' : 'Rekrut'}
+                    {negotiatingId === candidate.id ? 'Tutup Negosiasi' : 'Nego Kontrak'}
                   </button>
                 </div>
+
+                {negotiatingId === candidate.id && (
+                  <NegotiationPanel
+                    key={candidate.id}
+                    candidate={candidate}
+                    reputation={gym.reputation}
+                    balance={gym.balance}
+                    signing={signingId === candidate.id}
+                    onCancel={() => setNegotiatingId(null)}
+                    onAccept={(offer) => handleSignContract(candidate, offer)}
+                    onWalkAway={() => handleWalkAway(candidate)}
+                  />
+                )}
               </div>
             )
           })}
