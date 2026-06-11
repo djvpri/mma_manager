@@ -70,6 +70,7 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
   const buyoutCost = isUnderContract ? fighter.buyout_clause : 0
   const potentialLabel = getPotentialLabel(fighter.potential)
   const updateFighter = useGameStore((s) => s.updateFighter)
+  const removeFighter = useGameStore((s) => s.removeFighter)
   const gym = useGameStore((s) => s.gym)
   const setGym = useGameStore((s) => s.setGym)
   const seasonWeek = gym?.season_week ?? 1
@@ -179,31 +180,23 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
     setReleasing(true)
     const supabase = createClient()
 
-    const { error: updateError } = await supabase
-      .from('fighters')
-      .update({ status: 'retired' })
-      .eq('id', fighter.id)
-    if (updateError) {
-      setReleaseError(updateError.message)
+    const { error } = await supabase.rpc('release_fighter_to_pool', {
+      p_fighter_id:  fighter.id,
+      p_gym_id:      gym.id,
+      p_buyout_cost: buyoutCost,
+      p_salary:      fighter.salary_monthly,
+    })
+
+    if (error) {
+      setReleaseError(error.message)
       setReleasing(false)
       return
     }
 
     const newBalance = gym.balance - buyoutCost
     const newExpense = Math.max(0, gym.monthly_expense - fighter.salary_monthly)
-    const { error: gymError } = await supabase
-      .from('gyms')
-      .update({ balance: newBalance, monthly_expense: newExpense })
-      .eq('id', gym.id)
-
-    if (gymError) {
-      setReleaseError(gymError.message)
-      setReleasing(false)
-      return
-    }
-
     setGym({ ...gym, balance: newBalance, monthly_expense: newExpense })
-    updateFighter(fighter.id, { status: 'retired' })
+    removeFighter(fighter.id)
   }
 
   async function handleGenerateAvatar() {
