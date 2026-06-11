@@ -45,7 +45,9 @@ export default function LeaderboardPage() {
   const [entries, setEntries]       = useState<LeaderboardEntry[] | null>(null)
   const [poolFighters, setPool]     = useState<Fighter[] | null>(null)
   const [champions, setChampions]   = useState<Championship[] | null>(null)
-  const [selectedWC, setSelectedWC] = useState<WeightClass>('Flyweight')
+  const [selectedWC, setSelectedWC] = useState<WeightClass>(
+    () => fighters.find((f) => f.status !== 'retired')?.weight_class ?? 'Flyweight'
+  )
   const [error, setError]           = useState<string | null>(null)
 
   // Gym leaderboard
