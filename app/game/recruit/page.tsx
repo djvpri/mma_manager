@@ -6,16 +6,9 @@ import { useGameStore } from '@/store/game-store'
 import Avatar from '@/components/avatar/Avatar'
 import { generateRecruitPool, type RecruitCandidate } from '@/lib/generate-recruits'
 import { getPotentialLabel } from '@/lib/potential'
+import { getCategoryAverages } from '@/lib/attrs'
 
 const POOL_SIZE = 6
-
-const ATTR_LABELS: { key: keyof RecruitCandidate['attrs']; label: string }[] = [
-  { key: 'striking', label: 'STR' },
-  { key: 'grappling', label: 'GRP' },
-  { key: 'cardio', label: 'CDO' },
-  { key: 'fight_iq', label: 'IQ' },
-  { key: 'mental', label: 'MNT' },
-]
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('id-ID', {
@@ -186,16 +179,16 @@ export default function RecruitPage() {
                 </div>
 
                 <div className="mt-3 space-y-1.5">
-                  {ATTR_LABELS.map(({ key, label }) => (
+                  {getCategoryAverages(candidate.attrs).map(({ key, label, value }) => (
                     <div key={key} className="flex items-center gap-2">
                       <span className="w-8 text-[10px] font-medium text-gray-500">{label}</span>
                       <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-octagon-dark">
                         <div
                           className="h-full rounded-full bg-octagon-teal"
-                          style={{ width: `${candidate.attrs[key]}%` }}
+                          style={{ width: `${value}%` }}
                         />
                       </div>
-                      <span className="w-6 text-right text-[10px] text-gray-400">{candidate.attrs[key]}</span>
+                      <span className="w-6 text-right text-[10px] text-gray-400">{value}</span>
                     </div>
                   ))}
                 </div>

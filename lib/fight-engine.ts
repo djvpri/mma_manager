@@ -26,13 +26,38 @@ const CORNER_MODS: Record<CornerAdvice, [number, number]> = {
   striking: [1.10, 0.93],
 }
 
+// Skor ofensif: gabungan kekuatan/akurasi striking, grappling, kecepatan, dan fight IQ
+function offenseScore(attrs: FighterAttrs): number {
+  return (
+    attrs.punch_power * 0.18 +
+    attrs.kick_power * 0.12 +
+    attrs.accuracy * 0.20 +
+    attrs.takedowns * 0.12 +
+    attrs.ground_control * 0.10 +
+    attrs.submission * 0.08 +
+    attrs.speed * 0.08 +
+    attrs.fight_iq * 0.12
+  )
+}
+
+// Skor defensif: seberapa sulit fighter ini ditembus/dijatuhkan
+function defenseScore(attrs: FighterAttrs): number {
+  return (
+    attrs.striking_defense * 0.35 +
+    attrs.takedown_defense * 0.25 +
+    attrs.durability * 0.25 +
+    attrs.chin * 0.15
+  )
+}
+
 export function simulateRound(config: FightConfig): RoundResult {
   const { myFighter, opponent, gamePlan, cornerAdvice, roundNum, myStamina, oppStamina, myMental, oppMental } = config
   const a = myFighter.attrs
   const o = opponent.attrs
 
-  let myScore = a.striking * 0.35 + a.grappling * 0.25 + a.cardio * 0.20 + a.fight_iq * 0.20
-  let opScore = o.striking * 0.35 + o.grappling * 0.25 + o.cardio * 0.20 + o.fight_iq * 0.20
+  // Defense lawan meredam/memperkuat skor ofensif (defense 50 = netral, ±20% di ujung skala)
+  let myScore = offenseScore(a) * (1 - (defenseScore(o) - 50) / 250)
+  let opScore = offenseScore(o) * (1 - (defenseScore(a) - 50) / 250)
 
   const [mm, om] = GAME_PLAN_MODS[gamePlan]
   const [cm, co] = CORNER_MODS[cornerAdvice]
@@ -53,13 +78,15 @@ export function simulateRound(config: FightConfig): RoundResult {
   const myPct = Math.round((myScore / total) * 100)
   const winner = myScore > opScore ? 'my' : 'opp'
 
-  // Finish chance — makin besar jika lawan kehabisan stamina/mental
+  // Finish chance — makin besar jika lawan kehabisan stamina/mental, diredam oleh chin & daya tahan lawan
   let finishChance = winner === 'my'
     ? Math.max(0, (myScore - opScore) / total * 1.8 - 0.1)
     : 0
   if (winner === 'my') {
     if (oppStamina < 30) finishChance += (30 - oppStamina) * 0.01
     if (oppMental < 40) finishChance += (40 - oppMental) * 0.01
+    const toughness = (o.chin * 0.6 + o.durability * 0.4) / 100
+    finishChance *= 1 - toughness * 0.35
   }
 
   let finish: FinishMethod | null = null
@@ -92,8 +119,8 @@ export function simulateRound(config: FightConfig): RoundResult {
     finish,
     corner_advice: cornerAdvice,
     ticks,
-    my_stamina: clamp(myStamina - myStaminaLoss(gamePlan, cornerAdvice, a.cardio), 0, 100),
-    opp_stamina: clamp(oppStamina - oppStaminaLoss(o.cardio), 0, 100),
+    my_stamina: clamp(myStamina - myStaminaLoss(gamePlan, cornerAdvice, a.cardio, a.recovery), 0, 100),
+    opp_stamina: clamp(oppStamina - oppStaminaLoss(o.cardio, o.recovery), 0, 100),
     my_mental: clamp(myMental + mentalChange(winner === 'my', dmgToMe, myFinished, a.mental), 0, 100),
     opp_mental: clamp(oppMental + mentalChange(winner === 'opp', dmgToOpp, oppFinished, o.mental), 0, 100),
   }
@@ -117,18 +144,20 @@ const CORNER_STAMINA_COST: Record<CornerAdvice, number> = {
   striking: 2,
 }
 
-function myStaminaLoss(gamePlan: GamePlan, cornerAdvice: CornerAdvice, cardio: number): number {
+function myStaminaLoss(gamePlan: GamePlan, cornerAdvice: CornerAdvice, cardio: number, recovery: number): number {
   const base = GAME_PLAN_STAMINA_COST[gamePlan] + CORNER_STAMINA_COST[cornerAdvice]
   const cardioRelief = (cardio - 70) * 0.08
+  const recoveryRelief = (recovery - 70) * 0.04
   const variance = Math.random() * 4 - 2
-  return Math.max(3, Math.round(base - cardioRelief + variance))
+  return Math.max(3, Math.round(base - cardioRelief - recoveryRelief + variance))
 }
 
-function oppStaminaLoss(cardio: number): number {
+function oppStaminaLoss(cardio: number, recovery: number): number {
   const base = 10
   const cardioRelief = (cardio - 70) * 0.08
+  const recoveryRelief = (recovery - 70) * 0.04
   const variance = Math.random() * 4 - 2
-  return Math.max(3, Math.round(base - cardioRelief + variance))
+  return Math.max(3, Math.round(base - cardioRelief - recoveryRelief + variance))
 }
 
 // Perubahan mental setelah satu ronde: menang menambah, kalah/kena hit besar/finish mengurangi.

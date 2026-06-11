@@ -1,4 +1,5 @@
 import type { Fighter, RoundResult, GamePlan } from '@/types'
+import { getCategoryAverages } from './attrs'
 
 export async function getAICornerAdvice(
   roundNum: number,
@@ -11,11 +12,12 @@ export async function getAICornerAdvice(
   const myWins = roundResults.filter((r) => r.winner === 'my').length
   const oppWins = roundResults.filter((r) => r.winner === 'opp').length
   const last = roundResults[roundResults.length - 1]
+  const cats = Object.fromEntries(getCategoryAverages(myFighter.attrs).map((c) => [c.key, c.value]))
 
   const prompt = `Kamu adalah corner man MMA. Berikan instruksi corner yang tajam dan spesifik dalam Bahasa Indonesia (maks 3 kalimat, langsung ke intinya seperti trainer sungguhan).
 
 Situasi:
-- Fighter: ${myFighter.name} (${myFighter.specialty}, STK ${myFighter.attrs.striking}, GRP ${myFighter.attrs.grappling})
+- Fighter: ${myFighter.name} (${myFighter.specialty}, STR ${cats.striking}, GRP ${cats.grappling}, FIS ${cats.physical}, MOV ${cats.movement}, MNT ${cats.mental})
 - Lawan: ${oppName} (${oppSpecialty})
 - Ronde baru selesai: ${roundNum}
 - Skor: kita ${myWins} – ${oppWins} lawan

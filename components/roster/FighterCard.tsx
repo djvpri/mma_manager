@@ -8,6 +8,7 @@ import { generateFighterAvatar } from '@/lib/ai-avatar'
 import { createClient } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/format'
 import { getPotentialLabel } from '@/lib/potential'
+import { ATTR_GROUPS, getCategoryAverages } from '@/lib/attrs'
 
 const STATUS_STYLES: Record<Fighter['status'], string> = {
   active: 'border-octagon-teal/30 bg-octagon-teal/15 text-octagon-teal',
@@ -24,22 +25,6 @@ const STATUS_LABELS: Record<Fighter['status'], string> = {
   prospect: 'Prospek',
   retired: 'Pensiun',
 }
-
-const ATTR_LABELS: { key: keyof Fighter['attrs']; label: string }[] = [
-  { key: 'striking', label: 'STR' },
-  { key: 'grappling', label: 'GRP' },
-  { key: 'cardio', label: 'CDO' },
-  { key: 'fight_iq', label: 'IQ' },
-  { key: 'mental', label: 'MNT' },
-]
-
-const FOCUS_OPTIONS: { key: keyof Fighter['attrs']; label: string }[] = [
-  { key: 'striking', label: 'Striking' },
-  { key: 'grappling', label: 'Grappling' },
-  { key: 'cardio', label: 'Cardio' },
-  { key: 'fight_iq', label: 'Fight IQ' },
-  { key: 'mental', label: 'Mental' },
-]
 
 export default function FighterCard({ fighter }: { fighter: Fighter }) {
   const { record, attrs } = fighter
@@ -227,13 +212,13 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
       </div>
 
       <div className="mt-3 space-y-1.5">
-        {ATTR_LABELS.map(({ key, label }) => (
+        {getCategoryAverages(attrs).map(({ key, label, value }) => (
           <div key={key} className="flex items-center gap-2">
             <span className="w-8 text-[10px] font-medium text-gray-500">{label}</span>
             <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-octagon-dark">
-              <div className="h-full rounded-full bg-octagon-teal" style={{ width: `${attrs[key]}%` }} />
+              <div className="h-full rounded-full bg-octagon-teal" style={{ width: `${value}%` }} />
             </div>
-            <span className="w-6 text-right text-[10px] text-gray-400">{attrs[key]}</span>
+            <span className="w-6 text-right text-[10px] text-gray-400">{value}</span>
           </div>
         ))}
       </div>
@@ -251,10 +236,14 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
             className="rounded-md border border-octagon-border bg-octagon-dark px-2 py-1 text-xs text-white disabled:opacity-50"
           >
             <option value="">Tidak ada</option>
-            {FOCUS_OPTIONS.map(({ key, label }) => (
-              <option key={key} value={key}>
-                {label}
-              </option>
+            {ATTR_GROUPS.map((group) => (
+              <optgroup key={group.key} label={group.label}>
+                {group.attrs.map(({ key, label }) => (
+                  <option key={key} value={key}>
+                    {label}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
         </div>

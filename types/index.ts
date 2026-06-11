@@ -30,9 +30,24 @@ export type CornerAdvice = 'push' | 'patient' | 'takedown' | 'striking'
 export type FinishMethod = 'ko' | 'tko' | 'submission' | 'decision'
 
 export interface FighterAttrs {
-  striking: number    // 0–100
-  grappling: number
+  // Striking
+  punch_power: number    // 0–100
+  kick_power: number
+  accuracy: number
+  striking_defense: number
+  // Grappling
+  takedowns: number
+  takedown_defense: number
+  ground_control: number
+  submission: number
+  // Fisik
   cardio: number
+  chin: number
+  durability: number
+  recovery: number
+  // Pergerakan
+  speed: number
+  // Mental
   fight_iq: number
   mental: number
 }

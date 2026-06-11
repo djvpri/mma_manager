@@ -9,6 +9,7 @@ import { getAICornerAdvice } from '@/lib/ai-corner'
 import { createClient } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/format'
 import { syncLeaderboard } from '@/lib/leaderboard'
+import { ATTR_GROUPS, ALL_ATTR_KEYS } from '@/lib/attrs'
 import type { Fighter, FighterAttrs, GamePlan, CornerAdvice, Specialty, RoundResult, RoundTick } from '@/types'
 
 const TOTAL_ROUNDS = 3
@@ -56,24 +57,12 @@ function formatClock(totalSec: number): string {
 }
 
 function generateOpponent(myFighter: Fighter): Opponent {
-  const avg =
-    (myFighter.attrs.striking +
-      myFighter.attrs.grappling +
-      myFighter.attrs.cardio +
-      myFighter.attrs.fight_iq +
-      myFighter.attrs.mental) /
-    5
+  const avg = ALL_ATTR_KEYS.reduce((sum, key) => sum + myFighter.attrs[key], 0) / ALL_ATTR_KEYS.length
   const roll = () => Math.max(35, Math.min(95, Math.round(avg + randInt(-12, 12))))
 
   return {
     name: OPPONENT_NAMES[randInt(0, OPPONENT_NAMES.length - 1)],
-    attrs: {
-      striking: roll(),
-      grappling: roll(),
-      cardio: roll(),
-      fight_iq: roll(),
-      mental: roll(),
-    },
+    attrs: Object.fromEntries(ALL_ATTR_KEYS.map((key) => [key, roll()])) as unknown as FighterAttrs,
     record: { w: randInt(3, 18), l: randInt(0, 8), d: 0 },
     specialty: SPECIALTIES[randInt(0, SPECIALTIES.length - 1)],
     color: OPPONENT_COLORS[randInt(0, OPPONENT_COLORS.length - 1)],
@@ -140,14 +129,6 @@ function RoundSplitBar({
     </div>
   )
 }
-
-const ATTR_LABELS: { key: keyof FighterAttrs; label: string }[] = [
-  { key: 'striking', label: 'Striking' },
-  { key: 'grappling', label: 'Grappling' },
-  { key: 'cardio', label: 'Cardio' },
-  { key: 'fight_iq', label: 'Fight IQ' },
-  { key: 'mental', label: 'Mental' },
-]
 
 function AttrCompareBar({
   label,
@@ -727,15 +708,22 @@ export default function FightPage() {
 
           <div className="rounded-lg border border-octagon-border bg-octagon-card p-4">
             <p className="mb-3 text-xs font-semibold uppercase text-gray-500">Statistik Fighter</p>
-            <div className="space-y-3">
-              {ATTR_LABELS.map(({ key, label }) => (
-                <AttrCompareBar
-                  key={key}
-                  label={label}
-                  myVal={fight.fighter!.attrs[key]}
-                  oppVal={fight.opponent!.attrs[key]}
-                  oppColor={fight.opponent!.color}
-                />
+            <div className="space-y-4">
+              {ATTR_GROUPS.map((group) => (
+                <div key={group.key}>
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600">{group.label}</p>
+                  <div className="space-y-3">
+                    {group.attrs.map(({ key, label }) => (
+                      <AttrCompareBar
+                        key={key}
+                        label={label}
+                        myVal={fight.fighter!.attrs[key]}
+                        oppVal={fight.opponent!.attrs[key]}
+                        oppColor={fight.opponent!.color}
+                      />
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           </div>

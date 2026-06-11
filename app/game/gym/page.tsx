@@ -4,16 +4,9 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useGameStore } from '@/store/game-store'
 import type { Fighter, FighterAttrs, GymRooms } from '@/types'
+import { ATTR_NAME_LABELS } from '@/lib/attrs'
 
 type RoomKey = keyof GymRooms
-
-const ATTR_NAME_LABELS: Record<keyof FighterAttrs, string> = {
-  striking: 'Striking',
-  grappling: 'Grappling',
-  cardio: 'Cardio',
-  fight_iq: 'Fight IQ',
-  mental: 'Mental',
-}
 
 interface WeeklyReport {
   week: number

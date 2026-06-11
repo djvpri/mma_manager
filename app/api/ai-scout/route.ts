@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { getPotentialLabel } from '@/lib/potential'
+import { getCategoryAverages } from '@/lib/attrs'
 
 export async function POST(req: NextRequest) {
   try {
     const { fighter } = await req.json()
+    const cats = getCategoryAverages(fighter.attrs)
+    const attrText = cats.map((c) => `${c.label} ${c.value}`).join(', ')
 
     const prompt = `Kamu adalah talent scout MMA. Buat laporan scouting singkat dalam Bahasa Indonesia untuk evaluasi calon rekrutan berikut.
 
@@ -12,7 +15,7 @@ Nama: ${fighter.name} "${fighter.nickname}"
 Usia: ${fighter.age} tahun, Kelas: ${fighter.weight_class}
 Spesialisasi: ${fighter.specialty}, Kepribadian: ${fighter.personality}
 Rekor amatir: ${fighter.record.w}-${fighter.record.l}-${fighter.record.d}
-Atribut — Striking: ${fighter.attrs.striking}, Grappling: ${fighter.attrs.grappling}, Cardio: ${fighter.attrs.cardio}, Fight IQ: ${fighter.attrs.fight_iq}, Mental: ${fighter.attrs.mental}
+Atribut (rata-rata per kategori, skala 0-100) — ${attrText}
 Potensi jangka panjang: ${getPotentialLabel(fighter.potential).label}
 
 Format: 3 bagian singkat — (1) Kekuatan utama, (2) Kelemahan/risiko, (3) Rekomendasi rekrutmen & gaya pengembangan. Total maks 120 kata.`

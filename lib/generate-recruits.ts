@@ -1,4 +1,5 @@
 import type { WeightClass, Specialty, FighterPersonality, FighterAttrs, FighterRecord } from '@/types'
+import { ALL_ATTR_KEYS } from './attrs'
 
 export interface RecruitCandidate {
   id: string
@@ -66,16 +67,12 @@ export function generateRecruit(): RecruitCandidate {
   const potential = randInt(50, 92)
   const baseAttr = randInt(45, 70)
 
-  const attrs: FighterAttrs = {
-    striking: clampAttr(baseAttr + randInt(-10, 10)),
-    grappling: clampAttr(baseAttr + randInt(-10, 10)),
-    cardio: clampAttr(baseAttr + randInt(-10, 10)),
-    fight_iq: clampAttr(baseAttr + randInt(-10, 10)),
-    mental: clampAttr(baseAttr + randInt(-10, 10)),
-  }
+  const attrs = Object.fromEntries(
+    ALL_ATTR_KEYS.map((key) => [key, clampAttr(baseAttr + randInt(-10, 10))])
+  ) as unknown as FighterAttrs
 
-  const sumAttrs = attrs.striking + attrs.grappling + attrs.cardio + attrs.fight_iq + attrs.mental
-  const cost = Math.round(((sumAttrs + potential) * 100_000) / 500_000) * 500_000
+  const avgAttr = ALL_ATTR_KEYS.reduce((sum, key) => sum + attrs[key], 0) / ALL_ATTR_KEYS.length
+  const cost = Math.round(((avgAttr * 5 + potential) * 100_000) / 500_000) * 500_000
   const salary_monthly = Math.round((2_000_000 + potential * 25_000) / 100_000) * 100_000
 
   return {
