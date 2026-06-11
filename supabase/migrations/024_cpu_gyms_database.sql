@@ -2,6 +2,10 @@
 -- Tersebar di kota-kota Indonesia, bervariasi dari pemula hingga elite
 -- UUID deterministik via md5() agar aman di-re-run (ON CONFLICT DO NOTHING)
 
+-- Drop foreign key constraint agar leaderboard bisa menampung CPU gym
+-- yang tidak memiliki entri di tabel gyms
+ALTER TABLE leaderboard DROP CONSTRAINT IF EXISTS leaderboard_gym_id_fkey;
+
 INSERT INTO leaderboard (id, gym_id, gym_name, player_name, reputation, total_wins, top_fighters)
 VALUES
 
