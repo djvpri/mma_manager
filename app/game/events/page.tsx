@@ -1,206 +1,244 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import Avatar from '@/components/avatar/Avatar'
 import { useGameStore } from '@/store/game-store'
-import { createClient } from '@/lib/supabase'
 import {
-  EVENT_TIER_CONFIG,
-  EVENT_TIER_BADGE_CLASS,
-  getEventsForMonth,
-  ensureEventsForCurrentMonth,
+  PROMOTION_CONFIG,
+  SLOT_CONFIG,
+  ensureEventsForUpcomingWeeks,
+  registerFighterToEvent,
+  unregisterFighterFromEvent,
+  getBestAvailableSlot,
 } from '@/lib/generate-events'
+import { formatCurrency } from '@/lib/format'
 import type { Fighter, MmaEvent } from '@/types'
 
 export default function EventsPage() {
-  const gym = useGameStore((s) => s.gym)
+  const gym      = useGameStore((s) => s.gym)
   const fighters = useGameStore((s) => s.fighters)
-  const setGym = useGameStore((s) => s.setGym)
+  const setGym   = useGameStore((s) => s.setGym)
 
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [selected, setSelected] = useState<Record<string, string>>({})
-  const [busyEventId, setBusyEventId] = useState<string | null>(null)
+  const [loading, setLoading]   = useState(true)
+  const [error, setError]       = useState<string | null>(null)
+  const [busyId, setBusyId]     = useState<string | null>(null) // eventId_slotType
 
   useEffect(() => {
     if (!gym) return
     let cancelled = false
-    ensureEventsForCurrentMonth(gym).then((updated) => {
+    ensureEventsForUpcomingWeeks(gym).then((updated) => {
       if (cancelled) return
       if (updated !== gym) setGym(updated)
       setLoading(false)
     })
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gym?.id, gym?.season_week])
 
-  if (!gym || loading) {
-    return <p className="text-sm text-gray-400">Memuat kalender event...</p>
-  }
+  if (!gym || loading) return <p className="text-sm text-gray-400">Memuat kalender event...</p>
 
-  const seasonWeek = gym.season_week
-  const monthEvents = getEventsForMonth(gym.events, seasonWeek)
-  const registeredFighterIds = new Set(monthEvents.flatMap((e) => e.fighter_ids))
+  const seasonWeek    = gym.season_week
+  const activeFighters = fighters.filter(
+    (f) => f.status !== 'retired' && f.status !== 'injured'
+  )
 
-  function getRegisteredFighters(event: MmaEvent): Fighter[] {
-    return event.fighter_ids
-      .map((id) => fighters.find((f) => f.id === id))
-      .filter((f): f is Fighter => !!f)
-  }
+  // Semua fighter yang sudah terdaftar di event apapun
+  const registeredFighterIds = new Set(
+    gym.events.flatMap((e) => e.slots.map((s) => s.fighter_id).filter(Boolean)) as string[]
+  )
 
+  // Upcoming events: minggu ini + 3 ke depan
+  const upcomingEvents = gym.events
+    .filter((e) => e.week >= seasonWeek && e.week <= seasonWeek + 3)
+    .sort((a, b) => a.week - b.week)
+
+  // Fighter yang eligible untuk event tertentu
   function getEligibleFighters(event: MmaEvent): Fighter[] {
-    return fighters.filter(
-      (f) =>
-        f.status !== 'retired' &&
-        f.status !== 'injured' &&
-        (f.next_fight_week === null || f.next_fight_week <= event.week) &&
-        !registeredFighterIds.has(f.id)
-    )
+    const promoCfg = PROMOTION_CONFIG[event.promotion]
+    return activeFighters.filter((f) => {
+      if (f.weight_class !== event.weight_class) return false
+      if (f.record.w < promoCfg.minWins) return false
+      if (registeredFighterIds.has(f.id)) return false
+      if (f.next_fight_week !== null && f.next_fight_week > seasonWeek) return false
+      return true
+    })
   }
 
-  async function persistEvents(newEvents: MmaEvent[]) {
+  async function handleRegister(event: MmaEvent, fighter: Fighter) {
     if (!gym) return
-    const supabase = createClient()
-    const { data, error: updateError } = await supabase
-      .from('gyms')
-      .update({ events: newEvents })
-      .eq('id', gym.id)
-      .select()
-      .single()
-
-    if (updateError) {
-      setError(updateError.message)
-      return
-    }
-    if (data) setGym(data)
-  }
-
-  async function handleRegister(event: MmaEvent) {
-    if (!gym) return
-    const fighterId = selected[event.id]
-    if (!fighterId) return
-
     setError(null)
-    setBusyEventId(event.id)
-    const newEvents = gym.events.map((e) =>
-      e.id === event.id ? { ...e, fighter_ids: [...e.fighter_ids, fighterId] } : e
-    )
-    await persistEvents(newEvents)
-    setSelected((s) => ({ ...s, [event.id]: '' }))
-    setBusyEventId(null)
+    setBusyId(`${event.id}_register`)
+
+    const updated = await registerFighterToEvent(gym, event.id, fighter)
+    if (!updated) {
+      setError('Gagal mendaftarkan fighter. Coba lagi.')
+    } else {
+      setGym(updated)
+    }
+    setBusyId(null)
   }
 
   async function handleUnregister(event: MmaEvent, fighterId: string) {
     if (!gym) return
     setError(null)
-    setBusyEventId(event.id)
-    const newEvents = gym.events.map((e) =>
-      e.id === event.id ? { ...e, fighter_ids: e.fighter_ids.filter((id) => id !== fighterId) } : e
-    )
-    await persistEvents(newEvents)
-    setBusyEventId(null)
+    setBusyId(`${event.id}_unregister`)
+
+    const updated = await unregisterFighterFromEvent(gym, event.id, fighterId)
+    if (!updated) {
+      setError('Gagal membatalkan pendaftaran.')
+    } else {
+      setGym(updated)
+    }
+    setBusyId(null)
   }
 
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-bold text-white">Kalender Event MMA</h1>
+        <h1 className="text-2xl font-bold text-white">Kalender Event</h1>
         <p className="text-sm text-gray-400">
-          Daftarkan fighter ke event bulan ini, atau biarkan istirahat — fighter hanya bisa
-          bertanding pada minggu event yang ia ikuti.
+          Daftarkan fighter ke event — slot & lawan otomatis dipilihkan sesuai rekam bertanding.
         </p>
       </header>
 
       {error && <p className="text-sm text-octagon-red">{error}</p>}
 
-      {monthEvents.length === 0 ? (
+      {upcomingEvents.length === 0 ? (
         <div className="rounded-lg border border-dashed border-octagon-border bg-octagon-card p-8 text-center">
-          <p className="text-gray-400">Tidak ada event MMA bulan ini.</p>
+          <p className="text-gray-400">Tidak ada event mendatang.</p>
         </div>
       ) : (
-        <div className="space-y-4">
-          {monthEvents.map((event) => {
-            const tierConfig = EVENT_TIER_CONFIG[event.tier]
-            const isPast = event.week < seasonWeek
-            const isToday = event.week === seasonWeek
-            const registered = getRegisteredFighters(event)
-            const eligible = getEligibleFighters(event)
-            const busy = busyEventId === event.id
+        <div className="space-y-6">
+          {upcomingEvents.map((event) => {
+            const promoCfg    = PROMOTION_CONFIG[event.promotion]
+            const isPast      = event.week < seasonWeek
+            const isThisWeek  = event.week === seasonWeek
+            const eligible    = getEligibleFighters(event)
+            const isBusy      = busyId?.startsWith(event.id) ?? false
 
             return (
-              <div
-                key={event.id}
-                className={`rounded-lg border border-octagon-border bg-octagon-card p-4 ${isPast ? 'opacity-60' : ''}`}
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
+              <div key={event.id} className={`rounded-lg border bg-octagon-card ${isPast ? 'opacity-50 border-octagon-border' : 'border-octagon-border'}`}>
+                {/* Event header */}
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-octagon-border px-4 py-3">
                   <div>
-                    <p className="font-semibold text-white">{event.name}</p>
+                    <div className="flex items-center gap-2">
+                      <span className={`rounded border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${promoCfg.badgeClass}`}>
+                        {promoCfg.label}
+                      </span>
+                      {isThisWeek && (
+                        <span className="rounded border border-octagon-red/40 bg-octagon-red/10 px-2 py-0.5 text-[10px] font-semibold text-octagon-red">
+                          Minggu Ini
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-1 font-semibold text-white">{event.name}</p>
                     <p className="text-xs text-gray-400">
-                      Minggu ke-{event.week}
-                      {isToday && ' · Berlangsung minggu ini'}
-                      {isPast && ' · Selesai'}
+                      Minggu ke-{event.week} · {event.weight_class} · Syarat: {promoCfg.minWins}+ menang
                     </p>
                   </div>
-                  <span
-                    className={`shrink-0 rounded border px-2 py-0.5 text-[10px] font-medium uppercase ${EVENT_TIER_BADGE_CLASS[event.tier]}`}
-                  >
-                    {tierConfig.label}
-                  </span>
                 </div>
 
-                <div className="mt-3 space-y-2">
-                  {registered.length === 0 ? (
-                    <p className="text-xs text-gray-500">Belum ada fighter terdaftar.</p>
-                  ) : (
-                    registered.map((f) => (
-                      <div
-                        key={f.id}
-                        className="flex items-center justify-between gap-2 rounded-md bg-octagon-dark px-2.5 py-1.5"
-                      >
-                        <div className="flex min-w-0 items-center gap-2">
-                          <Avatar imageUrl={f.avatar_url} size={28} className="shrink-0 overflow-hidden rounded-full" />
-                          <span className="truncate text-sm text-gray-200">{f.name}</span>
+                {/* Fight card slots */}
+                <div className="divide-y divide-octagon-border/50">
+                  {event.slots.map((slot) => {
+                    const slotCfg   = SLOT_CONFIG[slot.type]
+                    const myFighter = slot.fighter_id
+                      ? fighters.find((f) => f.id === slot.fighter_id)
+                      : null
+
+                    return (
+                      <div key={slot.type} className="flex flex-wrap items-center gap-3 px-4 py-3">
+                        {/* Slot label */}
+                        <div className="w-28 shrink-0">
+                          <p className="text-xs font-semibold text-white">
+                            {slotCfg.icon && <span className="mr-1">{slotCfg.icon}</span>}
+                            {slotCfg.label}
+                          </p>
+                          <p className="text-[10px] text-octagon-amber">×{slotCfg.purseMult} purse</p>
+                          <p className="text-[10px] text-gray-600">{slotCfg.minWins}+ menang</p>
                         </div>
+
+                        {/* Fighter side */}
+                        <div className="flex min-w-0 flex-1 items-center gap-2">
+                          {myFighter ? (
+                            <>
+                              <Avatar size={32} imageUrl={myFighter.avatar_url} className="shrink-0 overflow-hidden rounded-full bg-octagon-dark" />
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-semibold text-octagon-teal">{myFighter.name}</p>
+                                <p className="text-[10px] text-gray-500">{myFighter.record.w}-{myFighter.record.l} · {myFighter.specialty}</p>
+                              </div>
+                            </>
+                          ) : (
+                            <p className="text-sm text-gray-600 italic">—</p>
+                          )}
+                        </div>
+
+                        {/* VS + Opponent */}
+                        {slot.fighter_id && (
+                          <>
+                            <span className="text-xs font-bold text-gray-600">VS</span>
+                            <div className="flex min-w-0 flex-1 items-center gap-2">
+                              {slot.opponent ? (
+                                <>
+                                  <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-octagon-dark" style={{ boxShadow: `0 0 0 2px ${slot.opponent.color}` }} />
+                                  <div className="min-w-0">
+                                    <p className="truncate text-sm font-semibold text-gray-200">{slot.opponent.name}</p>
+                                    <p className="text-[10px] text-gray-500">{slot.opponent.record.w}-{slot.opponent.record.l} · {slot.opponent.specialty}</p>
+                                  </div>
+                                </>
+                              ) : (
+                                <p className="text-xs text-gray-600 italic">Mencari lawan...</p>
+                              )}
+                            </div>
+                          </>
+                        )}
+
+                        {/* Action buttons */}
                         {!isPast && (
-                          <button
-                            onClick={() => handleUnregister(event, f.id)}
-                            disabled={busy}
-                            className="shrink-0 text-xs font-medium text-gray-500 transition-colors hover:text-octagon-red disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            Batalkan
-                          </button>
+                          <div className="shrink-0">
+                            {myFighter ? (
+                              <button
+                                onClick={() => handleUnregister(event, myFighter.id)}
+                                disabled={isBusy || isThisWeek}
+                                className="rounded border border-octagon-border px-2 py-1 text-[10px] font-medium text-gray-500 transition-colors hover:border-octagon-red hover:text-octagon-red disabled:cursor-not-allowed disabled:opacity-40"
+                              >
+                                Batalkan
+                              </button>
+                            ) : slot.fighter_id === null ? (
+                              <div className="flex flex-col gap-1">
+                                {eligible.length > 0 ? (
+                                  eligible
+                                    .filter((f) => getBestAvailableSlot(event, f.record.w)?.type === slot.type)
+                                    .map((f) => (
+                                      <button
+                                        key={f.id}
+                                        onClick={() => handleRegister(event, f)}
+                                        disabled={isBusy}
+                                        className="rounded bg-octagon-red px-2 py-1 text-[10px] font-semibold text-white transition-colors hover:bg-octagon-red/90 disabled:opacity-50"
+                                      >
+                                        {isBusy ? '...' : `+ ${f.name}`}
+                                      </button>
+                                    ))
+                                ) : (
+                                  <span className="text-[10px] text-gray-600">Tidak ada fighter eligible</span>
+                                )}
+                              </div>
+                            ) : null}
+                          </div>
                         )}
                       </div>
-                    ))
-                  )}
+                    )
+                  })}
                 </div>
 
-                {!isPast && (
-                  <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-                    <select
-                      value={selected[event.id] ?? ''}
-                      onChange={(e) => setSelected((s) => ({ ...s, [event.id]: e.target.value }))}
-                      disabled={busy || eligible.length === 0}
-                      className="flex-1 rounded-md border border-octagon-border bg-octagon-dark px-2 py-1.5 text-xs text-white disabled:opacity-50"
-                    >
-                      <option value="">
-                        {eligible.length === 0 ? 'Tidak ada fighter yang tersedia' : 'Pilih fighter...'}
-                      </option>
-                      {eligible.map((f) => (
-                        <option key={f.id} value={f.id}>
-                          {f.name} ({f.weight_class})
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      onClick={() => handleRegister(event)}
-                      disabled={busy || !selected[event.id]}
-                      className="shrink-0 rounded-md bg-octagon-red px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-octagon-red/90 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      Daftarkan
-                    </button>
+                {/* Info eligible fighters */}
+                {!isPast && !isThisWeek && eligible.length === 0 && (
+                  <div className="border-t border-octagon-border/50 px-4 py-2">
+                    <p className="text-xs text-gray-600">
+                      Tidak ada fighter {event.weight_class} dengan {promoCfg.minWins}+ menang yang tersedia.{' '}
+                      <Link href="/game/recruit" className="text-octagon-amber hover:underline">Rekrut fighter →</Link>
+                    </p>
                   </div>
                 )}
               </div>

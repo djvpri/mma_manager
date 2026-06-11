@@ -318,7 +318,9 @@ export default function FightPage() {
   const [roundClock, setRoundClock] = useState(ROUND_DURATION_SEC)
 
   const seasonWeek = gym?.season_week ?? 1
-  const todaysEvent = gym?.events.find((e) => e.week === seasonWeek) ?? null
+  // Ambil semua event minggu ini (bisa lebih dari satu untuk weight class berbeda)
+  const todaysEvents = gym?.events.filter((e) => e.week === seasonWeek) ?? []
+  const todaysEvent  = todaysEvents[0] ?? null // backward compat untuk saveFightResult
   const notRetiredOrInjured = fighters.filter((f) => f.status !== 'retired' && f.status !== 'injured')
   const cooldownReady = notRetiredOrInjured.filter(
     (f) => f.next_fight_week === null || f.next_fight_week <= seasonWeek
@@ -326,12 +328,12 @@ export default function FightPage() {
   const cooldownFighters = notRetiredOrInjured.filter(
     (f) => f.next_fight_week !== null && f.next_fight_week > seasonWeek
   )
-  const eligibleFighters = todaysEvent
-    ? cooldownReady.filter((f) => todaysEvent.fighter_ids.includes(f.id))
-    : []
-  const unscheduledFighters = todaysEvent
-    ? cooldownReady.filter((f) => !todaysEvent.fighter_ids.includes(f.id))
-    : cooldownReady
+  // Fighter yang terdaftar di salah satu event minggu ini (via slots)
+  const registeredThisWeek = todaysEvents.flatMap((e) =>
+    e.slots.filter((s) => s.fighter_id !== null).map((s) => s.fighter_id!)
+  )
+  const eligibleFighters = cooldownReady.filter((f) => registeredThisWeek.includes(f.id))
+  const unscheduledFighters = cooldownReady.filter((f) => !registeredThisWeek.includes(f.id))
   const currentRoundResult = fight.roundResults.find((r) => r.round === fight.currentRound)
   const isFightOver =
     !!currentRoundResult &&
@@ -379,8 +381,11 @@ export default function FightPage() {
 
     const result = calculateFightResult(fight.roundResults)
     const isFinish = result.method !== 'decision'
-    const event = gym.events.find((e) => e.fighter_ids.includes(fighter.id)) ?? null
+    // Cari event & slot fighter ini
+    const event = gym.events.find((e) => e.slots.some((s) => s.fighter_id === fighter.id)) ?? null
+    const slot  = event?.slots.find((s) => s.fighter_id === fighter.id) ?? null
     const tierConfig = EVENT_TIER_CONFIG[event?.tier ?? 'regional']
+    const slotPurseMult = slot?.purse_mult ?? 1.0
 
     const supabase = createClient()
     const [staffRes, sponsorRes] = await Promise.all([
@@ -401,7 +406,7 @@ export default function FightPage() {
     }
 
     // Multiplier sesuai tier event (Lokal/Regional/Nasional)
-    purse = Math.round((purse * tierConfig.purseMult) / 100_000) * 100_000
+    purse = Math.round((purse * tierConfig.purseMult * slotPurseMult) / 100_000) * 100_000
     reputationChange = Math.round(reputationChange * tierConfig.reputationMult)
 
     // Manajer Pertarungan: negosiasi purse lebih baik
@@ -461,9 +466,15 @@ export default function FightPage() {
       : 0
     const newBalance = gym.balance + purse + commission + sponsorWinBonus - winBonusPaid - medicalCost - purseShare
     const newReputation = Math.max(0, Math.min(100, gym.reputation + reputationChange + reputationBonus))
+    // Kosongkan slot fighter setelah bertanding
     const newEvents = event
       ? gym.events.map((e) =>
-          e.id === event.id ? { ...e, fighter_ids: e.fighter_ids.filter((id) => id !== fighter.id) } : e
+          e.id !== event.id ? e : {
+            ...e,
+            slots: e.slots.map((s) =>
+              s.fighter_id === fighter.id ? { ...s, fighter_id: null, opponent: null } : s
+            ),
+          }
         )
       : gym.events
 
@@ -543,8 +554,21 @@ export default function FightPage() {
 
   function handleStartFight() {
     const fighter = eligibleFighters.find((f) => f.id === selectedFighterId)
-    if (!fighter || !todaysEvent) return
-    const opponent = generateOpponent(fighter, todaysEvent.tier)
+    if (!fighter) return
+
+    // Cari lawan yang sudah di-booking di event slot
+    const eventForFighter = todaysEvents.find((e) =>
+      e.slots.some((s) => s.fighter_id === fighter.id)
+    )
+    const slot = eventForFighter?.slots.find((s) => s.fighter_id === fighter.id)
+    const bookedOpponent = slot?.opponent
+
+    // Gunakan lawan yang sudah di-booking, atau fallback ke generate random
+    const tier = eventForFighter?.tier ?? todaysEvent?.tier ?? 'regional'
+    const opponent = bookedOpponent
+      ? { name: bookedOpponent.name, attrs: bookedOpponent.attrs, record: bookedOpponent.record, specialty: bookedOpponent.specialty as Specialty, color: bookedOpponent.color }
+      : generateOpponent(fighter, tier as EventTier)
+
     setFightFighter(fighter)
     setOpponent(opponent)
     setFightVitals({

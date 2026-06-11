@@ -36,12 +36,14 @@ export default function RosterPage() {
   const [report, setReport] = useState<WeeklyReport | null>(null)
 
   const activeFighters = fighters.filter((f) => f.status !== 'retired')
-  const todaysEvent = gym?.events.find((e) => e.week === gym.season_week) ?? null
-  const pendingFighters = todaysEvent
-    ? todaysEvent.fighter_ids
-        .map((id) => fighters.find((f) => f.id === id))
-        .filter((f): f is Fighter => f !== undefined)
-    : []
+  // Semua event minggu ini — bisa lebih dari satu (beda weight class)
+  const todaysEvents = gym?.events.filter((e) => e.week === gym.season_week) ?? []
+  const pendingFighters = todaysEvents.flatMap((e) =>
+    e.slots
+      .filter((s) => s.fighter_id !== null)
+      .map((s) => fighters.find((f) => f.id === s.fighter_id))
+      .filter((f): f is Fighter => f !== undefined)
+  )
   const hasPendingFight = pendingFighters.length > 0
 
   async function handleAdvanceWeek() {

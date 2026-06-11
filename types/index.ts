@@ -57,13 +57,33 @@ export type CornerAdvice = 'push' | 'patient' | 'takedown' | 'striking'
 export type FinishMethod = 'ko' | 'tko' | 'submission' | 'decision'
 
 export type EventTier = 'local' | 'regional' | 'national'
+export type EventPromotion = 'lokal' | 'regional' | 'nasional' | 'championship'
+export type EventSlotType = 'main' | 'comain' | 'featured' | 'undercard'
+
+export interface EventSlotOpponent {
+  name: string
+  attrs: FighterAttrs
+  record: FighterRecord
+  specialty: string
+  color: string
+}
+
+export interface EventSlot {
+  type: EventSlotType
+  purse_mult: number
+  min_wins: number
+  fighter_id: string | null
+  opponent: EventSlotOpponent | null
+}
 
 export interface MmaEvent {
   id: string
   name: string
-  tier: EventTier
-  week: number          // = gym.season_week saat event berlangsung
-  fighter_ids: string[] // fighter terdaftar & belum bertanding di event ini
+  promotion: EventPromotion
+  tier: EventTier          // tetap ada untuk kompatibilitas purse calc
+  week: number
+  weight_class: WeightClass
+  slots: EventSlot[]
 }
 
 export interface FighterAttrs {
