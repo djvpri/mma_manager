@@ -25,6 +25,17 @@ export type Specialty =
   | 'Counter Fighter'
   | 'Wrestler'
 
+export type TrainingSession = 'striking' | 'grappling' | 'cardio' | 'analytics' | 'mental' | 'sparring' | 'rest'
+
+export type WeeklySchedule = {
+  mon: TrainingSession
+  tue: TrainingSession
+  wed: TrainingSession
+  thu: TrainingSession
+  fri: TrainingSession
+  sat: TrainingSession
+}
+
 export type GamePlan = 'pressure' | 'counter' | 'grapple' | 'technical'
 export type CornerAdvice = 'push' | 'patient' | 'takedown' | 'striking'
 export type FinishMethod = 'ko' | 'tko' | 'submission' | 'decision'
@@ -98,6 +109,7 @@ export interface Fighter {
   avatar_url: string | null
   next_fight_week: number | null
   training_focus: keyof FighterAttrs | null
+  weekly_schedule: WeeklySchedule | null
   created_at: string
 }
 

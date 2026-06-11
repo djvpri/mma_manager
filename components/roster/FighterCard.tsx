@@ -1,14 +1,46 @@
 'use client'
 
 import { useState } from 'react'
-import type { Fighter, FightResult } from '@/types'
+import type { Fighter, FightResult, WeeklySchedule, TrainingSession } from '@/types'
 import Avatar from '@/components/avatar/Avatar'
 import { useGameStore } from '@/store/game-store'
 import { generateFighterAvatar } from '@/lib/ai-avatar'
 import { createClient } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/format'
 import { getPotentialLabel } from '@/lib/potential'
-import { ATTR_GROUPS, getCategoryAverages } from '@/lib/attrs'
+import { getCategoryAverages } from '@/lib/attrs'
+
+const SCHEDULE_DAYS: { key: keyof WeeklySchedule; label: string }[] = [
+  { key: 'mon', label: 'Sen' },
+  { key: 'tue', label: 'Sel' },
+  { key: 'wed', label: 'Rab' },
+  { key: 'thu', label: 'Kam' },
+  { key: 'fri', label: 'Jum' },
+  { key: 'sat', label: 'Sab' },
+]
+
+const SESSION_OPTIONS: { value: TrainingSession; label: string; dot: string }[] = [
+  { value: 'striking',  label: 'Striking',   dot: 'bg-orange-400' },
+  { value: 'grappling', label: 'Grappling',  dot: 'bg-blue-400' },
+  { value: 'cardio',    label: 'Cardio',     dot: 'bg-red-400' },
+  { value: 'analytics', label: 'Analitik',   dot: 'bg-purple-400' },
+  { value: 'mental',    label: 'Mental',     dot: 'bg-green-400' },
+  { value: 'sparring',  label: 'Sparring',   dot: 'bg-yellow-400' },
+  { value: 'rest',      label: 'Istirahat',  dot: 'bg-gray-500' },
+]
+
+const SESSION_DOT: Record<TrainingSession, string> = Object.fromEntries(
+  SESSION_OPTIONS.map((s) => [s.value, s.dot])
+) as Record<TrainingSession, string>
+
+const DEFAULT_SCHEDULE: WeeklySchedule = {
+  mon: 'striking',
+  tue: 'grappling',
+  wed: 'cardio',
+  thu: 'sparring',
+  fri: 'mental',
+  sat: 'rest',
+}
 
 const STATUS_STYLES: Record<Fighter['status'], string> = {
   active: 'border-octagon-teal/30 bg-octagon-teal/15 text-octagon-teal',
@@ -46,7 +78,7 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
   const [showHistory, setShowHistory] = useState(false)
   const [history, setHistory] = useState<FightResult[] | null>(null)
   const [loadingHistory, setLoadingHistory] = useState(false)
-  const [savingFocus, setSavingFocus] = useState(false)
+  const [savingSchedule, setSavingSchedule] = useState(false)
   const [renewing, setRenewing] = useState(false)
   const [renewError, setRenewError] = useState<string | null>(null)
   const [confirmingRelease, setConfirmingRelease] = useState(false)
@@ -69,16 +101,16 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
     setShowHistory((v) => !v)
   }
 
-  async function handleFocusChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const value = e.target.value
-    const newFocus = (value === '' ? null : value) as Fighter['training_focus']
-    setSavingFocus(true)
+  async function handleScheduleChange(day: keyof WeeklySchedule, session: TrainingSession) {
+    const currentSchedule = fighter.weekly_schedule ?? DEFAULT_SCHEDULE
+    const newSchedule: WeeklySchedule = { ...currentSchedule, [day]: session }
+    setSavingSchedule(true)
     const supabase = createClient()
-    const { error } = await supabase.from('fighters').update({ training_focus: newFocus }).eq('id', fighter.id)
+    const { error } = await supabase.from('fighters').update({ weekly_schedule: newSchedule }).eq('id', fighter.id)
     if (!error) {
-      updateFighter(fighter.id, { training_focus: newFocus })
+      updateFighter(fighter.id, { weekly_schedule: newSchedule })
     }
-    setSavingFocus(false)
+    setSavingSchedule(false)
   }
 
   async function handleRenewContract() {
@@ -249,28 +281,32 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
       )}
 
       {fighter.status === 'training' && (
-        <div className="mt-3 flex items-center justify-between gap-2 text-xs">
-          <label htmlFor={`focus-${fighter.id}`} className="text-gray-400">
-            Fokus Latihan
-          </label>
-          <select
-            id={`focus-${fighter.id}`}
-            value={fighter.training_focus ?? ''}
-            onChange={handleFocusChange}
-            disabled={savingFocus}
-            className="rounded-md border border-octagon-border bg-octagon-dark px-2 py-1 text-xs text-white disabled:opacity-50"
-          >
-            <option value="">Tidak ada</option>
-            {ATTR_GROUPS.map((group) => (
-              <optgroup key={group.key} label={group.label}>
-                {group.attrs.map(({ key, label }) => (
-                  <option key={key} value={key}>
-                    {label}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
+        <div className="mt-3">
+          <p className="mb-1.5 text-[10px] font-medium text-gray-400">Jadwal Latihan</p>
+          <div className="grid grid-cols-3 gap-x-2 gap-y-2">
+            {SCHEDULE_DAYS.map(({ key, label }) => {
+              const schedule = fighter.weekly_schedule ?? DEFAULT_SCHEDULE
+              const session = schedule[key]
+              return (
+                <div key={key} className="flex flex-col gap-0.5">
+                  <div className="flex items-center gap-1">
+                    <span className={`h-1.5 w-1.5 rounded-full ${SESSION_DOT[session]}`} />
+                    <span className="text-[10px] text-gray-500">{label}</span>
+                  </div>
+                  <select
+                    value={session}
+                    onChange={(e) => handleScheduleChange(key, e.target.value as TrainingSession)}
+                    disabled={savingSchedule}
+                    className="w-full rounded border border-octagon-border bg-octagon-dark px-1 py-0.5 text-[10px] text-white disabled:opacity-50"
+                  >
+                    {SESSION_OPTIONS.map(({ value, label: sLabel }) => (
+                      <option key={value} value={value}>{sLabel}</option>
+                    ))}
+                  </select>
+                </div>
+              )
+            })}
+          </div>
         </div>
       )}
 
