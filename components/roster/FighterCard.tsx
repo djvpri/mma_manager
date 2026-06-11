@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import type { Fighter, FightResult, WeeklySchedule, TrainingSession } from '@/types'
+import type { Fighter, FightResult, WeeklySchedule, TrainingSession, TrainingIntensity } from '@/types'
 import Avatar from '@/components/avatar/Avatar'
 import { useGameStore } from '@/store/game-store'
 import { generateFighterAvatar } from '@/lib/ai-avatar'
@@ -79,6 +79,7 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
   const [history, setHistory] = useState<FightResult[] | null>(null)
   const [loadingHistory, setLoadingHistory] = useState(false)
   const [savingSchedule, setSavingSchedule] = useState(false)
+  const [savingIntensity, setSavingIntensity] = useState(false)
   const [renewing, setRenewing] = useState(false)
   const [renewError, setRenewError] = useState<string | null>(null)
   const [confirmingRelease, setConfirmingRelease] = useState(false)
@@ -111,6 +112,16 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
       updateFighter(fighter.id, { weekly_schedule: newSchedule })
     }
     setSavingSchedule(false)
+  }
+
+  async function handleIntensityChange(intensity: TrainingIntensity) {
+    setSavingIntensity(true)
+    const supabase = createClient()
+    const { error } = await supabase.from('fighters').update({ training_intensity: intensity }).eq('id', fighter.id)
+    if (!error) {
+      updateFighter(fighter.id, { training_intensity: intensity })
+    }
+    setSavingIntensity(false)
   }
 
   async function handleRenewContract() {
@@ -306,6 +317,31 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
                 </div>
               )
             })}
+          </div>
+
+          <div className="mt-2 flex items-center justify-between">
+            <span className="text-[10px] font-medium text-gray-400">Intensitas</span>
+            <div className="flex gap-1">
+              {(['low', 'medium', 'high'] as TrainingIntensity[]).map((lvl) => {
+                const active = (fighter.training_intensity ?? 'medium') === lvl
+                const styles: Record<TrainingIntensity, string> = {
+                  low:    active ? 'border-blue-500 bg-blue-500/20 text-blue-300'   : 'border-octagon-border text-gray-500',
+                  medium: active ? 'border-octagon-amber bg-octagon-amber/20 text-octagon-amber' : 'border-octagon-border text-gray-500',
+                  high:   active ? 'border-octagon-red bg-octagon-red/20 text-octagon-red'   : 'border-octagon-border text-gray-500',
+                }
+                const labels: Record<TrainingIntensity, string> = { low: 'Rendah', medium: 'Sedang', high: 'Tinggi' }
+                return (
+                  <button
+                    key={lvl}
+                    onClick={() => handleIntensityChange(lvl)}
+                    disabled={savingIntensity}
+                    className={`rounded border px-2 py-0.5 text-[10px] font-medium transition-colors disabled:opacity-50 ${styles[lvl]}`}
+                  >
+                    {labels[lvl]}
+                  </button>
+                )
+              })}
+            </div>
           </div>
         </div>
       )}

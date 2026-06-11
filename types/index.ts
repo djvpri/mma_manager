@@ -26,6 +26,7 @@ export type Specialty =
   | 'Wrestler'
 
 export type TrainingSession = 'striking' | 'grappling' | 'cardio' | 'analytics' | 'mental' | 'sparring' | 'rest'
+export type TrainingIntensity = 'low' | 'medium' | 'high'
 
 export type WeeklySchedule = {
   mon: TrainingSession
@@ -110,6 +111,7 @@ export interface Fighter {
   next_fight_week: number | null
   training_focus: keyof FighterAttrs | null
   weekly_schedule: WeeklySchedule | null
+  training_intensity: TrainingIntensity
   created_at: string
 }
 
