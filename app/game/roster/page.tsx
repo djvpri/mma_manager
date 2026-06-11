@@ -8,6 +8,7 @@ import { useGameStore } from '@/store/game-store'
 import FighterCard from '@/components/roster/FighterCard'
 import { buildWeeklyReport, type WeeklyReport } from '@/lib/weekly-report'
 import { formatCurrency } from '@/lib/format'
+import { ensureEventsForUpcomingWeeks, getBestAvailableSlot, PROMOTION_CONFIG } from '@/lib/generate-events'
 import type { Championship, Fighter, Gym } from '@/types'
 
 export default function RosterPage() {
@@ -45,6 +46,18 @@ export default function RosterPage() {
     })
   }, [gym?.id])
 
+  // Pastikan kalender event sudah ter-generate untuk minggu berjalan + 3 ke depan
+  useEffect(() => {
+    if (!gym) return
+    let cancelled = false
+    ensureEventsForUpcomingWeeks(gym).then((updated) => {
+      if (cancelled) return
+      if (updated !== gym) setGym(updated)
+    })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gym?.id, gym?.season_week])
+
   const activeFighters = fighters.filter((f) => f.status !== 'retired')
   // Semua event minggu ini — bisa lebih dari satu (beda weight class)
   const todaysEvents = gym?.events.filter((e) => e.week === gym.season_week) ?? []
@@ -55,6 +68,25 @@ export default function RosterPage() {
       .filter((f): f is Fighter => f !== undefined)
   )
   const hasPendingFight = pendingFighters.length > 0
+
+  // Fighter yang punya slot event terbuka & cocok (minggu ini s/d 3 minggu ke depan)
+  const seasonWeek = gym?.season_week ?? 0
+  const validEvents = gym?.events.filter((e) => Array.isArray(e.slots) && e.promotion) ?? []
+  const upcomingEvents = validEvents.filter((e) => e.week >= seasonWeek && e.week <= seasonWeek + 3)
+  const registeredFighterIds = new Set(
+    validEvents.flatMap((e) => e.slots.map((s) => s.fighter_id).filter(Boolean)) as string[]
+  )
+  const matchedFighters = activeFighters.filter((f) => {
+    if (f.status === 'injured') return false
+    if (registeredFighterIds.has(f.id)) return false
+    if (f.next_fight_week !== null && f.next_fight_week > seasonWeek) return false
+    return upcomingEvents.some((e) => {
+      if (e.weight_class !== f.weight_class) return false
+      const promoCfg = PROMOTION_CONFIG[e.promotion] ?? PROMOTION_CONFIG.lokal
+      if (f.record.w < promoCfg.minWins) return false
+      return getBestAvailableSlot(e, f.record.w) !== null
+    })
+  })
 
   async function handleAdvanceWeek() {
     if (!gym) return
@@ -144,6 +176,24 @@ export default function RosterPage() {
               </button>
             )}
           </div>
+        </div>
+      )}
+
+      {gymReady && matchedFighters.length > 0 && (
+        <div className="mb-6 flex flex-col gap-3 rounded-lg border border-octagon-teal/40 bg-octagon-teal/10 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-octagon-teal">📅 Event Tersedia</p>
+            <p className="text-xs text-gray-300">
+              {matchedFighters.map((f) => f.name).join(', ')}{' '}
+              {matchedFighters.length > 1 ? 'cocok dengan event' : 'cocok dengan sebuah event'} yang tersedia — daftarkan sebelum lanjut minggu.
+            </p>
+          </div>
+          <Link
+            href="/game/events"
+            className="shrink-0 rounded-md bg-octagon-teal px-4 py-2 text-center text-sm font-semibold text-octagon-dark transition-colors hover:bg-octagon-teal/90"
+          >
+            Lihat Event →
+          </Link>
         </div>
       )}
 
