@@ -131,6 +131,6 @@ export function evaluateOffer(
   return {
     outcome: 'counter',
     expectation: counter,
-    message: `${candidate.name} ${profile.phrase} dan membalas: ${formatCurrency(counter.salary)}/bulan, bonus ${formatCurrency(counter.bonus)}, kontrak ${counter.contractLength}x pertarungan.`,
+    message: `${candidate.name} ${profile.phrase} dan membalas: ${formatCurrency(counter.salary)}/minggu, bonus ${formatCurrency(counter.bonus)}, kontrak ${counter.contractLength}x pertarungan.`,
   }
 }
