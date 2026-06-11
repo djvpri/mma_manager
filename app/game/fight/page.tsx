@@ -637,6 +637,28 @@ export default function FightPage() {
             </div>
           </div>
 
+          <div className="rounded-lg border border-octagon-border bg-octagon-card p-4">
+            <p className="mb-3 text-xs font-semibold uppercase text-gray-500">Statistik Fighter</p>
+            <div className="space-y-4">
+              {ATTR_GROUPS.map((group) => (
+                <div key={group.key}>
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600">{group.label}</p>
+                  <div className="space-y-3">
+                    {group.attrs.map(({ key, label }) => (
+                      <AttrCompareBar
+                        key={key}
+                        label={label}
+                        myVal={fight.fighter!.attrs[key]}
+                        oppVal={fight.opponent!.attrs[key]}
+                        oppColor={fight.opponent!.color}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div>
             <p className="mb-2 text-sm font-semibold text-white">Pilih Game Plan</p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
