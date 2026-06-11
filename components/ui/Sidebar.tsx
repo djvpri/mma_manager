@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useGameStore } from '@/store/game-store'
 import { createClient } from '@/lib/supabase'
 import { NAV_ITEMS, IconLogout, IconRefresh, formatCurrency } from './nav-icons'
+import ThemeToggle from './ThemeToggle'
 
 export default function Sidebar() {
   const pathname = usePathname()
@@ -83,6 +84,7 @@ export default function Sidebar() {
       </nav>
 
       <div className="border-t border-octagon-border px-3 py-3 space-y-1">
+        <ThemeToggle className="w-full" />
         <button
           onClick={handleNewGame}
           className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-gray-400 transition-colors hover:bg-white/5 hover:text-octagon-amber"

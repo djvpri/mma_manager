@@ -2,6 +2,50 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  color-scheme: dark;
+
+  --color-bg: 10 10 10;
+  --color-card: 20 20 20;
+  --color-border: 42 42 42;
+  --color-fg: 255 255 255;
+
+  --color-gray-100: 243 244 246;
+  --color-gray-200: 229 231 235;
+  --color-gray-300: 209 213 219;
+  --color-gray-400: 156 163 175;
+  --color-gray-500: 107 114 128;
+  --color-gray-600: 75 85 99;
+
+  --color-yellow-300: 253 224 71;
+  --color-yellow-400: 250 204 21;
+  --color-yellow-500: 234 179 8;
+  --color-blue-300: 147 197 253;
+  --color-blue-400: 96 165 250;
+}
+
+[data-theme='light'] {
+  color-scheme: light;
+
+  --color-bg: 244 244 245;
+  --color-card: 255 255 255;
+  --color-border: 228 228 231;
+  --color-fg: 24 24 27;
+
+  --color-gray-100: 31 41 55;
+  --color-gray-200: 55 65 81;
+  --color-gray-300: 75 85 99;
+  --color-gray-400: 107 114 128;
+  --color-gray-500: 156 163 175;
+  --color-gray-600: 209 213 219;
+
+  --color-yellow-300: 161 98 7;
+  --color-yellow-400: 161 98 7;
+  --color-yellow-500: 133 77 14;
+  --color-blue-300: 37 99 235;
+  --color-blue-400: 37 99 235;
+}
+
 @layer base {
   body {
     @apply bg-octagon-dark text-gray-100;

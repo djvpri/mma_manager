@@ -1,14 +1,27 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useGameStore } from '@/store/game-store'
 import { createClient } from '@/lib/supabase'
-import { IconLogout, IconRefresh, formatCurrency } from './nav-icons'
+import { applyTheme, getStoredTheme, type Theme } from '@/lib/theme'
+import { IconLogout, IconRefresh, IconSun, IconMoon, formatCurrency } from './nav-icons'
 
 export default function MobileHeader() {
   const router = useRouter()
   const gym = useGameStore((s) => s.gym)
   const resetGame = useGameStore((s) => s.resetGame)
+  const [theme, setTheme] = useState<Theme>('dark')
+
+  useEffect(() => {
+    setTheme(getStoredTheme())
+  }, [])
+
+  function toggleTheme() {
+    const next: Theme = theme === 'dark' ? 'light' : 'dark'
+    applyTheme(next)
+    setTheme(next)
+  }
 
   async function handleLogout() {
     const supabase = createClient()
@@ -49,6 +62,13 @@ export default function MobileHeader() {
           <p className="text-[11px] text-gray-400">Saldo</p>
           <p className="text-xs font-semibold text-octagon-amber">{formatCurrency(gym?.balance ?? 0)}</p>
         </div>
+        <button
+          onClick={toggleTheme}
+          className="flex h-8 w-8 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-white/5 hover:text-octagon-amber"
+          aria-label="Ganti Tema"
+        >
+          {theme === 'dark' ? <IconSun className="h-5 w-5" /> : <IconMoon className="h-5 w-5" />}
+        </button>
         <button
           onClick={handleNewGame}
           className="flex h-8 w-8 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-white/5 hover:text-octagon-amber"
