@@ -156,7 +156,6 @@ export default function RecruitPage() {
               <div key={candidate.id} className="rounded-lg border border-octagon-border bg-octagon-card p-4">
                 <div className="flex items-start gap-3">
                   <Avatar
-                    seed={candidate.avatar_seed}
                     size={64}
                     className="shrink-0 overflow-hidden rounded-full bg-octagon-dark"
                   />

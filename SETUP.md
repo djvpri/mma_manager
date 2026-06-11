@@ -92,13 +92,12 @@ mma-manager/
 │   ├── roster/                   ← Roster-specific components
 │   ├── fight/                    ← Fight night components
 │   ├── gym/                      ← Gym management components
-│   └── avatar/                   ← Procedural avatar generator
+│   └── avatar/                   ← Avatar display (foto AI atau siluet default)
 ├── lib/
 │   ├── supabase.ts               ← Supabase browser client
 │   ├── supabase-server.ts        ← Supabase server client (RSC)
 │   ├── fight-engine.ts           ← Fight simulation logic
-│   ├── ai-corner.ts              ← AI corner advice calls
-│   └── avatar.ts                 ← Procedural avatar SVG generator
+│   └── ai-corner.ts              ← AI corner advice calls
 ├── store/
 │   └── game-store.ts             ← Zustand global state
 ├── types/
