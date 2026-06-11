@@ -122,6 +122,7 @@ export interface Fighter {
   name: string
   nickname: string
   age: number
+  birth_week: number       // 1-52, minggu "ulang tahun" dalam siklus season_week
   hometown: string
   weight_class: WeightClass
   status: FighterStatus

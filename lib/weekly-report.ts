@@ -9,6 +9,7 @@ export interface WeeklyReport {
   healed: string[]
   growth: { name: string; attr: string; from: number; to: number }[]
   contractWarnings: string[]
+  birthdays: string[]
 }
 
 export function buildWeeklyReport(
@@ -23,6 +24,7 @@ export function buildWeeklyReport(
   const healed: string[] = []
   const growth: WeeklyReport['growth'] = []
   const contractWarnings: string[] = []
+  const birthdays: string[] = []
 
   for (const f of next) {
     const p = prevById.get(f.id)
@@ -32,6 +34,10 @@ export function buildWeeklyReport(
       const reason = f.age >= 38 ? 'usia veteran' : 'kontrak habis'
       retirements.push({ name: f.name, reason })
       continue
+    }
+
+    if (newWeek % 52 === f.birth_week % 52) {
+      birthdays.push(f.name)
     }
 
     if (p.status === 'injured' && f.status === 'training') {
@@ -57,5 +63,6 @@ export function buildWeeklyReport(
     healed,
     growth,
     contractWarnings,
+    birthdays,
   }
 }

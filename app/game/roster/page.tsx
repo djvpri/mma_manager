@@ -241,6 +241,17 @@ export default function RosterPage() {
             </div>
           )}
 
+          {report.birthdays.length > 0 && (
+            <div className="mt-2">
+              <p className="text-xs font-semibold text-gray-300">Ulang Tahun</p>
+              <ul className="mt-1 space-y-0.5 text-xs text-octagon-amber">
+                {report.birthdays.map((name, i) => (
+                  <li key={i}>🎂 {name} merayakan ulang tahun minggu ini. Moral sedikit meningkat.</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {report.retirements.length > 0 && (
             <div className="mt-2">
               <p className="text-xs font-semibold text-gray-300">Pensiun</p>
