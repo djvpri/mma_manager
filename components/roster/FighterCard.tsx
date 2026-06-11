@@ -38,7 +38,6 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
   const buyoutCost = isUnderContract ? fighter.buyout_clause : 0
   const potentialLabel = getPotentialLabel(fighter.potential)
   const updateFighter = useGameStore((s) => s.updateFighter)
-  const removeFighter = useGameStore((s) => s.removeFighter)
   const gym = useGameStore((s) => s.gym)
   const setGym = useGameStore((s) => s.setGym)
   const seasonWeek = gym?.season_week ?? 1
@@ -135,9 +134,12 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
     setReleasing(true)
     const supabase = createClient()
 
-    const { error: deleteError } = await supabase.from('fighters').delete().eq('id', fighter.id)
-    if (deleteError) {
-      setReleaseError(deleteError.message)
+    const { error: updateError } = await supabase
+      .from('fighters')
+      .update({ status: 'retired' })
+      .eq('id', fighter.id)
+    if (updateError) {
+      setReleaseError(updateError.message)
       setReleasing(false)
       return
     }
@@ -156,7 +158,7 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
     }
 
     setGym({ ...gym, balance: newBalance, monthly_expense: newExpense })
-    removeFighter(fighter.id)
+    updateFighter(fighter.id, { status: 'retired' })
   }
 
   async function handleGenerateAvatar() {
@@ -385,37 +387,39 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
       </button>
       {genError && <p className="mt-1 text-[10px] text-octagon-red">{genError}</p>}
 
-      {confirmingRelease ? (
-        <div className="mt-3 rounded-md border border-octagon-red/30 bg-octagon-red/10 p-2">
-          <p className="text-xs text-octagon-red">
-            Yakin putus kontrak {fighter.name}? Fighter akan keluar dari roster secara permanen.
-            {buyoutCost > 0 && ` Gym akan membayar klausul buyout sebesar ${formatCurrency(buyoutCost)}.`}
-          </p>
-          <div className="mt-2 flex gap-2">
-            <button
-              onClick={handleReleaseFighter}
-              disabled={releasing || (gym ? gym.balance < buyoutCost : false)}
-              className="flex-1 rounded-md bg-octagon-red px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-octagon-red/90 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {releasing ? 'Memproses...' : 'Ya, Putus Kontrak'}
-            </button>
-            <button
-              onClick={() => setConfirmingRelease(false)}
-              disabled={releasing}
-              className="flex-1 rounded-md border border-octagon-border px-3 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:border-octagon-teal hover:text-octagon-teal disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Batal
-            </button>
+      {fighter.status !== 'retired' && (
+        confirmingRelease ? (
+          <div className="mt-3 rounded-md border border-octagon-red/30 bg-octagon-red/10 p-2">
+            <p className="text-xs text-octagon-red">
+              Yakin putus kontrak {fighter.name}? Fighter akan pensiun dan tidak bisa lagi bertanding untuk gym ini.
+              {buyoutCost > 0 && ` Gym akan membayar klausul buyout sebesar ${formatCurrency(buyoutCost)}.`}
+            </p>
+            <div className="mt-2 flex gap-2">
+              <button
+                onClick={handleReleaseFighter}
+                disabled={releasing || (gym ? gym.balance < buyoutCost : false)}
+                className="flex-1 rounded-md bg-octagon-red px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-octagon-red/90 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {releasing ? 'Memproses...' : 'Ya, Putus Kontrak'}
+              </button>
+              <button
+                onClick={() => setConfirmingRelease(false)}
+                disabled={releasing}
+                className="flex-1 rounded-md border border-octagon-border px-3 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:border-octagon-teal hover:text-octagon-teal disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Batal
+              </button>
+            </div>
+            {releaseError && <p className="mt-1 text-[10px] text-octagon-red">{releaseError}</p>}
           </div>
-          {releaseError && <p className="mt-1 text-[10px] text-octagon-red">{releaseError}</p>}
-        </div>
-      ) : (
-        <button
-          onClick={() => setConfirmingRelease(true)}
-          className="mt-3 w-full rounded-md border border-octagon-border px-3 py-1.5 text-xs font-medium text-gray-500 transition-colors hover:border-octagon-red hover:text-octagon-red"
-        >
-          Putus Kontrak
-        </button>
+        ) : (
+          <button
+            onClick={() => setConfirmingRelease(true)}
+            className="mt-3 w-full rounded-md border border-octagon-border px-3 py-1.5 text-xs font-medium text-gray-500 transition-colors hover:border-octagon-red hover:text-octagon-red"
+          >
+            Putus Kontrak
+          </button>
+        )
       )}
     </div>
   )
