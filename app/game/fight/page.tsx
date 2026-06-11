@@ -141,6 +141,44 @@ function RoundSplitBar({
   )
 }
 
+const ATTR_LABELS: { key: keyof FighterAttrs; label: string }[] = [
+  { key: 'striking', label: 'Striking' },
+  { key: 'grappling', label: 'Grappling' },
+  { key: 'cardio', label: 'Cardio' },
+  { key: 'fight_iq', label: 'Fight IQ' },
+  { key: 'mental', label: 'Mental' },
+]
+
+function AttrCompareBar({
+  label,
+  myVal,
+  oppVal,
+  oppColor,
+}: {
+  label: string
+  myVal: number
+  oppVal: number
+  oppColor: string
+}) {
+  return (
+    <div>
+      <div className="mb-1 flex items-center justify-between text-xs">
+        <span className="font-semibold text-octagon-teal">{myVal}</span>
+        <span className="text-gray-500">{label}</span>
+        <span className="font-semibold" style={{ color: oppColor }}>{oppVal}</span>
+      </div>
+      <div className="flex items-center gap-1">
+        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-octagon-dark">
+          <div className="ml-auto h-full rounded-full bg-octagon-teal" style={{ width: `${myVal}%` }} />
+        </div>
+        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-octagon-dark">
+          <div className="h-full rounded-full" style={{ width: `${oppVal}%`, backgroundColor: oppColor }} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function OctagonBackground() {
   return (
     <svg
@@ -655,6 +693,21 @@ export default function FightPage() {
                 <p className="truncate font-semibold text-white">{fight.opponent.name}</p>
               </div>
               <HpBar label="HP" value={fight.oppHP} colorClass="bg-octagon-red" />
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-octagon-border bg-octagon-card p-4">
+            <p className="mb-3 text-xs font-semibold uppercase text-gray-500">Statistik Fighter</p>
+            <div className="space-y-3">
+              {ATTR_LABELS.map(({ key, label }) => (
+                <AttrCompareBar
+                  key={key}
+                  label={label}
+                  myVal={fight.fighter!.attrs[key]}
+                  oppVal={fight.opponent!.attrs[key]}
+                  oppColor={fight.opponent!.color}
+                />
+              ))}
             </div>
           </div>
 
