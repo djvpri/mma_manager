@@ -147,10 +147,34 @@ export interface FightResult {
   created_at: string
 }
 
+export interface TickStat {
+  type: 'strike' | 'takedown'
+  target?: 'head' | 'body' | 'leg' // hanya untuk type 'strike'
+  attempted: number
+  landed: number
+  controlSec: number
+  knockdown: boolean
+}
+
 export interface RoundTick {
   text: string
   my_dmg: number
   opp_dmg: number
+  myStat?: TickStat | null
+  oppStat?: TickStat | null
+}
+
+// Statistik ala broadcast UFC: knockdown, sig. strikes, takedown, control time
+export interface FightStats {
+  knockdowns: number
+  sigStrikesLanded: number
+  sigStrikesAttempted: number
+  strikesHead: number
+  strikesBody: number
+  strikesLeg: number
+  takedownsLanded: number
+  takedownsAttempted: number
+  controlSec: number
 }
 
 export interface RoundResult {
@@ -166,6 +190,8 @@ export interface RoundResult {
   opp_stamina?: number
   my_mental?: number
   opp_mental?: number
+  myStats?: FightStats
+  oppStats?: FightStats
 }
 
 export interface GameState {

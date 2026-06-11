@@ -1,4 +1,4 @@
-import type { Fighter, FighterAttrs, GamePlan, CornerAdvice, RoundResult, RoundTick, FinishMethod } from '@/types'
+import type { Fighter, FighterAttrs, GamePlan, CornerAdvice, RoundResult, RoundTick, TickStat, FightStats, FinishMethod } from '@/types'
 
 export interface FightConfig {
   myFighter: Fighter
@@ -105,7 +105,8 @@ export function simulateRound(config: FightConfig): RoundResult {
   const winnerName = winner === 'my' ? myFirst : oppFirst
   const loserName = winner === 'my' ? oppFirst : myFirst
 
-  const ticks = generateTicks(roundNum, myFirst, oppFirst, gamePlan, dmgToMe, dmgToOpp, finish, winnerName, loserName)
+  const ticks = generateTicks(roundNum, myFirst, oppFirst, gamePlan, dmgToMe, dmgToOpp, finish, winnerName, loserName, a, o)
+  const { my: myStats, opp: oppStats } = aggregateTickStats(ticks)
 
   const myFinished = finish !== null && winner === 'opp'
   const oppFinished = finish !== null && winner === 'my'
@@ -123,6 +124,8 @@ export function simulateRound(config: FightConfig): RoundResult {
     opp_stamina: clamp(oppStamina - oppStaminaLoss(o.cardio, o.recovery), 0, 100),
     my_mental: clamp(myMental + mentalChange(winner === 'my', dmgToMe, myFinished, a.mental), 0, 100),
     opp_mental: clamp(oppMental + mentalChange(winner === 'opp', dmgToOpp, oppFinished, o.mental), 0, 100),
+    myStats,
+    oppStats,
   }
 }
 
@@ -258,6 +261,117 @@ function splitTotal(total: number, parts: number): number[] {
   return result
 }
 
+function randInt(min: number, max: number): number {
+  return Math.floor(Math.random() * (max - min + 1)) + min
+}
+
+// Distribusi target striking [head, body, leg] per game plan
+const STRIKE_TARGET_WEIGHTS: Record<GamePlan, [number, number, number]> = {
+  pressure:  [0.50, 0.35, 0.15],
+  counter:   [0.60, 0.25, 0.15],
+  grapple:   [0.40, 0.40, 0.20],
+  technical: [0.40, 0.20, 0.40],
+}
+
+function pickTarget(gamePlan: GamePlan): 'head' | 'body' | 'leg' {
+  const [head, body] = STRIKE_TARGET_WEIGHTS[gamePlan]
+  const r = Math.random()
+  if (r < head) return 'head'
+  if (r < head + body) return 'body'
+  return 'leg'
+}
+
+// Peluang sebuah exchange berupa upaya takedown, bukan pertukaran pukulan
+const TAKEDOWN_ATTEMPT_CHANCE: Record<GamePlan, number> = {
+  pressure: 0.08,
+  counter: 0.08,
+  grapple: 0.45,
+  technical: 0.05,
+}
+
+// Hasilkan statistik (sig. strike / takedown) untuk satu exchange, dari sudut pandang attacker
+function generateTickStat(attacker: FighterAttrs, defender: FighterAttrs, gamePlan: GamePlan, dmg: number): TickStat {
+  if (Math.random() < TAKEDOWN_ATTEMPT_CHANCE[gamePlan]) {
+    const successChance = clamp(0.3 + (attacker.takedowns - defender.takedown_defense) / 150, 0.1, 0.9)
+    const landed = Math.random() < successChance
+    return {
+      type: 'takedown',
+      attempted: 1,
+      landed: landed ? 1 : 0,
+      controlSec: landed ? Math.round(15 + (attacker.ground_control / 100) * 45 + Math.random() * 10) : 0,
+      knockdown: false,
+    }
+  }
+
+  const attempted = randInt(2, 5)
+  const landRatio = clamp(0.3 + (attacker.accuracy - defender.striking_defense) / 150, 0.15, 0.85)
+  const landed = clamp(Math.round(attempted * landRatio), dmg > 0 ? 1 : 0, attempted)
+
+  return {
+    type: 'strike',
+    target: pickTarget(gamePlan),
+    attempted,
+    landed,
+    controlSec: 0,
+    knockdown: dmg >= 8 && Math.random() < 0.4,
+  }
+}
+
+export function emptyFightStats(): FightStats {
+  return {
+    knockdowns: 0,
+    sigStrikesLanded: 0,
+    sigStrikesAttempted: 0,
+    strikesHead: 0,
+    strikesBody: 0,
+    strikesLeg: 0,
+    takedownsLanded: 0,
+    takedownsAttempted: 0,
+    controlSec: 0,
+  }
+}
+
+function applyTickStat(stats: FightStats, stat: TickStat | null | undefined) {
+  if (!stat) return
+  if (stat.type === 'strike') {
+    stats.sigStrikesAttempted += stat.attempted
+    stats.sigStrikesLanded += stat.landed
+    if (stat.target === 'head') stats.strikesHead += stat.landed
+    if (stat.target === 'body') stats.strikesBody += stat.landed
+    if (stat.target === 'leg') stats.strikesLeg += stat.landed
+    if (stat.knockdown) stats.knockdowns += 1
+  } else {
+    stats.takedownsAttempted += stat.attempted
+    stats.takedownsLanded += stat.landed
+    stats.controlSec += stat.controlSec
+  }
+}
+
+export function aggregateTickStats(ticks: RoundTick[]): { my: FightStats; opp: FightStats } {
+  const my = emptyFightStats()
+  const opp = emptyFightStats()
+  for (const tick of ticks) {
+    applyTickStat(my, tick.myStat)
+    applyTickStat(opp, tick.oppStat)
+  }
+  return { my, opp }
+}
+
+export function sumFightStats(list: FightStats[]): FightStats {
+  return list.reduce((acc, s) => {
+    acc.knockdowns += s.knockdowns
+    acc.sigStrikesLanded += s.sigStrikesLanded
+    acc.sigStrikesAttempted += s.sigStrikesAttempted
+    acc.strikesHead += s.strikesHead
+    acc.strikesBody += s.strikesBody
+    acc.strikesLeg += s.strikesLeg
+    acc.takedownsLanded += s.takedownsLanded
+    acc.takedownsAttempted += s.takedownsAttempted
+    acc.controlSec += s.controlSec
+    return acc
+  }, emptyFightStats())
+}
+
 function generateTicks(
   roundNum: number,
   myFirst: string,
@@ -267,7 +381,9 @@ function generateTicks(
   dmgToOpp: number,
   finish: FinishMethod | null,
   winnerName: string,
-  loserName: string
+  loserName: string,
+  myAttrs: FighterAttrs,
+  oppAttrs: FighterAttrs
 ): RoundTick[] {
   const opener: RoundTick = { text: pick(NARRATION_OPENERS)(roundNum), my_dmg: 0, opp_dmg: 0 }
 
@@ -280,7 +396,13 @@ function generateTicks(
     if (oppDmg > myDmg) line = pick(exchangeLines(myFirst, oppFirst, gamePlan))
     else if (myDmg > oppDmg) line = pick(exchangeLines(oppFirst, myFirst, gamePlan))
     else line = pick(evenExchangeLines(myFirst, oppFirst))
-    return { text: `${line}.`, my_dmg: myDmg, opp_dmg: oppDmg }
+
+    // myStat: statistik ofensif milik fighter saya (damage yang dia hasilkan ke lawan)
+    const myStat = oppDmg > 0 ? generateTickStat(myAttrs, oppAttrs, gamePlan, oppDmg) : null
+    // oppStat: statistik ofensif milik lawan (damage yang dia hasilkan ke saya)
+    const oppStat = myDmg > 0 ? generateTickStat(oppAttrs, myAttrs, gamePlan, myDmg) : null
+
+    return { text: `${line}.`, my_dmg: myDmg, opp_dmg: oppDmg, myStat, oppStat }
   })
 
   if (finish && finish !== 'decision') {

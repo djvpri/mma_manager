@@ -4,13 +4,21 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Avatar from '@/components/avatar/Avatar'
 import { useGameStore } from '@/store/game-store'
-import { simulateRound, calculateFightResult, rollInjury, generateClosingLine } from '@/lib/fight-engine'
+import {
+  simulateRound,
+  calculateFightResult,
+  rollInjury,
+  generateClosingLine,
+  aggregateTickStats,
+  emptyFightStats,
+  sumFightStats,
+} from '@/lib/fight-engine'
 import { getAICornerAdvice } from '@/lib/ai-corner'
 import { createClient } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/format'
 import { syncLeaderboard } from '@/lib/leaderboard'
 import { ATTR_GROUPS, ALL_ATTR_KEYS } from '@/lib/attrs'
-import type { Fighter, FighterAttrs, GamePlan, CornerAdvice, Specialty, RoundResult, RoundTick } from '@/types'
+import type { Fighter, FighterAttrs, GamePlan, CornerAdvice, Specialty, RoundResult, RoundTick, FightStats } from '@/types'
 
 const TOTAL_ROUNDS = 3
 
@@ -160,33 +168,86 @@ function AttrCompareBar({
   )
 }
 
-function StatCompareBar({
+function landedPct(landed: number, attempted: number): number {
+  return attempted > 0 ? Math.round((landed / attempted) * 100) : 0
+}
+
+function formatControlTime(sec: number): string {
+  const m = Math.floor(sec / 60)
+  const s = sec % 60
+  return `${m}:${String(s).padStart(2, '0')} Mins`
+}
+
+function FightStatRow({
   label,
   myVal,
   oppVal,
   oppColor,
-  unit = '',
 }: {
   label: string
-  myVal: number
-  oppVal: number
+  myVal: string
+  oppVal: string
   oppColor: string
-  unit?: string
 }) {
-  const total = myVal + oppVal
-  const myPct = total > 0 ? (myVal / total) * 100 : 50
-  const oppPct = 100 - myPct
+  return (
+    <div className="grid grid-cols-[1fr_auto_auto] items-center gap-3 border-b border-octagon-border py-1.5 text-xs last:border-b-0">
+      <span className="text-gray-500">{label}</span>
+      <span className="w-20 text-right font-semibold text-octagon-teal">{myVal}</span>
+      <span className="w-20 text-right font-semibold" style={{ color: oppColor }}>{oppVal}</span>
+    </div>
+  )
+}
+
+function FightStatsTable({
+  myStats,
+  oppStats,
+  myLabel,
+  oppLabel,
+  oppColor,
+}: {
+  myStats: FightStats
+  oppStats: FightStats
+  myLabel: string
+  oppLabel: string
+  oppColor: string
+}) {
   return (
     <div>
-      <div className="mb-1 flex items-center justify-between text-xs">
-        <span className="font-semibold text-octagon-teal">{myVal}{unit}</span>
-        <span className="text-gray-500">{label}</span>
-        <span className="font-semibold" style={{ color: oppColor }}>{oppVal}{unit}</span>
+      <div className="grid grid-cols-[1fr_auto_auto] gap-3 pb-1.5 text-[10px] uppercase tracking-wide text-gray-600">
+        <span></span>
+        <span className="w-20 text-right">{myLabel}</span>
+        <span className="w-20 text-right">{oppLabel}</span>
       </div>
-      <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-octagon-dark">
-        <div className="h-full bg-octagon-teal" style={{ width: `${myPct}%` }} />
-        <div className="h-full" style={{ width: `${oppPct}%`, backgroundColor: oppColor }} />
-      </div>
+      <FightStatRow
+        label="Knockdowns"
+        myVal={`${myStats.knockdowns}`}
+        oppVal={`${oppStats.knockdowns}`}
+        oppColor={oppColor}
+      />
+      <FightStatRow
+        label="Sig. Strikes Landed"
+        myVal={`${myStats.sigStrikesLanded}/${myStats.sigStrikesAttempted} (${landedPct(myStats.sigStrikesLanded, myStats.sigStrikesAttempted)}%)`}
+        oppVal={`${oppStats.sigStrikesLanded}/${oppStats.sigStrikesAttempted} (${landedPct(oppStats.sigStrikesLanded, oppStats.sigStrikesAttempted)}%)`}
+        oppColor={oppColor}
+      />
+      <FightStatRow
+        label="Head/Body/Leg"
+        myVal={`${myStats.strikesHead}/${myStats.strikesBody}/${myStats.strikesLeg}`}
+        oppVal={`${oppStats.strikesHead}/${oppStats.strikesBody}/${oppStats.strikesLeg}`}
+        oppColor={oppColor}
+      />
+      <FightStatRow
+        label="Takedowns"
+        myVal={`${myStats.takedownsLanded}/${myStats.takedownsAttempted} (${landedPct(myStats.takedownsLanded, myStats.takedownsAttempted)}%)`}
+        oppVal={`${oppStats.takedownsLanded}/${oppStats.takedownsAttempted} (${landedPct(oppStats.takedownsLanded, oppStats.takedownsAttempted)}%)`}
+        oppColor={oppColor}
+      />
+      <FightStatRow
+        label="Control Time"
+        myVal={formatControlTime(myStats.controlSec)}
+        oppVal={formatControlTime(oppStats.controlSec)}
+        oppColor={oppColor}
+      />
     </div>
   )
 }
@@ -264,11 +325,12 @@ export default function FightPage() {
   const isFightOver =
     !!currentRoundResult &&
     (!!currentRoundResult.finish || fight.myHP <= 0 || fight.oppHP <= 0 || fight.currentRound >= TOTAL_ROUNDS)
-  const roundsWonMy = fight.roundResults.filter((r) => r.winner === 'my').length
-  const roundsWonOpp = fight.roundResults.filter((r) => r.winner === 'opp').length
-  const allTicks = fight.roundResults.flatMap((r) => r.ticks ?? [])
-  const totalDmgDealt = allTicks.reduce((sum, t) => sum + t.opp_dmg, 0)
-  const totalDmgTaken = allTicks.reduce((sum, t) => sum + t.my_dmg, 0)
+  const liveTicks = currentRoundResult
+    ? currentRoundResult.ticks ?? []
+    : animation
+      ? animation.ticks.slice(0, animation.index)
+      : []
+  const { my: liveMyStats, opp: liveOppStats } = aggregateTickStats(liveTicks)
 
   // Ambil saran corner dari AI saat masuk fase istirahat antar ronde
   useEffect(() => {
@@ -814,21 +876,16 @@ export default function FightPage() {
           </div>
 
           <div className="rounded-lg border border-octagon-border bg-octagon-card p-4">
-            <p className="mb-3 text-xs font-semibold uppercase text-gray-500">Statistik Pertandingan</p>
-            <div className="space-y-3">
-              <StatCompareBar
-                label="Ronde Dimenangkan"
-                myVal={roundsWonMy}
-                oppVal={roundsWonOpp}
-                oppColor={fight.opponent.color}
-              />
-              <StatCompareBar
-                label="Damage Dilayangkan"
-                myVal={totalDmgDealt}
-                oppVal={totalDmgTaken}
-                oppColor={fight.opponent.color}
-              />
-            </div>
+            <p className="mb-3 text-xs font-semibold uppercase text-gray-500">
+              Statistik (Ronde {fight.currentRound})
+            </p>
+            <FightStatsTable
+              myStats={liveMyStats}
+              oppStats={liveOppStats}
+              myLabel={fight.fighter.name.split(' ')[0]}
+              oppLabel={fight.opponent.name.split(' ')[0]}
+              oppColor={fight.opponent.color}
+            />
           </div>
 
           {animation ? (
@@ -1014,6 +1071,36 @@ export default function FightPage() {
                     <RoundSplitBar myPct={r.my_pct} oppPct={r.opp_pct} oppColor={fight.opponent!.color} compact />
                   </div>
                 ))}
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-octagon-border bg-octagon-card p-4 text-left">
+              <p className="mb-3 text-xs font-semibold uppercase text-gray-500">Statistik Pertandingan</p>
+              <div className="space-y-4">
+                {fight.roundResults.map((r) => (
+                  <div key={r.round}>
+                    <p className="mb-1.5 text-xs font-semibold text-gray-400">Ronde {r.round}</p>
+                    <FightStatsTable
+                      myStats={r.myStats ?? emptyFightStats()}
+                      oppStats={r.oppStats ?? emptyFightStats()}
+                      myLabel={fight.fighter!.name.split(' ')[0]}
+                      oppLabel={fight.opponent!.name.split(' ')[0]}
+                      oppColor={fight.opponent!.color}
+                    />
+                  </div>
+                ))}
+                {fight.roundResults.length > 1 && (
+                  <div>
+                    <p className="mb-1.5 text-xs font-semibold text-gray-400">Total</p>
+                    <FightStatsTable
+                      myStats={sumFightStats(fight.roundResults.map((r) => r.myStats ?? emptyFightStats()))}
+                      oppStats={sumFightStats(fight.roundResults.map((r) => r.oppStats ?? emptyFightStats()))}
+                      myLabel={fight.fighter!.name.split(' ')[0]}
+                      oppLabel={fight.opponent!.name.split(' ')[0]}
+                      oppColor={fight.opponent!.color}
+                    />
+                  </div>
+                )}
               </div>
             </div>
 
