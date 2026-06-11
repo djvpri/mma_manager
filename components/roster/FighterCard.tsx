@@ -47,6 +47,7 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
   const newSalary = Math.round((fighter.salary_monthly * 1.1) / 100_000) * 100_000
   const potentialLabel = getPotentialLabel(fighter.potential)
   const updateFighter = useGameStore((s) => s.updateFighter)
+  const removeFighter = useGameStore((s) => s.removeFighter)
   const gym = useGameStore((s) => s.gym)
   const setGym = useGameStore((s) => s.setGym)
   const seasonWeek = gym?.season_week ?? 1
@@ -58,6 +59,9 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
   const [savingFocus, setSavingFocus] = useState(false)
   const [renewing, setRenewing] = useState(false)
   const [renewError, setRenewError] = useState<string | null>(null)
+  const [confirmingRelease, setConfirmingRelease] = useState(false)
+  const [releasing, setReleasing] = useState(false)
+  const [releaseError, setReleaseError] = useState<string | null>(null)
 
   async function handleToggleHistory() {
     if (!showHistory && history === null) {
@@ -126,6 +130,35 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
     updateFighter(fighter.id, { contract_fights_left: 3, salary_monthly: newSalary })
     setGym({ ...gym, balance: newBalance, monthly_expense: newExpense })
     setRenewing(false)
+  }
+
+  async function handleReleaseFighter() {
+    if (!gym) return
+    setReleaseError(null)
+    setReleasing(true)
+    const supabase = createClient()
+
+    const { error: deleteError } = await supabase.from('fighters').delete().eq('id', fighter.id)
+    if (deleteError) {
+      setReleaseError(deleteError.message)
+      setReleasing(false)
+      return
+    }
+
+    const newExpense = Math.max(0, gym.monthly_expense - fighter.salary_monthly)
+    const { error: gymError } = await supabase
+      .from('gyms')
+      .update({ monthly_expense: newExpense })
+      .eq('id', gym.id)
+
+    if (gymError) {
+      setReleaseError(gymError.message)
+      setReleasing(false)
+      return
+    }
+
+    setGym({ ...gym, monthly_expense: newExpense })
+    removeFighter(fighter.id)
   }
 
   async function handleGenerateAvatar() {
@@ -307,6 +340,38 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
         {generating ? 'Membuat foto...' : fighter.avatar_url ? 'Buat Ulang Foto AI' : 'Generate Foto AI'}
       </button>
       {genError && <p className="mt-1 text-[10px] text-octagon-red">{genError}</p>}
+
+      {confirmingRelease ? (
+        <div className="mt-3 rounded-md border border-octagon-red/30 bg-octagon-red/10 p-2">
+          <p className="text-xs text-octagon-red">
+            Yakin putus kontrak {fighter.name}? Fighter akan keluar dari roster secara permanen.
+          </p>
+          <div className="mt-2 flex gap-2">
+            <button
+              onClick={handleReleaseFighter}
+              disabled={releasing}
+              className="flex-1 rounded-md bg-octagon-red px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-octagon-red/90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {releasing ? 'Memproses...' : 'Ya, Putus Kontrak'}
+            </button>
+            <button
+              onClick={() => setConfirmingRelease(false)}
+              disabled={releasing}
+              className="flex-1 rounded-md border border-octagon-border px-3 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:border-octagon-teal hover:text-octagon-teal disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Batal
+            </button>
+          </div>
+          {releaseError && <p className="mt-1 text-[10px] text-octagon-red">{releaseError}</p>}
+        </div>
+      ) : (
+        <button
+          onClick={() => setConfirmingRelease(true)}
+          className="mt-3 w-full rounded-md border border-octagon-border px-3 py-1.5 text-xs font-medium text-gray-500 transition-colors hover:border-octagon-red hover:text-octagon-red"
+        >
+          Putus Kontrak
+        </button>
+      )}
     </div>
   )
 }

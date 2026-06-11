@@ -39,6 +39,7 @@ interface GameStore {
   setGym: (gym: Gym) => void
   setFighters: (fighters: Fighter[]) => void
   updateFighter: (id: string, updates: Partial<Fighter>) => void
+  removeFighter: (id: string) => void
   setActiveNav: (nav: string) => void
 
   // fight actions
@@ -93,6 +94,10 @@ export const useGameStore = create<GameStore>()(
       updateFighter: (id, updates) =>
         set((s) => ({
           fighters: s.fighters.map((f) => (f.id === id ? { ...f, ...updates } : f)),
+        })),
+      removeFighter: (id) =>
+        set((s) => ({
+          fighters: s.fighters.filter((f) => f.id !== id),
         })),
       setActiveNav: (nav) => set({ activeNav: nav }),
 
