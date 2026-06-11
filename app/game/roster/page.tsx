@@ -18,14 +18,17 @@ export default function RosterPage() {
 
   const router = useRouter()
   const [advancing, setAdvancing] = useState(false)
+  const [gymReady, setGymReady] = useState(false)
 
   // Refresh gym dari Supabase setiap kali halaman ini dimuat,
-  // agar event.fighter_ids selalu mencerminkan hasil fight terbaru
+  // agar event.fighter_ids selalu mencerminkan hasil fight terbaru.
+  // gymReady mencegah tombol fight/lanjut muncul sebelum data fresh siap.
   useEffect(() => {
-    if (!gym) return
+    if (!gym) { setGymReady(true); return }
     const supabase = createClient()
     supabase.from('gyms').select('*').eq('id', gym.id).single().then(({ data }) => {
       if (data) setGym(data as Gym)
+      setGymReady(true)
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -102,11 +105,11 @@ export default function RosterPage() {
       </header>
 
       {gym && (
-        <div className={`mb-6 rounded-lg border bg-octagon-card p-4 ${hasPendingFight ? 'border-octagon-amber/50' : 'border-octagon-border'}`}>
+        <div className={`mb-6 rounded-lg border bg-octagon-card p-4 ${gymReady && hasPendingFight ? 'border-octagon-amber/50' : 'border-octagon-border'}`}>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-sm font-semibold text-white">Minggu ke-{gym.season_week}</p>
-              {hasPendingFight ? (
+              {gymReady && hasPendingFight ? (
                 <p className="text-xs text-octagon-amber">
                   ⚡ {pendingFighters.map((f) => f.name).join(', ')} dijadwalkan bertanding minggu ini — selesaikan fight night dulu!
                 </p>
@@ -116,7 +119,11 @@ export default function RosterPage() {
                 </p>
               )}
             </div>
-            {hasPendingFight ? (
+            {!gymReady ? (
+              <button disabled className="shrink-0 rounded-md bg-octagon-border px-4 py-2 text-sm font-semibold text-gray-500 opacity-50">
+                Memuat...
+              </button>
+            ) : hasPendingFight ? (
               <button
                 onClick={() => router.push('/game/fight')}
                 className="shrink-0 rounded-md bg-octagon-amber px-4 py-2 text-sm font-semibold text-black transition-colors hover:bg-octagon-amber/90"
