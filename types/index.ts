@@ -94,7 +94,6 @@ export interface Gym {
   monthly_expense: number
   season_week: number
   rooms: GymRooms
-  starters_seeded: boolean
   created_at: string
 }
 

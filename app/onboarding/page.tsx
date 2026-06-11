@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { useGameStore } from '@/store/game-store'
-import { STARTER_FIGHTERS } from '@/lib/seed-fighters'
 
 const CITIES = ['Jakarta', 'Bandung', 'Surabaya', 'Medan', 'Bali', 'Yogyakarta']
 
@@ -71,21 +70,8 @@ export default function OnboardingPage() {
       return
     }
 
-    const { data: fighters, error: fightersError } = await supabase
-      .from('fighters')
-      .insert(STARTER_FIGHTERS.map((f) => ({ ...f, gym_id: gym.id })))
-      .select()
-
-    if (fightersError) {
-      setError(fightersError.message)
-      setLoading(false)
-      return
-    }
-
-    await supabase.from('gyms').update({ starters_seeded: true }).eq('id', gym.id)
-
-    setGym({ ...gym, starters_seeded: true })
-    setFighters(fighters ?? [])
+    setGym(gym)
+    setFighters([])
     router.push('/game/roster')
     router.refresh()
   }
@@ -103,7 +89,7 @@ export default function OnboardingPage() {
       <div className="w-full max-w-md rounded-lg border border-octagon-border bg-octagon-card p-6">
         <h1 className="text-xl font-bold text-white">Buat Gym Pertamamu</h1>
         <p className="mt-1 text-sm text-gray-400">
-          Mulai karir sebagai manajer MMA. Kamu akan mendapat 6 fighter awal untuk roster.
+          Mulai karir sebagai manajer MMA. Roster awal kosong — rekrut fighter pertamamu di menu Rekrutmen.
         </p>
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">

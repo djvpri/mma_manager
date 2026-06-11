@@ -138,7 +138,7 @@ Semua tabel menggunakan **Row Level Security (RLS)** — setiap user hanya bisa 
 
 - [x] Auth dengan Email/Password (Google OAuth opsional, belum diaktifkan)
 - [x] Onboarding: buat nama gym & pilih kota awal
-- [x] Seed data fighter awal (6 fighter default per gym baru)
+- [x] Roster awal kosong, pemain merekrut fighter pertamanya sendiri
 - [x] Navigasi utama (sidebar / bottom nav)
 - [x] Sistem rekrutmen fighter baru
 - [x] Advance week / simulasi waktu
