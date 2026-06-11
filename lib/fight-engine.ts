@@ -109,6 +109,80 @@ function generateEvents(
   return result
 }
 
+function pick<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)]
+}
+
+const NARRATION_OPENERS: ((round: number) => string)[] = [
+  (round) => `Ronde ${round} dimulai dengan kedua petarung saling melempar jab pembuka untuk membaca jarak.`,
+  (round) => `Bel berbunyi tanda ronde ${round} dimulai — penonton langsung berdiri menyambut aksi pembuka.`,
+  (round) => `Tensi langsung naik begitu ronde ${round} bergulir, kedua sudut berteriak memberi instruksi.`,
+  (round) => `Ronde ${round}: kedua petarung saling mengunci pandangan sebelum baku hantam dimulai.`,
+  (round) => `Wasit memberi aba-aba, dan ronde ${round} pun pecah dengan pertukaran pukulan cepat.`,
+]
+
+function dominantLines(winnerName: string): string[] {
+  return [
+    `${winnerName} benar-benar mengambil alih kendali ronde ini, nyaris tanpa perlawanan berarti dari lawannya.`,
+    `Dominasi ${winnerName} terlihat jelas — setiap pertukaran dimenangkan dengan telak.`,
+    `${winnerName} tampil seperti petarung kelas dunia di ronde ini, mengontrol tempo dari awal hingga akhir.`,
+  ]
+}
+
+function closeLines(myFirst: string, oppFirst: string): string[] {
+  return [
+    `Ronde ini berjalan sangat ketat — ${myFirst} dan ${oppFirst} silih berganti mendominasi momen demi momen.`,
+    `Sulit menentukan siapa yang lebih unggul; ${myFirst} dan ${oppFirst} sama-sama memberikan perlawanan sengit.`,
+    `Juri pasti kesulitan mencatat skor ronde ini — pertarungan berjalan begitu berimbang.`,
+  ]
+}
+
+const FINISH_LINES: Record<Exclude<FinishMethod, 'decision'>, (winner: string, loser: string) => string> = {
+  ko: (w, l) =>
+    `DAN ITU DIA — pukulan telak menghantam ${l}, tubuhnya langsung ambruk ke kanvas! ${w} mengakhiri pertarungan dengan KNOCKOUT brutal!`,
+  tko: (w, l) =>
+    `Wasit melompat masuk menghentikan pertarungan! ${l} sudah tidak mampu melindungi diri — TKO untuk ${w}!`,
+  submission: (w, l) =>
+    `${l} menepuk matras berkali-kali — submission sempurna dari ${w} mengunci kemenangan malam ini!`,
+}
+
+const ROUND_CLOSERS: string[] = [
+  'Kedua sudut kini sibuk menyiapkan strategi untuk ronde berikutnya.',
+  'Penonton bersorak menantikan apa yang akan terjadi di ronde selanjutnya.',
+  'Pelatih masing-masing fighter berteriak dari pinggir oktagon, mencoba mengubah momentum.',
+]
+
+const FIGHT_END_CLOSERS: string[] = [
+  'Bel berbunyi menandai akhir pertarungan — kini tinggal menunggu keputusan juri.',
+  'Pertarungan ini akan dikenang sebagai salah satu yang paling intens malam ini.',
+  'Kedua petarung saling merangkul di tengah oktagon, menghormati perjuangan masing-masing.',
+]
+
+export function generateNarration(
+  result: RoundResult,
+  myName: string,
+  oppName: string,
+  isFightOver: boolean
+): string {
+  const myFirst = myName.split(' ')[0]
+  const oppFirst = oppName.split(' ')[0]
+  const winnerName = result.winner === 'my' ? myFirst : oppFirst
+  const loserName = result.winner === 'my' ? oppFirst : myFirst
+  const margin = Math.abs(result.my_pct - result.opp_pct)
+
+  const sentences: string[] = [pick(NARRATION_OPENERS)(result.round)]
+  sentences.push(...result.events.map((e) => `${e}.`))
+  sentences.push(margin >= 25 ? pick(dominantLines(winnerName)) : pick(closeLines(myFirst, oppFirst)))
+
+  if (result.finish && result.finish !== 'decision') {
+    sentences.push(FINISH_LINES[result.finish](winnerName, loserName))
+  } else {
+    sentences.push(pick(isFightOver ? FIGHT_END_CLOSERS : ROUND_CLOSERS))
+  }
+
+  return sentences.join(' ')
+}
+
 export function calculateFightResult(rounds: RoundResult[]): {
   winner: 'my' | 'opp' | 'draw'
   method: FinishMethod

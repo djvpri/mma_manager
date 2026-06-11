@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Avatar from '@/components/avatar/Avatar'
 import { useGameStore } from '@/store/game-store'
-import { simulateRound, calculateFightResult, rollInjury } from '@/lib/fight-engine'
-import { getAICornerAdvice, getAINarration } from '@/lib/ai-corner'
+import { simulateRound, calculateFightResult, rollInjury, generateNarration } from '@/lib/fight-engine'
+import { getAICornerAdvice } from '@/lib/ai-corner'
 import { createClient } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/format'
 import { syncLeaderboard } from '@/lib/leaderboard'
@@ -336,10 +336,8 @@ export default function FightPage() {
     setFightPhase('fighting')
   }
 
-  async function handleSimulateRound() {
+  function handleSimulateRound() {
     if (!fight.fighter || !fight.opponent || !fight.gamePlan) return
-    setAiNarration('')
-    setAiLoading(true)
 
     const result = simulateRound({
       myFighter: fight.fighter,
@@ -373,15 +371,9 @@ export default function FightPage() {
 
     addRoundResult(final)
 
-    const narration = await getAINarration(
-      fight.currentRound,
-      final,
-      fight.fighter.name,
-      fight.opponent.name,
-      fight.gamePlan
-    )
+    const isFightOver = !!final.finish || newMyHP === 0 || newOppHP === 0 || fight.currentRound >= TOTAL_ROUNDS
+    const narration = generateNarration(final, fight.fighter.name, fight.opponent.name, isFightOver)
     setAiNarration(narration)
-    setAiLoading(false)
   }
 
   function handleAfterRound() {
@@ -616,18 +608,15 @@ export default function FightPage() {
                   {currentRoundResult.finish}! Pertarungan selesai di ronde {currentRoundResult.round}.
                 </p>
               )}
-              {fight.aiLoading ? (
-                <p className="mt-3 animate-pulse text-sm text-gray-500">Komentator sedang berbicara...</p>
-              ) : fight.aiNarration ? (
+              {fight.aiNarration && (
                 <p className="mt-3 rounded-md bg-octagon-dark p-3 text-sm italic text-gray-300">
                   &ldquo;{fight.aiNarration}&rdquo;
                 </p>
-              ) : null}
+              )}
 
               <button
                 onClick={handleAfterRound}
-                disabled={fight.aiLoading}
-                className="mt-4 rounded-md bg-octagon-red px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-octagon-red/90 disabled:cursor-not-allowed disabled:opacity-40"
+                className="mt-4 rounded-md bg-octagon-red px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-octagon-red/90"
               >
                 {isFightOver ? 'Lihat Hasil' : 'Lanjut ke Corner'}
               </button>
@@ -635,10 +624,9 @@ export default function FightPage() {
           ) : (
             <button
               onClick={handleSimulateRound}
-              disabled={fight.aiLoading}
-              className="rounded-md bg-octagon-red px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-octagon-red/90 disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-md bg-octagon-red px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-octagon-red/90"
             >
-              {fight.aiLoading ? 'Mensimulasikan...' : `Mulai Ronde ${fight.currentRound}`}
+              {`Mulai Ronde ${fight.currentRound}`}
             </button>
           )}
 
