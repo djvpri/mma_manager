@@ -19,6 +19,20 @@ export function IconFight(props: React.SVGProps<SVGSVGElement>) {
   )
 }
 
+export function IconCalendar(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <rect x="3" y="4" width="18" height="17" rx="2" />
+      <line x1="3" y1="9" x2="21" y2="9" />
+      <line x1="8" y1="2" x2="8" y2="6" />
+      <line x1="16" y1="2" x2="16" y2="6" />
+      <circle cx="8" cy="14" r="1" />
+      <circle cx="12" cy="14" r="1" />
+      <circle cx="16" cy="14" r="1" />
+    </svg>
+  )
+}
+
 export function IconGym(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -110,6 +124,7 @@ export function IconLogout(props: React.SVGProps<SVGSVGElement>) {
 export const NAV_ITEMS = [
   { href: '/game/roster', label: 'Roster', icon: IconRoster },
   { href: '/game/fight', label: 'Fight Night', icon: IconFight },
+  { href: '/game/events', label: 'Kalender Event', icon: IconCalendar },
   { href: '/game/gym', label: 'Gym', icon: IconGym },
   { href: '/game/finance', label: 'Keuangan', icon: IconFinance },
   { href: '/game/sponsor', label: 'Sponsor Hunt', icon: IconSponsor },

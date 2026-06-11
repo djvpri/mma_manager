@@ -29,6 +29,16 @@ export type GamePlan = 'pressure' | 'counter' | 'grapple' | 'technical'
 export type CornerAdvice = 'push' | 'patient' | 'takedown' | 'striking'
 export type FinishMethod = 'ko' | 'tko' | 'submission' | 'decision'
 
+export type EventTier = 'local' | 'regional' | 'national'
+
+export interface MmaEvent {
+  id: string
+  name: string
+  tier: EventTier
+  week: number          // = gym.season_week saat event berlangsung
+  fighter_ids: string[] // fighter terdaftar & belum bertanding di event ini
+}
+
 export interface FighterAttrs {
   // Striking
   punch_power: number    // 0–100
@@ -117,6 +127,7 @@ export interface Gym {
   season_week: number
   last_sponsor_week: number | null
   rooms: GymRooms
+  events: MmaEvent[]
   created_at: string
 }
 

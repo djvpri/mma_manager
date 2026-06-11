@@ -18,6 +18,7 @@ import { createClient } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/format'
 import { syncLeaderboard } from '@/lib/leaderboard'
 import { ATTR_GROUPS, ALL_ATTR_KEYS } from '@/lib/attrs'
+import { EVENT_TIER_CONFIG, EVENT_TIER_BADGE_CLASS, type EventTier } from '@/lib/generate-events'
 import type { Fighter, FighterAttrs, GamePlan, CornerAdvice, Specialty, RoundResult, RoundTick, FightStats } from '@/types'
 
 const TOTAL_ROUNDS = 3
@@ -64,14 +65,17 @@ function formatClock(totalSec: number): string {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
-function generateOpponent(myFighter: Fighter): Opponent {
+function generateOpponent(myFighter: Fighter, tier: EventTier): Opponent {
+  const config = EVENT_TIER_CONFIG[tier]
   const avg = ALL_ATTR_KEYS.reduce((sum, key) => sum + myFighter.attrs[key], 0) / ALL_ATTR_KEYS.length
-  const roll = () => Math.max(35, Math.min(95, Math.round(avg + randInt(-12, 12))))
+  const roll = () =>
+    Math.max(35, Math.min(95, Math.round(avg + config.attrOffset + randInt(-config.attrSpread, config.attrSpread))))
+  const { wMin, wMax, lMin, lMax } = config.recordRange
 
   return {
     name: OPPONENT_NAMES[randInt(0, OPPONENT_NAMES.length - 1)],
     attrs: Object.fromEntries(ALL_ATTR_KEYS.map((key) => [key, roll()])) as unknown as FighterAttrs,
-    record: { w: randInt(3, 18), l: randInt(0, 8), d: 0 },
+    record: { w: randInt(wMin, wMax), l: randInt(lMin, lMax), d: 0 },
     specialty: SPECIALTIES[randInt(0, SPECIALTIES.length - 1)],
     color: OPPONENT_COLORS[randInt(0, OPPONENT_COLORS.length - 1)],
   }
@@ -314,13 +318,20 @@ export default function FightPage() {
   const [roundClock, setRoundClock] = useState(ROUND_DURATION_SEC)
 
   const seasonWeek = gym?.season_week ?? 1
+  const todaysEvent = gym?.events.find((e) => e.week === seasonWeek) ?? null
   const notRetiredOrInjured = fighters.filter((f) => f.status !== 'retired' && f.status !== 'injured')
-  const eligibleFighters = notRetiredOrInjured.filter(
+  const cooldownReady = notRetiredOrInjured.filter(
     (f) => f.next_fight_week === null || f.next_fight_week <= seasonWeek
   )
   const cooldownFighters = notRetiredOrInjured.filter(
     (f) => f.next_fight_week !== null && f.next_fight_week > seasonWeek
   )
+  const eligibleFighters = todaysEvent
+    ? cooldownReady.filter((f) => todaysEvent.fighter_ids.includes(f.id))
+    : []
+  const unscheduledFighters = todaysEvent
+    ? cooldownReady.filter((f) => !todaysEvent.fighter_ids.includes(f.id))
+    : cooldownReady
   const currentRoundResult = fight.roundResults.find((r) => r.round === fight.currentRound)
   const isFightOver =
     !!currentRoundResult &&
@@ -368,6 +379,8 @@ export default function FightPage() {
 
     const result = calculateFightResult(fight.roundResults)
     const isFinish = result.method !== 'decision'
+    const event = gym.events.find((e) => e.fighter_ids.includes(fighter.id)) ?? null
+    const tierConfig = EVENT_TIER_CONFIG[event?.tier ?? 'regional']
 
     const supabase = createClient()
     const { data: staffData } = await supabase
@@ -386,6 +399,10 @@ export default function FightPage() {
       purse = 2_000_000
       reputationChange = isFinish ? -4 : -2
     }
+
+    // Multiplier sesuai tier event (Lokal/Regional/Nasional)
+    purse = Math.round((purse * tierConfig.purseMult) / 100_000) * 100_000
+    reputationChange = Math.round(reputationChange * tierConfig.reputationMult)
 
     // Manajer Pertarungan: negosiasi purse lebih baik
     if (specialties.includes('Matchmaking & Promosi')) {
@@ -441,6 +458,11 @@ export default function FightPage() {
 
     const newBalance = gym.balance + purse + commission - winBonusPaid - medicalCost - purseShare
     const newReputation = Math.max(0, Math.min(100, gym.reputation + reputationChange + reputationBonus))
+    const newEvents = event
+      ? gym.events.map((e) =>
+          e.id === event.id ? { ...e, fighter_ids: e.fighter_ids.filter((id) => id !== fighter.id) } : e
+        )
+      : gym.events
 
     const [insertRes, fighterRes, gymRes] = await Promise.all([
       supabase.from('fight_results').insert({
@@ -474,7 +496,7 @@ export default function FightPage() {
         .single(),
       supabase
         .from('gyms')
-        .update({ balance: newBalance, reputation: newReputation })
+        .update({ balance: newBalance, reputation: newReputation, events: newEvents })
         .eq('id', gym.id)
         .select()
         .single(),
@@ -509,8 +531,8 @@ export default function FightPage() {
 
   function handleStartFight() {
     const fighter = eligibleFighters.find((f) => f.id === selectedFighterId)
-    if (!fighter) return
-    const opponent = generateOpponent(fighter)
+    if (!fighter || !todaysEvent) return
+    const opponent = generateOpponent(fighter, todaysEvent.tier)
     setFightFighter(fighter)
     setOpponent(opponent)
     setFightVitals({
@@ -659,12 +681,39 @@ export default function FightPage() {
 
       {fight.phase === 'pregame' && (
         <div className="space-y-6">
+          {todaysEvent ? (
+            <div className="rounded-lg border border-octagon-border bg-octagon-card p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-gray-500">Event Minggu Ini</p>
+                  <p className="font-semibold text-white">{todaysEvent.name}</p>
+                </div>
+                <span
+                  className={`shrink-0 rounded border px-2 py-0.5 text-[10px] font-medium uppercase ${EVENT_TIER_BADGE_CLASS[todaysEvent.tier]}`}
+                >
+                  {EVENT_TIER_CONFIG[todaysEvent.tier].label}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-lg border border-dashed border-octagon-border bg-octagon-card p-4 text-center">
+              <p className="text-sm text-gray-400">Tidak ada event MMA minggu ini.</p>
+              <Link href="/game/events" className="mt-1 inline-block text-sm font-medium text-octagon-amber hover:underline">
+                Cek Kalender Event →
+              </Link>
+            </div>
+          )}
+
           {eligibleFighters.length === 0 ? (
             <div className="rounded-lg border border-dashed border-octagon-border bg-octagon-card p-8 text-center">
-              <p className="text-gray-400">Tidak ada fighter yang siap bertanding.</p>
-              {cooldownFighters.length === 0 && (
-                <Link href="/game/roster" className="mt-2 inline-block text-sm font-medium text-octagon-amber hover:underline">
-                  Cek Roster →
+              <p className="text-gray-400">
+                {todaysEvent
+                  ? 'Belum ada fighter yang terdaftar di event minggu ini.'
+                  : 'Tidak ada fighter yang siap bertanding minggu ini.'}
+              </p>
+              {todaysEvent && (
+                <Link href="/game/events" className="mt-2 inline-block text-sm font-medium text-octagon-amber hover:underline">
+                  Daftarkan Fighter →
                 </Link>
               )}
             </div>
@@ -697,6 +746,25 @@ export default function FightPage() {
             >
               Cari Lawan
             </button>
+          )}
+
+          {unscheduledFighters.length > 0 && (
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Belum Terdaftar Event</p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {unscheduledFighters.map((f) => (
+                  <div key={f.id} className="rounded-lg border border-octagon-border bg-octagon-card/50 p-4 opacity-70">
+                    <p className="font-semibold text-white">{f.name}</p>
+                    <p className="text-xs text-gray-400">
+                      {f.weight_class} · {f.specialty} · {f.record.w}-{f.record.l}-{f.record.d}
+                    </p>
+                    <Link href="/game/events" className="mt-1 inline-block text-xs font-medium text-octagon-amber hover:underline">
+                      Daftarkan ke event →
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
 
           {cooldownFighters.length > 0 && (
