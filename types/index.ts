@@ -61,11 +61,14 @@ export type EventPromotion = 'lokal' | 'regional' | 'nasional' | 'championship' 
 export type EventSlotType = 'main' | 'comain' | 'featured' | 'undercard' | 'tournament'
 
 export interface EventSlotOpponent {
+  id?: string | null
   name: string
   attrs: FighterAttrs
   record: FighterRecord
   specialty: string
   color: string
+  is_rival?: boolean
+  rival_meetings?: number
 }
 
 export interface EventSlot {
@@ -242,6 +245,7 @@ export interface FightResult {
   id: string
   gym_id: string
   fighter_id: string
+  opponent_id?: string | null
   opponent_name: string
   opponent_record: FighterRecord
   round_results: RoundResult[]

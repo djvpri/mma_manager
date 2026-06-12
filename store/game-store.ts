@@ -6,11 +6,14 @@ import type { TitleFightResult } from '@/lib/championship'
 interface FightState {
   fighter: Fighter | null
   opponent: {
+    id?: string | null
     name: string
     attrs: Fighter['attrs']
     record: Fighter['record']
     specialty: string
     color: string
+    isRival?: boolean
+    rivalMeetings?: number
   } | null
   phase: 'pregame' | 'gameplan' | 'fighting' | 'corner' | 'result'
   currentRound: number

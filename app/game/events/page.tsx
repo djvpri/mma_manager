@@ -198,7 +198,10 @@ export default function EventsPage() {
                                     <>
                                       <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-octagon-dark" style={{ boxShadow: `0 0 0 2px ${currentOpp.color}` }} />
                                       <div className="min-w-0">
-                                        <p className="truncate text-sm font-semibold text-gray-200">{currentOpp.name}</p>
+                                        <p className="truncate text-sm font-semibold text-gray-200">
+                                          {currentOpp.name}
+                                          {currentOpp.is_rival && <span className="ml-1 text-octagon-red">🔥</span>}
+                                        </p>
                                         <p className="text-[10px] text-gray-500">{currentOpp.record.w}-{currentOpp.record.l} · {currentOpp.specialty}</p>
                                         <p className="text-[10px] font-semibold text-yellow-400">{TOURNAMENT_ROUND_LABELS[round]}</p>
                                       </div>
@@ -211,7 +214,10 @@ export default function EventsPage() {
                                 <>
                                   <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-octagon-dark" style={{ boxShadow: `0 0 0 2px ${slot.opponent.color}` }} />
                                   <div className="min-w-0">
-                                    <p className="truncate text-sm font-semibold text-gray-200">{slot.opponent.name}</p>
+                                    <p className="truncate text-sm font-semibold text-gray-200">
+                                      {slot.opponent.name}
+                                      {slot.opponent.is_rival && <span className="ml-1 text-octagon-red">🔥</span>}
+                                    </p>
                                     <p className="text-[10px] text-gray-500">{slot.opponent.record.w}-{slot.opponent.record.l} · {slot.opponent.specialty}</p>
                                   </div>
                                 </>

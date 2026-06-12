@@ -258,20 +258,21 @@ export function getBestAvailableSlot(event: MmaEvent, fighterWins: number): Even
 /** Fetch opponent dari pool free agent + roster CPU gym (weight class sama, wins mirip). */
 export async function fetchPoolOpponent(
   weightClass: WeightClass,
-  targetWins: number
+  targetWins: number,
+  fighterId?: string
 ): Promise<MmaEvent['slots'][0]['opponent']> {
   const supabase = createClient()
   const [{ data: poolData }, { data: cpuData }] = await Promise.all([
     supabase
       .from('fighters')
-      .select('name, attrs, record, specialty')
+      .select('id, name, attrs, record, specialty')
       .is('gym_id', null)
       .eq('status', 'prospect')
       .eq('weight_class', weightClass)
       .limit(30),
     supabase
       .from('fighters')
-      .select('name, attrs, record, specialty')
+      .select('id, name, attrs, record, specialty')
       .eq('is_cpu', true)
       .eq('status', 'active')
       .eq('weight_class', weightClass)
@@ -279,8 +280,8 @@ export async function fetchPoolOpponent(
   ])
 
   const pool = [
-    ...((poolData ?? []) as Pick<Fighter, 'name' | 'attrs' | 'record' | 'specialty'>[]),
-    ...((cpuData ?? []) as Pick<Fighter, 'name' | 'attrs' | 'record' | 'specialty'>[]),
+    ...((poolData ?? []) as Pick<Fighter, 'id' | 'name' | 'attrs' | 'record' | 'specialty'>[]),
+    ...((cpuData ?? []) as Pick<Fighter, 'id' | 'name' | 'attrs' | 'record' | 'specialty'>[]),
   ]
 
   if (pool.length === 0) return generateFallbackOpponent(targetWins)
@@ -288,12 +289,26 @@ export async function fetchPoolOpponent(
   const similar = pool.filter((f) => Math.abs(f.record.w - targetWins) <= 4)
   const chosen  = similar.length > 0 ? pick(similar) : pick(pool)
 
+  // Cek histori pertemuan untuk rivalry: sudah pernah bertanding sebelumnya = rematch rival.
+  let rivalMeetings = 0
+  if (fighterId) {
+    const { count } = await supabase
+      .from('fight_results')
+      .select('id', { count: 'exact', head: true })
+      .eq('fighter_id', fighterId)
+      .eq('opponent_id', chosen.id)
+    rivalMeetings = count ?? 0
+  }
+
   return {
+    id:        chosen.id,
     name:      chosen.name,
     attrs:     chosen.attrs,
     record:    chosen.record,
     specialty: chosen.specialty,
     color:     pick(OPPONENT_COLORS),
+    is_rival:  rivalMeetings >= 1,
+    rival_meetings: rivalMeetings,
   }
 }
 
@@ -305,22 +320,26 @@ function generateFallbackOpponent(targetWins: number): MmaEvent['slots'][0]['opp
   ) as unknown as Fighter['attrs']
 
   return {
+    id:        null,
     name:      `Fighter #${randInt(100,999)}`,
     attrs,
     record:    { w: targetWins + randInt(-2,2), l: randInt(0,5), d: 0 },
     specialty: pick(['Striker','Grappler','All-rounder','Counter Fighter','Wrestler']),
     color:     pick(OPPONENT_COLORS),
+    is_rival:  false,
+    rival_meetings: 0,
   }
 }
 
 /** Generate 3 lawan bracket turnamen (Quarterfinal, Semifinal, Final) — progresif makin sulit. */
 export async function fetchTournamentOpponents(
   weightClass: WeightClass,
-  targetWins: number
+  targetWins: number,
+  fighterId?: string
 ): Promise<NonNullable<EventSlot['opponents']>> {
   const tierBoosts = [-2, 3, 9] // QF: sedikit di bawah, SF: sedikit di atas, Final: jauh di atas
   const opponents = await Promise.all(
-    tierBoosts.map((boost) => fetchPoolOpponent(weightClass, Math.max(0, targetWins + boost)))
+    tierBoosts.map((boost) => fetchPoolOpponent(weightClass, Math.max(0, targetWins + boost), fighterId))
   )
   return opponents.map((opp, i) => opp ?? generateFallbackOpponent(targetWins + tierBoosts[i])) as NonNullable<EventSlot['opponents']>
 }
@@ -340,7 +359,7 @@ export async function registerFighterToEvent(
   let updatedEvents: MmaEvent[]
 
   if (event.promotion === 'turnamen') {
-    const opponents = await fetchTournamentOpponents(event.weight_class, fighter.record.w)
+    const opponents = await fetchTournamentOpponents(event.weight_class, fighter.record.w, fighter.id)
     updatedEvents = gym.events.map((e) => {
       if (e.id !== eventId) return e
       return {
@@ -353,7 +372,7 @@ export async function registerFighterToEvent(
       }
     })
   } else {
-    const opponent = await fetchPoolOpponent(event.weight_class, fighter.record.w)
+    const opponent = await fetchPoolOpponent(event.weight_class, fighter.record.w, fighter.id)
     updatedEvents = gym.events.map((e) => {
       if (e.id !== eventId) return e
       return {

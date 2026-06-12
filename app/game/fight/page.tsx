@@ -49,11 +49,14 @@ const OPPONENT_COLORS = ['#3B82F6', '#A855F7', '#F59E0B', '#06B6D4', '#EC4899']
 const SPECIALTIES: Specialty[] = ['Striker', 'Grappler', 'All-rounder', 'Counter Fighter', 'Wrestler']
 
 type Opponent = {
+  id?: string | null
   name: string
   attrs: FighterAttrs
   record: Fighter['record']
   specialty: string
   color: string
+  isRival?: boolean
+  rivalMeetings?: number
 }
 
 function randInt(min: number, max: number) {
@@ -76,11 +79,14 @@ function generateOpponent(myFighter: Fighter, tier: EventTier): Opponent {
   const { wMin, wMax, lMin, lMax } = config.recordRange
 
   return {
+    id: null,
     name: OPPONENT_NAMES[randInt(0, OPPONENT_NAMES.length - 1)],
     attrs: Object.fromEntries(ALL_ATTR_KEYS.map((key) => [key, roll()])) as unknown as FighterAttrs,
     record: { w: randInt(wMin, wMax), l: randInt(lMin, lMax), d: 0 },
     specialty: SPECIALTIES[randInt(0, SPECIALTIES.length - 1)],
     color: OPPONENT_COLORS[randInt(0, OPPONENT_COLORS.length - 1)],
+    isRival: false,
+    rivalMeetings: 0,
   }
 }
 
@@ -447,6 +453,12 @@ export default function FightPage() {
     purse = Math.round((purse * tierConfig.purseMult * slotPurseMult) / 100_000) * 100_000
     reputationChange = Math.round(reputationChange * tierConfig.reputationMult)
 
+    // Bonus rivalitas: rematch melawan lawan yang pernah dihadapi menarik lebih banyak penonton
+    if (opponent.isRival) {
+      purse = Math.round((purse * 1.25) / 100_000) * 100_000
+      if (result.winner === 'my') reputationChange += 2
+    }
+
     // Bonus juara Turnamen 8 Besar: menang 3 bout beruntun dalam satu fight night
     if (tournamentChampion) {
       purse += 50_000_000
@@ -529,6 +541,7 @@ export default function FightPage() {
       supabase.from('fight_results').insert({
         gym_id: gym.id,
         fighter_id: fighter.id,
+        opponent_id: opponent.id ?? null,
         opponent_name: opponent.name,
         opponent_record: opponent.record,
         round_results: fight.roundResults,
@@ -657,7 +670,16 @@ export default function FightPage() {
     // Gunakan lawan yang sudah di-booking, atau fallback ke generate random
     const tier = eventForFighter?.tier ?? todaysEvent?.tier ?? 'regional'
     const opponent = bookedOpponent
-      ? { name: bookedOpponent.name, attrs: bookedOpponent.attrs, record: bookedOpponent.record, specialty: bookedOpponent.specialty as Specialty, color: bookedOpponent.color }
+      ? {
+          id: bookedOpponent.id ?? null,
+          name: bookedOpponent.name,
+          attrs: bookedOpponent.attrs,
+          record: bookedOpponent.record,
+          specialty: bookedOpponent.specialty as Specialty,
+          color: bookedOpponent.color,
+          isRival: bookedOpponent.is_rival ?? false,
+          rivalMeetings: bookedOpponent.rival_meetings ?? 0,
+        }
       : generateOpponent(fighter, tier as EventTier)
 
     setFightFighter(fighter)
@@ -796,11 +818,14 @@ export default function FightPage() {
     if (!tournamentResult?.nextOpponent) return
     const opp = tournamentResult.nextOpponent
     startNextTournamentBout({
+      id: opp.id ?? null,
       name: opp.name,
       attrs: opp.attrs,
       record: opp.record,
       specialty: opp.specialty as Specialty,
       color: opp.color,
+      isRival: opp.is_rival ?? false,
+      rivalMeetings: opp.rival_meetings ?? 0,
     })
     setTournamentResult(null)
   }
@@ -816,9 +841,16 @@ export default function FightPage() {
           </p>
         )}
         {fight.fighter && fight.opponent ? (
-          <p className="text-sm text-gray-400">
-            {fight.fighter.name} <span className="text-gray-600">vs</span> {fight.opponent.name}
-          </p>
+          <>
+            <p className="text-sm text-gray-400">
+              {fight.fighter.name} <span className="text-gray-600">vs</span> {fight.opponent.name}
+            </p>
+            {fight.opponent.isRival && (
+              <p className="mt-1 inline-block rounded border border-octagon-red/30 bg-octagon-red/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-octagon-red">
+                🔥 Rival Match — pertemuan ke-{(fight.opponent.rivalMeetings ?? 0) + 1}
+              </p>
+            )}
+          </>
         ) : (
           <p className="text-sm text-gray-400">Pilih fighter untuk memulai pertarungan malam ini.</p>
         )}
