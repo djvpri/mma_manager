@@ -11,6 +11,7 @@ import { formatCurrency } from '@/lib/format'
 import { ensureEventsForUpcomingWeeks, getBestAvailableSlot, PROMOTION_CONFIG } from '@/lib/generate-events'
 import { recordRetirements } from '@/lib/hall-of-fame'
 import { runAssistantManagerSponsor, runAssistantManagerEventRegistration } from '@/lib/assistant-manager'
+import { getNotificationPermission, requestNotificationPermission, showWeeklyReportNotification } from '@/lib/notifications'
 import type { Championship, Fighter, Gym, TournamentTitle } from '@/types'
 
 export default function RosterPage() {
@@ -39,6 +40,16 @@ export default function RosterPage() {
   const [report, setReport] = useState<WeeklyReport | null>(null)
   const [championships, setChampionships] = useState<Championship[]>([])
   const [tournamentTitles, setTournamentTitles] = useState<TournamentTitle[]>([])
+  const [notifPermission, setNotifPermission] = useState<NotificationPermission | null>(null)
+
+  useEffect(() => {
+    setNotifPermission(getNotificationPermission())
+  }, [])
+
+  async function handleEnableNotifications() {
+    const permission = await requestNotificationPermission()
+    setNotifPermission(permission)
+  }
 
   // Cek gelar juara yang dipegang fighter di gym ini
   useEffect(() => {
@@ -142,16 +153,16 @@ export default function RosterPage() {
         setGym(latestGym)
       }
 
-      setReport(
-        buildWeeklyReport(
-          prevFighters,
-          newFighters,
-          prevBalance,
-          gymRes.data?.balance ?? prevBalance,
-          gymRes.data?.season_week ?? newWeek,
-          weekEvents
-        )
+      const weeklyReport = buildWeeklyReport(
+        prevFighters,
+        newFighters,
+        prevBalance,
+        gymRes.data?.balance ?? prevBalance,
+        gymRes.data?.season_week ?? newWeek,
+        weekEvents
       )
+      setReport(weeklyReport)
+      showWeeklyReportNotification(weeklyReport)
 
       const prevById = new Map(prevFighters.map((f) => [f.id, f]))
       const newlyRetired = newFighters.filter((f) => {
@@ -168,12 +179,22 @@ export default function RosterPage() {
 
   return (
     <div>
-      <header className="mb-6">
-        <h1 className="text-2xl font-bold text-white">Roster Fighter</h1>
-        <p className="text-sm text-gray-400">
-          {gym ? `${gym.name} — ` : ''}
-          {activeFighters.length} fighter terdaftar
-        </p>
+      <header className="mb-6 flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Roster Fighter</h1>
+          <p className="text-sm text-gray-400">
+            {gym ? `${gym.name} — ` : ''}
+            {activeFighters.length} fighter terdaftar
+          </p>
+        </div>
+        {notifPermission === 'default' && (
+          <button
+            onClick={handleEnableNotifications}
+            className="shrink-0 rounded-md border border-octagon-border bg-octagon-card px-3 py-1.5 text-xs font-semibold text-gray-300 transition-colors hover:border-octagon-amber/40 hover:text-octagon-amber"
+          >
+            🔔 Aktifkan Notifikasi
+          </button>
+        )}
       </header>
 
       {gym && (

@@ -1,0 +1,19 @@
+{
+  "name": "MMA Manager",
+  "short_name": "MMA Manager",
+  "description": "Kelola gym MMA dan bawa fighter-mu menuju juara",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0A0A0A",
+  "theme_color": "#0A0A0A",
+  "icons": [
+    {
+      "src": "/fighter-silhouette.png",
+      "sizes": "555x548",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

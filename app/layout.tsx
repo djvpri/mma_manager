@@ -1,6 +1,7 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import { THEME_STORAGE_KEY } from '@/lib/theme'
+import RegisterServiceWorker from '@/components/pwa/RegisterServiceWorker'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' })
@@ -8,6 +9,16 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-sans' })
 export const metadata: Metadata = {
   title: 'MMA Manager',
   description: 'Kelola gym MMA dan bawa fighter-mu menuju juara',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'MMA Manager',
+  },
+}
+
+export const viewport: Viewport = {
+  themeColor: '#0A0A0A',
 }
 
 // Set tema sebelum render pertama agar tidak ada flash dark→light.
@@ -19,7 +30,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
-      <body className="bg-octagon-dark font-sans text-gray-100 antialiased">{children}</body>
+      <body className="bg-octagon-dark font-sans text-gray-100 antialiased">
+        <RegisterServiceWorker />
+        {children}
+      </body>
     </html>
   )
 }
