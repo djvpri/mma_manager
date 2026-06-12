@@ -26,7 +26,9 @@ function buildReportSummary(report: WeeklyReport): string {
   if (report.randomEvents.length > 0) lines.push(report.randomEvents[0])
   if (report.growth.length > 0) lines.push(`${report.growth.length} fighter berkembang`)
   if (report.healed.length > 0) lines.push(`${report.healed.length} fighter pulih dari cedera`)
-  if (report.birthdays.length > 0) lines.push(`🎂 ${report.birthdays.join(', ')}`)
+  if (report.birthdays.length > 0) {
+    lines.push(`🎂 ${report.birthdays.map((b) => `${b.name} (${b.age})`).join(', ')}`)
+  }
   if (report.contractWarnings.length > 0) lines.push(`${report.contractWarnings.length} kontrak akan habis`)
   if (report.retirements.length > 0) {
     lines.push(`${report.retirements.map((r) => r.name).join(', ')} pensiun`)

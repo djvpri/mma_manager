@@ -4,12 +4,11 @@ import { ATTR_NAME_LABELS } from './attrs'
 export interface WeeklyReport {
   week: number
   balanceChange: number
-  agedUp: boolean
   retirements: { name: string; reason: string }[]
   healed: string[]
   growth: { name: string; attr: string; from: number; to: number }[]
   contractWarnings: string[]
-  birthdays: string[]
+  birthdays: { name: string; age: number }[]
   randomEvents: string[]
 }
 
@@ -26,7 +25,7 @@ export function buildWeeklyReport(
   const healed: string[] = []
   const growth: WeeklyReport['growth'] = []
   const contractWarnings: string[] = []
-  const birthdays: string[] = []
+  const birthdays: WeeklyReport['birthdays'] = []
 
   for (const f of next) {
     const p = prevById.get(f.id)
@@ -39,7 +38,7 @@ export function buildWeeklyReport(
     }
 
     if (newWeek % 52 === f.birth_week % 52) {
-      birthdays.push(f.name)
+      birthdays.push({ name: f.name, age: f.age })
     }
 
     if (p.status === 'injured' && f.status === 'training') {
@@ -60,7 +59,6 @@ export function buildWeeklyReport(
   return {
     week: newWeek,
     balanceChange: newBalance - prevBalance,
-    agedUp: newWeek % 12 === 0,
     retirements,
     healed,
     growth,

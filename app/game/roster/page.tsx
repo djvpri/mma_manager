@@ -272,8 +272,6 @@ export default function RosterPage() {
             </span>
           </p>
 
-          {report.agedUp && <p className="mt-1 text-xs text-octagon-amber">🎂 Semua fighter bertambah usia 1 tahun.</p>}
-
           {report.growth.length > 0 && (
             <div className="mt-2">
               <p className="text-xs font-semibold text-gray-300">Perkembangan Atribut</p>
@@ -302,8 +300,8 @@ export default function RosterPage() {
             <div className="mt-2">
               <p className="text-xs font-semibold text-gray-300">Ulang Tahun</p>
               <ul className="mt-1 space-y-0.5 text-xs text-octagon-amber">
-                {report.birthdays.map((name, i) => (
-                  <li key={i}>🎂 {name} merayakan ulang tahun minggu ini. Moral sedikit meningkat.</li>
+                {report.birthdays.map((b, i) => (
+                  <li key={i}>🎂 {b.name} merayakan ulang tahun, kini berusia {b.age} tahun. Moral sedikit meningkat.</li>
                 ))}
               </ul>
             </div>

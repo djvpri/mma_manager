@@ -2,6 +2,7 @@
 
 import Avatar from '@/components/avatar/Avatar'
 import { getCategoryAverages, overallRating } from '@/lib/attrs'
+import { formatBirthDate } from '@/lib/birthdate'
 import type { Fighter } from '@/types'
 
 const STATUS_STYLES: Record<Fighter['status'], string> = {
@@ -74,7 +75,7 @@ export default function FighterDetailModal({ fighter, gymLabel, onClose }: Fight
           </div>
           <div>
             <p className="text-xs text-gray-500">Lahir</p>
-            <p className="text-white">Minggu ke-{fighter.birth_week}</p>
+            <p className="text-white">{formatBirthDate(fighter.birth_week, fighter.age)}</p>
           </div>
           <div className="col-span-2">
             <p className="text-xs text-gray-500">Personality</p>
