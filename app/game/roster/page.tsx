@@ -10,6 +10,7 @@ import { buildWeeklyReport, type WeeklyReport } from '@/lib/weekly-report'
 import { formatCurrency } from '@/lib/format'
 import { ensureEventsForUpcomingWeeks, getBestAvailableSlot, PROMOTION_CONFIG } from '@/lib/generate-events'
 import { recordRetirements } from '@/lib/hall-of-fame'
+import { runAssistantManagerSponsor } from '@/lib/assistant-manager'
 import type { Championship, Fighter, Gym, TournamentTitle } from '@/types'
 
 export default function RosterPage() {
@@ -118,12 +119,21 @@ export default function RosterPage() {
       supabase.from('fighter_news').select('message').eq('gym_id', gym.id).eq('season_week', newWeek),
     ])
 
+    let assistantManagerMessage: string | null = null
     if (gymRes.error) setError(gymRes.error.message)
-    else if (gymRes.data) setGym(gymRes.data)
+    else if (gymRes.data) {
+      setGym(gymRes.data)
+      const result = await runAssistantManagerSponsor(gymRes.data as Gym)
+      if (result.message) {
+        assistantManagerMessage = result.message
+        setGym(result.gym)
+      }
+    }
 
     if (!fightersRes.error && fightersRes.data) {
       const newFighters = fightersRes.data as Fighter[]
       setFighters(newFighters)
+      const weekEvents = (newsRes.data ?? []).map((n) => n.message as string)
       setReport(
         buildWeeklyReport(
           prevFighters,
@@ -131,7 +141,7 @@ export default function RosterPage() {
           prevBalance,
           gymRes.data?.balance ?? prevBalance,
           gymRes.data?.season_week ?? newWeek,
-          (newsRes.data ?? []).map((n) => n.message as string)
+          assistantManagerMessage ? [...weekEvents, assistantManagerMessage] : weekEvents
         )
       )
 

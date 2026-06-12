@@ -122,8 +122,31 @@ export default function StaffPage() {
       return
     }
 
-    setGym({ ...gym, monthly_expense: newExpense })
+    const wasAssistantManager = gym.assistant_manager_id === member.id
+    setGym({ ...gym, monthly_expense: newExpense, ...(wasAssistantManager ? { assistant_manager_id: null } : {}) })
     setHired((h) => (h ?? []).filter((s) => s.id !== member.id))
+    setBusyId(null)
+  }
+
+  async function handleToggleAssistantManager(member: Staff) {
+    if (!gym) return
+    setError(null)
+    setBusyId(member.id)
+    const supabase = createClient()
+
+    const newId = gym.assistant_manager_id === member.id ? null : member.id
+    const { error: gymError } = await supabase
+      .from('gyms')
+      .update({ assistant_manager_id: newId })
+      .eq('id', gym.id)
+
+    if (gymError) {
+      setError(gymError.message)
+      setBusyId(null)
+      return
+    }
+
+    setGym({ ...gym, assistant_manager_id: newId })
     setBusyId(null)
   }
 
@@ -150,6 +173,9 @@ export default function StaffPage() {
 
       <div>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-400">Staf Aktif</h2>
+        <p className="mb-3 text-xs text-gray-500">
+          Jadikan satu staf sebagai Asisten Manajer agar setiap minggu otomatis mencari & menandatangani kontrak sponsor baru saat ada slot kosong — staf dengan rating lebih tinggi memilih penawaran yang lebih menguntungkan.
+        </p>
         {hired === null ? (
           <p className="text-sm text-gray-400">Memuat...</p>
         ) : hired.length === 0 ? (
@@ -158,28 +184,47 @@ export default function StaffPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {hired.map((member) => (
-              <div key={member.id} className="rounded-lg border border-octagon-border bg-octagon-card p-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-white">{member.name}</h3>
-                  <Stars rating={member.rating} />
+            {hired.map((member) => {
+              const isAssistantManager = gym.assistant_manager_id === member.id
+              return (
+                <div key={member.id} className={`rounded-lg border bg-octagon-card p-4 ${isAssistantManager ? 'border-octagon-teal/50' : 'border-octagon-border'}`}>
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold text-white">{member.name}</h3>
+                    <Stars rating={member.rating} />
+                  </div>
+                  <p className="mt-1 text-xs text-gray-400">
+                    {member.role} · {member.specialty}
+                  </p>
+                  {isAssistantManager && (
+                    <p className="mt-1 inline-block rounded border border-octagon-teal/40 bg-octagon-teal/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-octagon-teal">
+                      👔 Asisten Manajer
+                    </p>
+                  )}
+                  <div className="mt-3 flex items-center justify-between text-sm">
+                    <span className="text-xs text-gray-400">Gaji/minggu</span>
+                    <span className="font-medium text-white">{formatCurrency(member.salary)}</span>
+                  </div>
+                  <button
+                    onClick={() => handleToggleAssistantManager(member)}
+                    disabled={busyId === member.id}
+                    className={`mt-3 w-full rounded-md border px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                      isAssistantManager
+                        ? 'border-octagon-teal/50 text-octagon-teal hover:border-octagon-red hover:text-octagon-red'
+                        : 'border-octagon-border text-gray-300 hover:border-octagon-teal hover:text-octagon-teal'
+                    }`}
+                  >
+                    {busyId === member.id ? 'Memproses...' : isAssistantManager ? 'Lepas Jabatan Asisten Manajer' : 'Jadikan Asisten Manajer'}
+                  </button>
+                  <button
+                    onClick={() => handleFire(member)}
+                    disabled={busyId === member.id}
+                    className="mt-2 w-full rounded-md border border-octagon-border px-3 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:border-octagon-red hover:text-octagon-red disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {busyId === member.id ? 'Memproses...' : 'Pecat'}
+                  </button>
                 </div>
-                <p className="mt-1 text-xs text-gray-400">
-                  {member.role} · {member.specialty}
-                </p>
-                <div className="mt-3 flex items-center justify-between text-sm">
-                  <span className="text-xs text-gray-400">Gaji/minggu</span>
-                  <span className="font-medium text-white">{formatCurrency(member.salary)}</span>
-                </div>
-                <button
-                  onClick={() => handleFire(member)}
-                  disabled={busyId === member.id}
-                  className="mt-3 w-full rounded-md border border-octagon-border px-3 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:border-octagon-red hover:text-octagon-red disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {busyId === member.id ? 'Memproses...' : 'Pecat'}
-                </button>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>

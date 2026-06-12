@@ -198,6 +198,7 @@ export interface Gym {
   rooms: GymRooms
   events: MmaEvent[]
   friend_code: string
+  assistant_manager_id: string | null
   created_at: string
 }
 
