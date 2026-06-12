@@ -1,7 +1,13 @@
 import { createClient } from './supabase'
 import { getAvailableSponsors, MAX_ACTIVE_CONTRACTS, type SponsorBrandTemplate } from './sponsor-contracts'
 import { formatCurrency } from './format'
-import type { Gym, SponsorContract } from '@/types'
+import {
+  ensureEventsForUpcomingWeeks,
+  getBestAvailableSlot,
+  registerFighterToEvent,
+  PROMOTION_CONFIG,
+} from './generate-events'
+import type { Fighter, Gym, SponsorContract } from '@/types'
 
 /** Asisten Manajer otomatis cari & tanda tangan sponsor 1x per minggu, jika ada slot kosong. */
 export async function runAssistantManagerSponsor(gym: Gym): Promise<{ gym: Gym; message: string | null }> {
@@ -53,4 +59,48 @@ export async function runAssistantManagerSponsor(gym: Gym): Promise<{ gym: Gym; 
     gym: updatedGym,
     message: `🤝 Asisten Manajer ${managerName} menandatangani kontrak sponsor dengan ${chosen.name} (${formatCurrency(chosen.weekly_income)}/minggu).`,
   }
+}
+
+/** Asisten Manajer otomatis daftarkan fighter yang siap tanding ke event yang cocok. */
+export async function runAssistantManagerEventRegistration(
+  gym: Gym,
+  fighters: Fighter[]
+): Promise<{ gym: Gym; messages: string[] }> {
+  if (!gym.assistant_manager_id) return { gym, messages: [] }
+
+  const messages: string[] = []
+  let currentGym = await ensureEventsForUpcomingWeeks(gym)
+  const seasonWeek = currentGym.season_week
+
+  const activeFighters = fighters.filter((f) => f.status !== 'retired' && f.status !== 'injured')
+
+  for (const fighter of activeFighters) {
+    if (fighter.next_fight_week !== null && fighter.next_fight_week > seasonWeek) continue
+
+    const validEvents = currentGym.events.filter((e) => Array.isArray(e.slots) && e.promotion)
+    const registeredFighterIds = new Set(
+      validEvents.flatMap((e) => e.slots.map((s) => s.fighter_id).filter(Boolean)) as string[]
+    )
+    if (registeredFighterIds.has(fighter.id)) continue
+
+    const upcomingEvents = validEvents.filter((e) => e.week >= seasonWeek && e.week <= seasonWeek + 3)
+    const candidateEvent = upcomingEvents
+      .filter((e) => e.weight_class === fighter.weight_class)
+      .filter((e) => {
+        const promoCfg = PROMOTION_CONFIG[e.promotion] ?? PROMOTION_CONFIG.lokal
+        if (fighter.record.w < promoCfg.minWins) return false
+        return getBestAvailableSlot(e, fighter.record.w) !== null
+      })
+      .sort((a, b) => a.week - b.week)[0]
+
+    if (!candidateEvent) continue
+
+    const updated = await registerFighterToEvent(currentGym, candidateEvent.id, fighter)
+    if (updated) {
+      currentGym = updated
+      messages.push(`📅 Asisten Manajer mendaftarkan ${fighter.name} ke ${candidateEvent.name} (Minggu ke-${candidateEvent.week}).`)
+    }
+  }
+
+  return { gym: currentGym, messages }
 }

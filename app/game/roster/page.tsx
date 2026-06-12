@@ -10,7 +10,7 @@ import { buildWeeklyReport, type WeeklyReport } from '@/lib/weekly-report'
 import { formatCurrency } from '@/lib/format'
 import { ensureEventsForUpcomingWeeks, getBestAvailableSlot, PROMOTION_CONFIG } from '@/lib/generate-events'
 import { recordRetirements } from '@/lib/hall-of-fame'
-import { runAssistantManagerSponsor } from '@/lib/assistant-manager'
+import { runAssistantManagerSponsor, runAssistantManagerEventRegistration } from '@/lib/assistant-manager'
 import type { Championship, Fighter, Gym, TournamentTitle } from '@/types'
 
 export default function RosterPage() {
@@ -119,21 +119,29 @@ export default function RosterPage() {
       supabase.from('fighter_news').select('message').eq('gym_id', gym.id).eq('season_week', newWeek),
     ])
 
-    let assistantManagerMessage: string | null = null
+    let latestGym: Gym | null = null
+    let weekEvents = (newsRes.data ?? []).map((n) => n.message as string)
     if (gymRes.error) setError(gymRes.error.message)
     else if (gymRes.data) {
       setGym(gymRes.data)
-      const result = await runAssistantManagerSponsor(gymRes.data as Gym)
-      if (result.message) {
-        assistantManagerMessage = result.message
-        setGym(result.gym)
-      }
+      latestGym = gymRes.data as Gym
+      const sponsorResult = await runAssistantManagerSponsor(latestGym)
+      if (sponsorResult.message) weekEvents = [...weekEvents, sponsorResult.message]
+      latestGym = sponsorResult.gym
+      setGym(latestGym)
     }
 
     if (!fightersRes.error && fightersRes.data) {
       const newFighters = fightersRes.data as Fighter[]
       setFighters(newFighters)
-      const weekEvents = (newsRes.data ?? []).map((n) => n.message as string)
+
+      if (latestGym) {
+        const eventResult = await runAssistantManagerEventRegistration(latestGym, newFighters)
+        if (eventResult.messages.length > 0) weekEvents = [...weekEvents, ...eventResult.messages]
+        latestGym = eventResult.gym
+        setGym(latestGym)
+      }
+
       setReport(
         buildWeeklyReport(
           prevFighters,
@@ -141,7 +149,7 @@ export default function RosterPage() {
           prevBalance,
           gymRes.data?.balance ?? prevBalance,
           gymRes.data?.season_week ?? newWeek,
-          assistantManagerMessage ? [...weekEvents, assistantManagerMessage] : weekEvents
+          weekEvents
         )
       )
 

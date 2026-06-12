@@ -174,7 +174,7 @@ export default function StaffPage() {
       <div>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-400">Staf Aktif</h2>
         <p className="mb-3 text-xs text-gray-500">
-          Jadikan satu staf sebagai Asisten Manajer agar setiap minggu otomatis mencari & menandatangani kontrak sponsor baru saat ada slot kosong — staf dengan rating lebih tinggi memilih penawaran yang lebih menguntungkan.
+          Jadikan satu staf sebagai Asisten Manajer agar setiap minggu otomatis: (1) mencari & menandatangani kontrak sponsor baru saat ada slot kosong — staf dengan rating lebih tinggi memilih penawaran yang lebih menguntungkan, dan (2) mendaftarkan fighter yang sudah siap tanding ke event yang cocok.
         </p>
         {hired === null ? (
           <p className="text-sm text-gray-400">Memuat...</p>
