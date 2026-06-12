@@ -209,6 +209,24 @@ export interface Championship {
   updated_at: string
 }
 
+export interface HallOfFameEntry {
+  id: string
+  gym_id: string
+  fighter_id: string
+  name: string
+  nickname: string | null
+  avatar_url: string | null
+  weight_class: WeightClass
+  specialty: string
+  personality: string
+  age_at_retirement: number
+  record: FighterRecord
+  attrs: FighterAttrs
+  was_champion: boolean
+  retired_at_week: number
+  created_at: string
+}
+
 export interface Staff {
   id: string
   gym_id: string

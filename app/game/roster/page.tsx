@@ -9,6 +9,7 @@ import FighterCard from '@/components/roster/FighterCard'
 import { buildWeeklyReport, type WeeklyReport } from '@/lib/weekly-report'
 import { formatCurrency } from '@/lib/format'
 import { ensureEventsForUpcomingWeeks, getBestAvailableSlot, PROMOTION_CONFIG } from '@/lib/generate-events'
+import { recordRetirements } from '@/lib/hall-of-fame'
 import type { Championship, Fighter, Gym, TournamentTitle } from '@/types'
 
 export default function RosterPage() {
@@ -133,6 +134,15 @@ export default function RosterPage() {
           (newsRes.data ?? []).map((n) => n.message as string)
         )
       )
+
+      const prevById = new Map(prevFighters.map((f) => [f.id, f]))
+      const newlyRetired = newFighters.filter((f) => {
+        const p = prevById.get(f.id)
+        return p && p.status !== 'retired' && f.status === 'retired'
+      })
+      if (newlyRetired.length > 0 && gymRes.data) {
+        recordRetirements(gymRes.data as Gym, newlyRetired, championships)
+      }
     }
 
     setAdvancing(false)

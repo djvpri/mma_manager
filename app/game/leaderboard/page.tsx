@@ -4,8 +4,10 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useGameStore } from '@/store/game-store'
 import { overallRating } from '@/lib/attrs'
+import Avatar from '@/components/avatar/Avatar'
 import FighterDetailModal from '@/components/roster/FighterDetailModal'
-import type { Championship, Fighter, WeightClass } from '@/types'
+import { fetchHallOfFame } from '@/lib/hall-of-fame'
+import type { Championship, Fighter, HallOfFameEntry, WeightClass } from '@/types'
 
 // ─── Gym tier system ─────────────────────────────────────────────────────────
 
@@ -42,10 +44,11 @@ export default function LeaderboardPage() {
   const gym     = useGameStore((s) => s.gym)
   const fighters = useGameStore((s) => s.fighters)
 
-  const [tab, setTab]               = useState<'gym' | 'fighter' | 'champions'>('gym')
+  const [tab, setTab]               = useState<'gym' | 'fighter' | 'champions' | 'legends'>('gym')
   const [entries, setEntries]       = useState<LeaderboardEntry[] | null>(null)
   const [poolFighters, setPool]     = useState<Fighter[] | null>(null)
   const [champions, setChampions]   = useState<Championship[] | null>(null)
+  const [legends, setLegends]       = useState<HallOfFameEntry[] | null>(null)
   const [selectedWC, setSelectedWC] = useState<WeightClass>(
     () => fighters.find((f) => f.status !== 'retired')?.weight_class ?? 'Flyweight'
   )
@@ -76,6 +79,12 @@ export default function LeaderboardPage() {
         setChampions(rows)
       })
   }, [champions])
+
+  // Legenda: hall of fame fighter pensiun dari gym ini
+  useEffect(() => {
+    if (tab !== 'legends' || !gym || legends !== null) return
+    fetchHallOfFame(gym.id).then(setLegends)
+  }, [tab, gym, legends])
 
   // Fighter rankings: load pool + player fighters untuk weight class terpilih
   useEffect(() => {
@@ -126,14 +135,14 @@ export default function LeaderboardPage() {
       </header>
 
       {/* Tabs */}
-      <div className="flex gap-1 rounded-lg border border-octagon-border bg-octagon-card p-1">
-        {(['gym','fighter','champions'] as const).map((t) => (
+      <div className="flex flex-wrap gap-1 rounded-lg border border-octagon-border bg-octagon-card p-1">
+        {(['gym','fighter','champions','legends'] as const).map((t) => (
           <button key={t} onClick={() => setTab(t)}
             className={`flex-1 rounded-md py-1.5 text-sm font-medium transition-colors ${
               tab === t ? 'bg-octagon-red text-white' : 'text-gray-400 hover:text-gray-200'
             }`}
           >
-            {t === 'gym' ? '🏋️ Ranking Gym' : t === 'fighter' ? '🥊 Ranking Fighter' : '🏆 Champions'}
+            {t === 'gym' ? '🏋️ Ranking Gym' : t === 'fighter' ? '🥊 Ranking Fighter' : t === 'champions' ? '🏆 Champions' : '🎖️ Legenda'}
           </button>
         ))}
       </div>
@@ -353,6 +362,56 @@ export default function LeaderboardPage() {
                 </tbody>
               </table>
             </div>
+          </div>
+        )
+      )}
+
+      {/* ── TAB: LEGENDA (HALL OF FAME) ──────────────────────────────── */}
+      {tab === 'legends' && (
+        legends === null ? (
+          <p className="text-sm text-gray-400">Memuat...</p>
+        ) : legends.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-octagon-border bg-octagon-card p-8 text-center">
+            <p className="text-gray-400">Belum ada fighter yang pensiun dari gym ini.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {legends.map((entry) => {
+              const ovr = overallRating(entry.attrs)
+              return (
+                <div key={entry.id} className="rounded-lg border border-octagon-border bg-octagon-card p-4">
+                  <div className="flex items-center gap-3">
+                    <Avatar size={48} imageUrl={entry.avatar_url} className="shrink-0 overflow-hidden rounded-full bg-octagon-dark" />
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-white">
+                        {entry.was_champion && '🏆 '}{entry.name}
+                      </p>
+                      {entry.nickname && (
+                        <p className="truncate text-xs italic text-octagon-amber">&ldquo;{entry.nickname}&rdquo;</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <p className="text-gray-500">Rekor Akhir</p>
+                      <p className="font-semibold text-white">{entry.record.w}-{entry.record.l}-{entry.record.d}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500">OVR</p>
+                      <p className={`font-bold ${ovr >= 75 ? 'text-octagon-teal' : ovr >= 60 ? 'text-octagon-amber' : 'text-gray-400'}`}>{ovr}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500">Kelas</p>
+                      <p className="text-white">{entry.weight_class}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500">Pensiun</p>
+                      <p className="text-white">Usia {entry.age_at_retirement} · Minggu {entry.retired_at_week}</p>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
           </div>
         )
       )}
