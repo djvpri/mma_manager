@@ -58,7 +58,7 @@ const STATUS_LABELS: Record<Fighter['status'], string> = {
   retired: 'Pensiun',
 }
 
-export default function FighterCard({ fighter, titleDefenses }: { fighter: Fighter; titleDefenses?: number }) {
+export default function FighterCard({ fighter, titleDefenses, tournamentTitles }: { fighter: Fighter; titleDefenses?: number; tournamentTitles?: number }) {
   const isChampion = titleDefenses !== undefined
   const { record, attrs } = fighter
   const renewalCost = Math.round((fighter.salary_monthly * 4) / 500_000) * 500_000
@@ -102,6 +102,9 @@ export default function FighterCard({ fighter, titleDefenses }: { fighter: Fight
 
   if (isChampion) {
     alerts.push({ key: 'champion', text: `🏆 Champion · ${titleDefenses}x defense`, className: ALERT_YELLOW })
+  }
+  if (tournamentTitles) {
+    alerts.push({ key: 'tournament', text: `🏆 Turnamen 8 Besar ×${tournamentTitles}`, className: ALERT_YELLOW })
   }
   if (fighter.title_shot_pending) {
     alerts.push({ key: 'titleshot', text: '🏆 Title Shot Pending', className: ALERT_AMBER })
@@ -415,6 +418,12 @@ export default function FighterCard({ fighter, titleDefenses }: { fighter: Fight
           {isChampion && (
             <p className="text-xs font-semibold text-yellow-400">
               🏆 Juara Indonesia Championship kelas {fighter.weight_class} · {titleDefenses}x defense
+            </p>
+          )}
+
+          {!!tournamentTitles && (
+            <p className="text-xs font-semibold text-yellow-400">
+              🏆 Juara Turnamen 8 Besar kelas {fighter.weight_class} · {tournamentTitles}x trofi
             </p>
           )}
 

@@ -83,6 +83,7 @@ interface GameStore {
   ) => void
   advanceRound: () => void
   resetFight: () => void
+  startNextTournamentBout: (opponent: FightState['opponent']) => void
 }
 
 const defaultFight: FightState = {
@@ -184,6 +185,20 @@ export const useGameStore = create<GameStore>()(
         set((s) => ({ fight: { ...s.fight, currentRound: s.fight.currentRound + 1, aiNarration: '' } })),
       resetFight: () =>
         set((s) => ({ fight: { ...defaultFight, fighter: s.fight.fighter } })),
+      // Lanjut ke bout berikutnya dalam Turnamen 8 Besar: HP/stamina/mental fighter
+      // hanya recover sebagian (~40%), lawan baru selalu mulai dari kondisi penuh.
+      startNextTournamentBout: (opponent) =>
+        set((s) => ({
+          fight: {
+            ...defaultFight,
+            fighter: s.fight.fighter,
+            opponent,
+            myHP: Math.min(100, s.fight.myHP + 40),
+            myStamina: Math.min(100, s.fight.myStamina + 40),
+            myMental: Math.min(100, s.fight.myMental + 20),
+            phase: 'gameplan',
+          },
+        })),
     }),
     {
       name: 'mma-manager-game-v2',

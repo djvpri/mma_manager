@@ -57,8 +57,8 @@ export type CornerAdvice = 'push' | 'patient' | 'takedown' | 'striking'
 export type FinishMethod = 'ko' | 'tko' | 'submission' | 'decision'
 
 export type EventTier = 'local' | 'regional' | 'national' | 'international'
-export type EventPromotion = 'lokal' | 'regional' | 'nasional' | 'championship' | 'internasional'
-export type EventSlotType = 'main' | 'comain' | 'featured' | 'undercard'
+export type EventPromotion = 'lokal' | 'regional' | 'nasional' | 'championship' | 'internasional' | 'turnamen'
+export type EventSlotType = 'main' | 'comain' | 'featured' | 'undercard' | 'tournament'
 
 export interface EventSlotOpponent {
   name: string
@@ -74,6 +74,19 @@ export interface EventSlot {
   min_wins: number
   fighter_id: string | null
   opponent: EventSlotOpponent | null
+  // Khusus slot 'tournament': bracket 3 lawan (QF/SF/Final) + progress
+  opponents?: EventSlotOpponent[] | null
+  bracket_round?: number // 0 = belum mulai, 1 = lolos QF, 2 = lolos SF, 3 = juara
+}
+
+export interface TournamentTitle {
+  id: string
+  gym_id: string
+  fighter_id: string
+  fighter_name: string
+  weight_class: WeightClass
+  season_week: number
+  created_at: string
 }
 
 export interface MmaEvent {

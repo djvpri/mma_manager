@@ -21,9 +21,10 @@ import { syncLeaderboard } from '@/lib/leaderboard'
 import { isTitleFight, resolveTitleFight } from '@/lib/championship'
 import { ATTR_GROUPS, ALL_ATTR_KEYS } from '@/lib/attrs'
 import { EVENT_TIER_CONFIG, EVENT_TIER_BADGE_CLASS } from '@/lib/generate-events'
-import type { Fighter, FighterAttrs, GamePlan, CornerAdvice, Specialty, RoundResult, RoundTick, FightStats, EventTier } from '@/types'
+import type { Fighter, FighterAttrs, GamePlan, CornerAdvice, Specialty, RoundResult, RoundTick, FightStats, EventTier, EventSlotOpponent } from '@/types'
 
 const TOTAL_ROUNDS = 3
+const ROUND_LABELS = ['Quarterfinal', 'Semifinal', 'Final']
 
 const GAME_PLANS: { value: GamePlan; label: string; desc: string }[] = [
   { value: 'pressure', label: 'Pressure', desc: 'Maju terus, tekan lawan ke pagar' },
@@ -303,12 +304,18 @@ export default function FightPage() {
   const updateFighter = useGameStore((s) => s.updateFighter)
   const advanceRound = useGameStore((s) => s.advanceRound)
   const resetFight = useGameStore((s) => s.resetFight)
+  const startNextTournamentBout = useGameStore((s) => s.startNextTournamentBout)
 
   const [selectedFighterId, setSelectedFighterId] = useState<string | null>(fight.fighter?.id ?? null)
   const [interviewText, setInterviewText] = useState<string | null>(null)
   const [interviewLoading, setInterviewLoading] = useState(false)
   const [savingResult, setSavingResult] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [tournamentResult, setTournamentResult] = useState<{
+    outcome: 'advance' | 'champion' | 'eliminated'
+    round: number
+    nextOpponent: EventSlotOpponent | null
+  } | null>(null)
   const [flashMy, setFlashMy] = useState(false)
   const [flashOpp, setFlashOpp] = useState(false)
   const [animation, setAnimation] = useState<{
@@ -347,6 +354,13 @@ export default function FightPage() {
   const showInterview =
     (todaysEvent?.tier === 'national' || todaysEvent?.tier === 'international') &&
     !!selectedFighter && !!selectedSlot?.opponent
+
+  // Info bracket Turnamen 8 Besar untuk fighter yang sedang bertarung
+  const fightEvent = gym?.events.find((e) => (e.slots ?? []).some((s) => s.fighter_id === fight.fighter?.id)) ?? null
+  const fightSlot = fightEvent?.slots?.find((s) => s.fighter_id === fight.fighter?.id) ?? null
+  const isTournamentFight = fightEvent?.promotion === 'turnamen'
+  const tournamentRound = fightSlot?.bracket_round ?? 0
+
   const currentRoundResult = fight.roundResults.find((r) => r.round === fight.currentRound)
   const isFightOver =
     !!currentRoundResult &&
@@ -405,6 +419,12 @@ export default function FightPage() {
     const tierConfig = EVENT_TIER_CONFIG[event?.tier ?? 'regional']
     const slotPurseMult = slot?.purse_mult ?? 1.0
 
+    // Turnamen 8 Besar: bracket 3 bout (QF/SF/Final) dalam satu fight night
+    const isTournament = event?.promotion === 'turnamen'
+    const bracketRound = slot?.bracket_round ?? 0
+    const tournamentAdvance = isTournament && result.winner === 'my' && bracketRound < 2
+    const tournamentChampion = isTournament && result.winner === 'my' && bracketRound === 2
+
     const supabase = createClient()
     const [staffRes, sponsorRes] = await Promise.all([
       supabase.from('staff').select('specialty').eq('gym_id', gym.id).eq('is_hired', true),
@@ -427,6 +447,12 @@ export default function FightPage() {
     purse = Math.round((purse * tierConfig.purseMult * slotPurseMult) / 100_000) * 100_000
     reputationChange = Math.round(reputationChange * tierConfig.reputationMult)
 
+    // Bonus juara Turnamen 8 Besar: menang 3 bout beruntun dalam satu fight night
+    if (tournamentChampion) {
+      purse += 50_000_000
+      reputationChange += 15
+    }
+
     // Manajer Pertarungan: negosiasi purse lebih baik
     if (specialties.includes('Matchmaking & Promosi')) {
       purse = Math.round((purse * 1.15) / 100_000) * 100_000
@@ -446,7 +472,8 @@ export default function FightPage() {
     }
     const newTrainingLoad = Math.min(100, fighter.training_load + 25)
     const newContractFightsLeft = Math.max(0, fighter.contract_fights_left - 1)
-    const newNextFightWeek = gym.season_week + randInt(1, 3)
+    // Lanjut bracket turnamen: fighter tetap eligible bertanding minggu ini (bout berikutnya)
+    const newNextFightWeek = tournamentAdvance ? gym.season_week : gym.season_week + randInt(1, 3)
     const finishRound = fight.roundResults.find((r) => r.finish)?.round ?? null
     // Fisioterapis: kurangi risiko cedera pasca-tanding
     const injuryReduction = specialties.includes('Pemulihan Cedera') ? 0.3 : 0
@@ -484,14 +511,16 @@ export default function FightPage() {
       : 0
     const newBalance = gym.balance + purse + commission + sponsorWinBonus - winBonusPaid - medicalCost - purseShare
     const newReputation = Math.max(0, Math.min(100, gym.reputation + reputationChange + reputationBonus))
-    // Kosongkan slot fighter setelah bertanding
+    // Kosongkan slot fighter setelah bertanding — kecuali lanjut ke bout turnamen berikutnya
     const newEvents = event
       ? gym.events.map((e) =>
           e.id !== event.id ? e : {
             ...e,
-            slots: (e.slots ?? []).map((s) =>
-              s.fighter_id === fighter.id ? { ...s, fighter_id: null, opponent: null } : s
-            ),
+            slots: (e.slots ?? []).map((s) => {
+              if (s.fighter_id !== fighter.id) return s
+              if (tournamentAdvance) return { ...s, bracket_round: bracketRound + 1 }
+              return { ...s, fighter_id: null, opponent: null, opponents: null, bracket_round: 0 }
+            }),
           }
         )
       : gym.events
@@ -558,6 +587,27 @@ export default function FightPage() {
         titleBeltResult = await resolveTitleFight(fighter, gym, result.winner === 'my')
       }
 
+      // Turnamen 8 Besar: juara mendapat trofi permanen
+      if (tournamentChampion) {
+        await supabase.from('tournament_titles').insert({
+          gym_id: gym.id,
+          fighter_id: fighter.id,
+          fighter_name: fighter.name,
+          weight_class: fighter.weight_class,
+          season_week: gym.season_week,
+        })
+      }
+
+      if (isTournament) {
+        setTournamentResult({
+          outcome: tournamentChampion ? 'champion' : tournamentAdvance ? 'advance' : 'eliminated',
+          round: bracketRound,
+          nextOpponent: tournamentAdvance ? slot?.opponents?.[bracketRound + 1] ?? null : null,
+        })
+      } else {
+        setTournamentResult(null)
+      }
+
       const state = useGameStore.getState()
       if (state.gym) syncLeaderboard(state.gym, state.fighters)
     }
@@ -600,7 +650,9 @@ export default function FightPage() {
       (e.slots ?? []).some((s) => s.fighter_id === fighter.id)
     )
     const slot = eventForFighter?.slots?.find((s) => s.fighter_id === fighter.id)
-    const bookedOpponent = slot?.opponent
+    const bookedOpponent = eventForFighter?.promotion === 'turnamen'
+      ? slot?.opponents?.[slot?.bracket_round ?? 0]
+      : slot?.opponent
 
     // Gunakan lawan yang sudah di-booking, atau fallback ke generate random
     const tier = eventForFighter?.tier ?? todaysEvent?.tier ?? 'regional'
@@ -740,11 +792,29 @@ export default function FightPage() {
     setFightPhase('fighting')
   }
 
+  function handleContinueTournament() {
+    if (!tournamentResult?.nextOpponent) return
+    const opp = tournamentResult.nextOpponent
+    startNextTournamentBout({
+      name: opp.name,
+      attrs: opp.attrs,
+      record: opp.record,
+      specialty: opp.specialty as Specialty,
+      color: opp.color,
+    })
+    setTournamentResult(null)
+  }
+
   return (
     <div>
       <OctagonBackground />
       <header className="mb-6">
         <h1 className="text-2xl font-bold text-white">Fight Night</h1>
+        {isTournamentFight && fight.phase !== 'pregame' && (
+          <p className="mb-1 inline-block rounded border border-yellow-500/30 bg-yellow-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-yellow-300">
+            🏆 Turnamen 8 Besar · {ROUND_LABELS[tournamentRound]}
+          </p>
+        )}
         {fight.fighter && fight.opponent ? (
           <p className="text-sm text-gray-400">
             {fight.fighter.name} <span className="text-gray-600">vs</span> {fight.opponent.name}
@@ -770,9 +840,13 @@ export default function FightPage() {
                   )}
                 </div>
                 <span
-                  className={`shrink-0 rounded border px-2 py-0.5 text-[10px] font-medium uppercase ${EVENT_TIER_BADGE_CLASS[todaysEvent.tier]}`}
+                  className={`shrink-0 rounded border px-2 py-0.5 text-[10px] font-medium uppercase ${
+                    todaysEvent.promotion === 'turnamen'
+                      ? 'border-yellow-500/30 bg-yellow-500/15 text-yellow-300'
+                      : EVENT_TIER_BADGE_CLASS[todaysEvent.tier]
+                  }`}
                 >
-                  {EVENT_TIER_CONFIG[todaysEvent.tier].label}
+                  {todaysEvent.promotion === 'turnamen' ? 'Turnamen 8 Besar' : EVENT_TIER_CONFIG[todaysEvent.tier].label}
                 </span>
               </div>
             </div>
@@ -1388,17 +1462,43 @@ export default function FightPage() {
                       kelas {fight.fighter!.weight_class}. Title kini vacant.
                     </div>
                   )}
+                  {tournamentResult?.outcome === 'advance' && (
+                    <div className="mt-2 rounded-md bg-yellow-500/10 px-3 py-2 font-semibold text-yellow-300">
+                      🏆 Menang di {ROUND_LABELS[tournamentResult.round]}! {fight.fighter!.name.split(' ')[0]}{' '}
+                      melaju ke {ROUND_LABELS[tournamentResult.round + 1]} Turnamen 8 Besar.
+                    </div>
+                  )}
+                  {tournamentResult?.outcome === 'champion' && (
+                    <div className="mt-2 rounded-md bg-yellow-500/10 px-3 py-2 font-semibold text-yellow-300">
+                      🏆🏆🏆 JUARA TURNAMEN 8 BESAR! {fight.fighter!.name.split(' ')[0]} memenangkan seluruh
+                      3 pertarungan kelas {fight.fighter!.weight_class} dan membawa pulang trofi!
+                    </div>
+                  )}
+                  {tournamentResult?.outcome === 'eliminated' && (
+                    <div className="mt-2 rounded-md bg-octagon-red/10 px-3 py-2 font-semibold text-octagon-red">
+                      💔 Tersingkir di {ROUND_LABELS[tournamentResult.round]} Turnamen 8 Besar.
+                    </div>
+                  )}
                 </div>
               ) : null}
             </div>
 
             <div className="flex flex-wrap justify-center gap-3">
-              <button
-                onClick={resetFight}
-                className="rounded-md bg-octagon-red px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-octagon-red/90"
-              >
-                Pertarungan Baru
-              </button>
+              {tournamentResult?.outcome === 'advance' && tournamentResult.nextOpponent ? (
+                <button
+                  onClick={handleContinueTournament}
+                  className="rounded-md bg-yellow-500 px-5 py-2.5 text-sm font-semibold text-octagon-dark transition-colors hover:bg-yellow-500/90"
+                >
+                  Lanjut ke {ROUND_LABELS[tournamentResult.round + 1]}
+                </button>
+              ) : (
+                <button
+                  onClick={resetFight}
+                  className="rounded-md bg-octagon-red px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-octagon-red/90"
+                >
+                  Pertarungan Baru
+                </button>
+              )}
               <Link
                 href="/game/roster"
                 className="rounded-md border border-octagon-border px-5 py-2.5 text-sm font-semibold text-gray-300 transition-colors hover:bg-white/5"

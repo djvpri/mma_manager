@@ -15,6 +15,8 @@ import {
 import { formatCurrency, formatNumber } from '@/lib/format'
 import type { Fighter, MmaEvent } from '@/types'
 
+const TOURNAMENT_ROUND_LABELS = ['Quarterfinal', 'Semifinal', 'Final']
+
 export default function EventsPage() {
   const gym      = useGameStore((s) => s.gym)
   const fighters = useGameStore((s) => s.fighters)
@@ -188,7 +190,24 @@ export default function EventsPage() {
                           <>
                             <span className="text-xs font-bold text-gray-600">VS</span>
                             <div className="flex min-w-0 flex-1 items-center gap-2">
-                              {slot.opponent ? (
+                              {slot.type === 'tournament' && slot.opponents ? (
+                                (() => {
+                                  const round = slot.bracket_round ?? 0
+                                  const currentOpp = slot.opponents?.[round]
+                                  return currentOpp ? (
+                                    <>
+                                      <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-octagon-dark" style={{ boxShadow: `0 0 0 2px ${currentOpp.color}` }} />
+                                      <div className="min-w-0">
+                                        <p className="truncate text-sm font-semibold text-gray-200">{currentOpp.name}</p>
+                                        <p className="text-[10px] text-gray-500">{currentOpp.record.w}-{currentOpp.record.l} · {currentOpp.specialty}</p>
+                                        <p className="text-[10px] font-semibold text-yellow-400">{TOURNAMENT_ROUND_LABELS[round]}</p>
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <p className="text-xs text-gray-600 italic">—</p>
+                                  )
+                                })()
+                              ) : slot.opponent ? (
                                 <>
                                   <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-octagon-dark" style={{ boxShadow: `0 0 0 2px ${slot.opponent.color}` }} />
                                   <div className="min-w-0">

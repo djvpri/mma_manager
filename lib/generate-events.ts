@@ -79,6 +79,11 @@ export const PROMOTION_CONFIG: Record<EventPromotion, PromotionConfig> = {
     badgeClass: 'border-purple-500/30 bg-purple-500/15 text-purple-300',
     namePrefix: ['World Fighting Series', 'Apex Global Championship', 'Global Combat League', 'Worldwide Fight Night'],
   },
+  turnamen: {
+    label: 'Turnamen 8 Besar', minWins: 8, tier: 'national',
+    badgeClass: 'border-yellow-500/30 bg-yellow-500/15 text-yellow-300',
+    namePrefix: ['Turnamen 8 Besar', 'Grand Tournament Series', 'Knockout Cup', 'Battle Royale Championship'],
+  },
 }
 
 export interface SlotConfig {
@@ -89,10 +94,11 @@ export interface SlotConfig {
 }
 
 export const SLOT_CONFIG: Record<EventSlotType, SlotConfig> = {
-  main:      { label: 'Main Event', purseMult: 2.5, minWins: 12, icon: '👑' },
-  comain:    { label: 'Co-Main',    purseMult: 1.8, minWins: 7,  icon: '⭐' },
-  featured:  { label: 'Featured',   purseMult: 1.3, minWins: 3,  icon: ''   },
-  undercard: { label: 'Undercard',  purseMult: 1.0, minWins: 0,  icon: ''   },
+  main:       { label: 'Main Event', purseMult: 2.5, minWins: 12, icon: '👑' },
+  comain:     { label: 'Co-Main',    purseMult: 1.8, minWins: 7,  icon: '⭐' },
+  featured:   { label: 'Featured',   purseMult: 1.3, minWins: 3,  icon: ''   },
+  undercard:  { label: 'Undercard',  purseMult: 1.0, minWins: 0,  icon: ''   },
+  tournament: { label: 'Turnamen 8 Besar', purseMult: 2.0, minWins: 8, icon: '🏆' },
 }
 
 const WEIGHT_CLASSES: WeightClass[] = [
@@ -110,6 +116,7 @@ const VENUE_POOL: Record<EventPromotion, string[]> = {
   nasional: ['Istora Senayan Jakarta', 'ICE BSD Tangerang', 'GOR Among Rogo Yogyakarta', 'Sentul International Convention Center'],
   championship: ['Indonesia Arena Jakarta', 'GBK Main Stadium Jakarta', 'Jakarta International Velodrome'],
   internasional: ['T-Mobile Arena Las Vegas', 'Etihad Arena Abu Dhabi', 'Saitama Super Arena Tokyo', 'Singapore Indoor Stadium', 'The O2 Arena London'],
+  turnamen: ['Istora Senayan Jakarta', 'GOR Among Rogo Yogyakarta', 'C-Tra Arena Bandung', 'ICE BSD Tangerang'],
 }
 
 const ATTENDANCE_RANGE: Record<EventPromotion, { min: number; max: number }> = {
@@ -118,6 +125,7 @@ const ATTENDANCE_RANGE: Record<EventPromotion, { min: number; max: number }> = {
   nasional: { min: 8000, max: 18000 },
   championship: { min: 15000, max: 40000 },
   internasional: { min: 25000, max: 60000 },
+  turnamen: { min: 10000, max: 22000 },
 }
 
 export function getEventVenue(promotion: EventPromotion): string {
@@ -137,7 +145,18 @@ export function pick<T>(arr: T[]): T {
   return arr[randInt(0, arr.length - 1)]
 }
 
-function generateEmptySlots(): EventSlot[] {
+function generateEmptySlots(promotion: EventPromotion): EventSlot[] {
+  if (promotion === 'turnamen') {
+    return [{
+      type: 'tournament',
+      purse_mult: SLOT_CONFIG.tournament.purseMult,
+      min_wins:   SLOT_CONFIG.tournament.minWins,
+      fighter_id: null,
+      opponent:   null,
+      opponents:  null,
+      bracket_round: 0,
+    }]
+  }
   const types: EventSlotType[] = ['main','comain','featured','undercard']
   return types.map((type) => ({
     type,
@@ -148,7 +167,9 @@ function generateEmptySlots(): EventSlot[] {
   }))
 }
 
-function pickPromotion(seasonWeek: number): EventPromotion {
+function pickPromotion(seasonWeek: number, week: number): EventPromotion {
+  // Turnamen 8 Besar: 1 kali per 8 minggu per weight class, mulai tersedia sejak syarat Nasional
+  if (seasonWeek >= 17 && week % 8 === 0) return 'turnamen'
   if (seasonWeek >= 35) return pick(['lokal','regional','nasional','championship','internasional'] as EventPromotion[])
   if (seasonWeek >= 25) return pick(['lokal','regional','nasional','championship'] as EventPromotion[])
   if (seasonWeek >= 17) return pick(['lokal','regional','nasional'] as EventPromotion[])
@@ -157,17 +178,19 @@ function pickPromotion(seasonWeek: number): EventPromotion {
 }
 
 function generateEvent(week: number, seasonWeek: number, wcIndex: number): MmaEvent {
-  const promotion  = pickPromotion(seasonWeek)
+  const promotion  = pickPromotion(seasonWeek, week)
   const config     = PROMOTION_CONFIG[promotion]
   const weightClass = WEIGHT_CLASSES[wcIndex % 8]
   return {
     id:          crypto.randomUUID(),
-    name:        `${pick(config.namePrefix)} Vol. ${randInt(1,99)}`,
+    name:        promotion === 'turnamen'
+      ? `${pick(config.namePrefix)} ${weightClass}`
+      : `${pick(config.namePrefix)} Vol. ${randInt(1,99)}`,
     promotion,
     tier:        config.tier,
     week,
     weight_class: weightClass,
-    slots:       generateEmptySlots(),
+    slots:       generateEmptySlots(promotion),
     venue:       getEventVenue(promotion),
     attendance:  getEventAttendance(promotion),
   }
@@ -219,7 +242,9 @@ export function getEventsForMonth(events: MmaEvent[], seasonWeek: number): MmaEv
 
 /** Tentukan slot terbaik yang bisa didapat fighter (berdasarkan wins). */
 export function getBestAvailableSlot(event: MmaEvent, fighterWins: number): EventSlot | null {
-  const order: EventSlotType[] = ['main','comain','featured','undercard']
+  const order: EventSlotType[] = event.promotion === 'turnamen'
+    ? ['tournament']
+    : ['main','comain','featured','undercard']
   for (const type of order) {
     const slot = event.slots.find((s) => s.type === type)
     if (!slot) continue
@@ -288,6 +313,18 @@ function generateFallbackOpponent(targetWins: number): MmaEvent['slots'][0]['opp
   }
 }
 
+/** Generate 3 lawan bracket turnamen (Quarterfinal, Semifinal, Final) — progresif makin sulit. */
+export async function fetchTournamentOpponents(
+  weightClass: WeightClass,
+  targetWins: number
+): Promise<NonNullable<EventSlot['opponents']>> {
+  const tierBoosts = [-2, 3, 9] // QF: sedikit di bawah, SF: sedikit di atas, Final: jauh di atas
+  const opponents = await Promise.all(
+    tierBoosts.map((boost) => fetchPoolOpponent(weightClass, Math.max(0, targetWins + boost)))
+  )
+  return opponents.map((opp, i) => opp ?? generateFallbackOpponent(targetWins + tierBoosts[i])) as NonNullable<EventSlot['opponents']>
+}
+
 /** Daftarkan fighter ke event: assign slot terbaik + booking lawan dari pool. */
 export async function registerFighterToEvent(
   gym: Gym,
@@ -300,19 +337,35 @@ export async function registerFighterToEvent(
   const slot = getBestAvailableSlot(event, fighter.record.w)
   if (!slot) return null
 
-  const opponent = await fetchPoolOpponent(event.weight_class, fighter.record.w)
+  let updatedEvents: MmaEvent[]
 
-  const updatedEvents = gym.events.map((e) => {
-    if (e.id !== eventId) return e
-    return {
-      ...e,
-      slots: e.slots.map((s) =>
-        s.type === slot.type
-          ? { ...s, fighter_id: fighter.id, opponent }
-          : s
-      ),
-    }
-  })
+  if (event.promotion === 'turnamen') {
+    const opponents = await fetchTournamentOpponents(event.weight_class, fighter.record.w)
+    updatedEvents = gym.events.map((e) => {
+      if (e.id !== eventId) return e
+      return {
+        ...e,
+        slots: e.slots.map((s) =>
+          s.type === slot.type
+            ? { ...s, fighter_id: fighter.id, opponents, bracket_round: 0 }
+            : s
+        ),
+      }
+    })
+  } else {
+    const opponent = await fetchPoolOpponent(event.weight_class, fighter.record.w)
+    updatedEvents = gym.events.map((e) => {
+      if (e.id !== eventId) return e
+      return {
+        ...e,
+        slots: e.slots.map((s) =>
+          s.type === slot.type
+            ? { ...s, fighter_id: fighter.id, opponent }
+            : s
+        ),
+      }
+    })
+  }
 
   const supabase = createClient()
   const { data, error } = await supabase
@@ -332,7 +385,9 @@ export async function unregisterFighterFromEvent(
     return {
       ...e,
       slots: e.slots.map((s) =>
-        s.fighter_id === fighterId ? { ...s, fighter_id: null, opponent: null } : s
+        s.fighter_id === fighterId
+          ? { ...s, fighter_id: null, opponent: null, opponents: null, bracket_round: 0 }
+          : s
       ),
     }
   })

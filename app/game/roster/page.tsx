@@ -9,7 +9,7 @@ import FighterCard from '@/components/roster/FighterCard'
 import { buildWeeklyReport, type WeeklyReport } from '@/lib/weekly-report'
 import { formatCurrency } from '@/lib/format'
 import { ensureEventsForUpcomingWeeks, getBestAvailableSlot, PROMOTION_CONFIG } from '@/lib/generate-events'
-import type { Championship, Fighter, Gym } from '@/types'
+import type { Championship, Fighter, Gym, TournamentTitle } from '@/types'
 
 export default function RosterPage() {
   const fighters = useGameStore((s) => s.fighters)
@@ -36,6 +36,7 @@ export default function RosterPage() {
   const [error, setError] = useState<string | null>(null)
   const [report, setReport] = useState<WeeklyReport | null>(null)
   const [championships, setChampionships] = useState<Championship[]>([])
+  const [tournamentTitles, setTournamentTitles] = useState<TournamentTitle[]>([])
 
   // Cek gelar juara yang dipegang fighter di gym ini
   useEffect(() => {
@@ -43,6 +44,9 @@ export default function RosterPage() {
     const supabase = createClient()
     supabase.from('championships').select('*').eq('champion_gym_id', gym.id).then(({ data }) => {
       setChampionships((data ?? []) as Championship[])
+    })
+    supabase.from('tournament_titles').select('*').eq('gym_id', gym.id).then(({ data }) => {
+      setTournamentTitles((data ?? []) as TournamentTitle[])
     })
   }, [gym?.id])
 
@@ -304,8 +308,14 @@ export default function RosterPage() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {activeFighters.map((fighter) => {
             const belt = championships.find((c) => c.champion_fighter_id === fighter.id)
+            const trophyCount = tournamentTitles.filter((t) => t.fighter_id === fighter.id).length
             return (
-              <FighterCard key={fighter.id} fighter={fighter} titleDefenses={belt?.title_defenses} />
+              <FighterCard
+                key={fighter.id}
+                fighter={fighter}
+                titleDefenses={belt?.title_defenses}
+                tournamentTitles={trophyCount || undefined}
+              />
             )
           })}
         </div>
