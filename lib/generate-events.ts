@@ -29,12 +29,18 @@ export const EVENT_TIER_CONFIG: Record<EventTier, EventTierConfig> = {
     attrOffset: 8, attrSpread: 14,
     recordRange: { wMin: 10, wMax: 25, lMin: 0, lMax: 5 },
   },
+  international: {
+    label: 'Internasional', purseMult: 2.5, reputationMult: 2.2,
+    attrOffset: 14, attrSpread: 16,
+    recordRange: { wMin: 18, wMax: 30, lMin: 0, lMax: 4 },
+  },
 }
 
 export const EVENT_TIER_BADGE_CLASS: Record<EventTier, string> = {
-  local:    'border-gray-500/30 bg-gray-500/15 text-gray-300',
-  regional: 'border-octagon-teal/30 bg-octagon-teal/15 text-octagon-teal',
-  national: 'border-octagon-amber/30 bg-octagon-amber/15 text-octagon-amber',
+  local:         'border-gray-500/30 bg-gray-500/15 text-gray-300',
+  regional:      'border-octagon-teal/30 bg-octagon-teal/15 text-octagon-teal',
+  national:      'border-octagon-amber/30 bg-octagon-amber/15 text-octagon-amber',
+  international: 'border-purple-500/30 bg-purple-500/15 text-purple-300',
 }
 
 // ─── Sistem promosi baru ──────────────────────────────────────────────────────
@@ -68,6 +74,11 @@ export const PROMOTION_CONFIG: Record<EventPromotion, PromotionConfig> = {
     badgeClass: 'border-octagon-red/30 bg-octagon-red/15 text-octagon-red',
     namePrefix: ['Indonesia Title Fight', 'Merah Putih Championship', 'Grand Prix Nasional'],
   },
+  internasional: {
+    label: 'World Fighting Series', minWins: 20, tier: 'international',
+    badgeClass: 'border-purple-500/30 bg-purple-500/15 text-purple-300',
+    namePrefix: ['World Fighting Series', 'Apex Global Championship', 'Global Combat League', 'Worldwide Fight Night'],
+  },
 }
 
 export interface SlotConfig {
@@ -98,6 +109,7 @@ const VENUE_POOL: Record<EventPromotion, string[]> = {
   regional: ['GOR Saparua Bandung', 'Sportorium UGM Yogyakarta', 'C-Tra Arena Bandung', 'GOR Tri Sakti Surabaya'],
   nasional: ['Istora Senayan Jakarta', 'ICE BSD Tangerang', 'GOR Among Rogo Yogyakarta', 'Sentul International Convention Center'],
   championship: ['Indonesia Arena Jakarta', 'GBK Main Stadium Jakarta', 'Jakarta International Velodrome'],
+  internasional: ['T-Mobile Arena Las Vegas', 'Etihad Arena Abu Dhabi', 'Saitama Super Arena Tokyo', 'Singapore Indoor Stadium', 'The O2 Arena London'],
 }
 
 const ATTENDANCE_RANGE: Record<EventPromotion, { min: number; max: number }> = {
@@ -105,6 +117,7 @@ const ATTENDANCE_RANGE: Record<EventPromotion, { min: number; max: number }> = {
   regional: { min: 1500, max: 6000 },
   nasional: { min: 8000, max: 18000 },
   championship: { min: 15000, max: 40000 },
+  internasional: { min: 25000, max: 60000 },
 }
 
 export function getEventVenue(promotion: EventPromotion): string {
@@ -136,6 +149,7 @@ function generateEmptySlots(): EventSlot[] {
 }
 
 function pickPromotion(seasonWeek: number): EventPromotion {
+  if (seasonWeek >= 35) return pick(['lokal','regional','nasional','championship','internasional'] as EventPromotion[])
   if (seasonWeek >= 25) return pick(['lokal','regional','nasional','championship'] as EventPromotion[])
   if (seasonWeek >= 17) return pick(['lokal','regional','nasional'] as EventPromotion[])
   if (seasonWeek >= 9)  return pick(['lokal','regional'] as EventPromotion[])

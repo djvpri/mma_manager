@@ -339,12 +339,14 @@ export default function FightPage() {
   const eligibleFighters = cooldownReady.filter((f) => registeredThisWeek.includes(f.id))
   const unscheduledFighters = cooldownReady.filter((f) => !registeredThisWeek.includes(f.id))
 
-  // Wawancara pra-pertandingan: hanya untuk fighter terpilih di event tier nasional/championship
+  // Wawancara pra-pertandingan: hanya untuk fighter terpilih di event tier nasional/internasional
   const selectedFighter = eligibleFighters.find((f) => f.id === selectedFighterId) ?? null
   const selectedSlot = selectedFighter
     ? todaysEvents.flatMap((e) => e.slots ?? []).find((s) => s.fighter_id === selectedFighter.id)
     : null
-  const showInterview = todaysEvent?.tier === 'national' && !!selectedFighter && !!selectedSlot?.opponent
+  const showInterview =
+    (todaysEvent?.tier === 'national' || todaysEvent?.tier === 'international') &&
+    !!selectedFighter && !!selectedSlot?.opponent
   const currentRoundResult = fight.roundResults.find((r) => r.round === fight.currentRound)
   const isFightOver =
     !!currentRoundResult &&

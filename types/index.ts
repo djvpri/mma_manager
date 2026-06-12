@@ -56,8 +56,8 @@ export type GamePlan = 'pressure' | 'counter' | 'grapple' | 'technical'
 export type CornerAdvice = 'push' | 'patient' | 'takedown' | 'striking'
 export type FinishMethod = 'ko' | 'tko' | 'submission' | 'decision'
 
-export type EventTier = 'local' | 'regional' | 'national'
-export type EventPromotion = 'lokal' | 'regional' | 'nasional' | 'championship'
+export type EventTier = 'local' | 'regional' | 'national' | 'international'
+export type EventPromotion = 'lokal' | 'regional' | 'nasional' | 'championship' | 'internasional'
 export type EventSlotType = 'main' | 'comain' | 'featured' | 'undercard'
 
 export interface EventSlotOpponent {
