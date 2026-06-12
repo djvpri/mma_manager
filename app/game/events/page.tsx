@@ -12,7 +12,7 @@ import {
   unregisterFighterFromEvent,
   getBestAvailableSlot,
 } from '@/lib/generate-events'
-import { formatCurrency } from '@/lib/format'
+import { formatCurrency, formatNumber } from '@/lib/format'
 import type { Fighter, MmaEvent } from '@/types'
 
 export default function EventsPage() {
@@ -139,6 +139,12 @@ export default function EventsPage() {
                     <p className="text-xs text-gray-400">
                       Minggu ke-{event.week} · {event.weight_class} · Syarat: {promoCfg.minWins}+ menang
                     </p>
+                    {event.venue && (
+                      <p className="mt-0.5 text-xs text-gray-500">
+                        📍 {event.venue}
+                        {event.attendance && ` · 👥 ~${formatNumber(event.attendance)} penonton`}
+                      </p>
+                    )}
                   </div>
                 </div>
 

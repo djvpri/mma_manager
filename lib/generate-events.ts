@@ -91,6 +91,31 @@ const WEIGHT_CLASSES: WeightClass[] = [
 
 const OPPONENT_COLORS = ['#3B82F6','#A855F7','#F59E0B','#06B6D4','#EC4899','#EF4444','#22C55E']
 
+// ─── Venue & estimasi penonton ───────────────────────────────────────────────
+
+const VENUE_POOL: Record<EventPromotion, string[]> = {
+  lokal: ['GOR Kecamatan Cibubur', 'Aula Serbaguna Mawar', 'Sasana Tinju Garuda', 'GOR Pemuda'],
+  regional: ['GOR Saparua Bandung', 'Sportorium UGM Yogyakarta', 'C-Tra Arena Bandung', 'GOR Tri Sakti Surabaya'],
+  nasional: ['Istora Senayan Jakarta', 'ICE BSD Tangerang', 'GOR Among Rogo Yogyakarta', 'Sentul International Convention Center'],
+  championship: ['Indonesia Arena Jakarta', 'GBK Main Stadium Jakarta', 'Jakarta International Velodrome'],
+}
+
+const ATTENDANCE_RANGE: Record<EventPromotion, { min: number; max: number }> = {
+  lokal: { min: 150, max: 800 },
+  regional: { min: 1500, max: 6000 },
+  nasional: { min: 8000, max: 18000 },
+  championship: { min: 15000, max: 40000 },
+}
+
+export function getEventVenue(promotion: EventPromotion): string {
+  return pick(VENUE_POOL[promotion])
+}
+
+export function getEventAttendance(promotion: EventPromotion): number {
+  const { min, max } = ATTENDANCE_RANGE[promotion]
+  return Math.round(randInt(min, max) / 50) * 50
+}
+
 export function randInt(min: number, max: number) {
   return Math.floor(Math.random() * (max - min + 1)) + min
 }
@@ -129,6 +154,8 @@ function generateEvent(week: number, seasonWeek: number, wcIndex: number): MmaEv
     week,
     weight_class: weightClass,
     slots:       generateEmptySlots(),
+    venue:       getEventVenue(promotion),
+    attendance:  getEventAttendance(promotion),
   }
 }
 

@@ -16,7 +16,7 @@ import {
 import { getAICornerAdvice } from '@/lib/ai-corner'
 import { getPreFightInterview } from '@/lib/ai-interview'
 import { createClient } from '@/lib/supabase'
-import { formatCurrency } from '@/lib/format'
+import { formatCurrency, formatNumber } from '@/lib/format'
 import { syncLeaderboard } from '@/lib/leaderboard'
 import { isTitleFight, resolveTitleFight } from '@/lib/championship'
 import { ATTR_GROUPS, ALL_ATTR_KEYS } from '@/lib/attrs'
@@ -760,6 +760,12 @@ export default function FightPage() {
                 <div>
                   <p className="text-xs uppercase tracking-wide text-gray-500">Event Minggu Ini</p>
                   <p className="font-semibold text-white">{todaysEvent.name}</p>
+                  {todaysEvent.venue && (
+                    <p className="mt-0.5 text-xs text-gray-500">
+                      📍 {todaysEvent.venue}
+                      {todaysEvent.attendance && ` · 👥 ~${formatNumber(todaysEvent.attendance)} penonton`}
+                    </p>
+                  )}
                 </div>
                 <span
                   className={`shrink-0 rounded border px-2 py-0.5 text-[10px] font-medium uppercase ${EVENT_TIER_BADGE_CLASS[todaysEvent.tier]}`}

@@ -84,6 +84,8 @@ export interface MmaEvent {
   week: number
   weight_class: WeightClass
   slots: EventSlot[]
+  venue?: string           // lokasi pertandingan (tidak ada di event lama)
+  attendance?: number      // estimasi jumlah penonton (tidak ada di event lama)
 }
 
 export interface FighterAttrs {
