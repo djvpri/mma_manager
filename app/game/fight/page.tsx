@@ -14,14 +14,15 @@ import {
   sumFightStats,
 } from '@/lib/fight-engine'
 import { getAICornerAdvice } from '@/lib/ai-corner'
-import { getPreFightInterview } from '@/lib/ai-interview'
+import { getPressConferenceQuotes } from '@/lib/ai-press-conference'
+import { resolveHype, HYPE_STYLES } from '@/lib/press-conference'
 import { createClient } from '@/lib/supabase'
 import { formatCurrency, formatNumber } from '@/lib/format'
 import { syncLeaderboard } from '@/lib/leaderboard'
 import { isTitleFight, resolveTitleFight } from '@/lib/championship'
 import { ATTR_GROUPS, ALL_ATTR_KEYS } from '@/lib/attrs'
 import { EVENT_TIER_CONFIG, EVENT_TIER_BADGE_CLASS } from '@/lib/generate-events'
-import type { Fighter, FighterAttrs, GamePlan, CornerAdvice, Specialty, RoundResult, RoundTick, FightStats, EventTier, EventSlotOpponent } from '@/types'
+import type { Fighter, FighterAttrs, GamePlan, CornerAdvice, Specialty, RoundResult, RoundTick, FightStats, EventTier, EventSlotOpponent, HypeStyle, Gym } from '@/types'
 
 const TOTAL_ROUNDS = 3
 const ROUND_LABELS = ['Quarterfinal', 'Semifinal', 'Final']
@@ -313,8 +314,8 @@ export default function FightPage() {
   const startNextTournamentBout = useGameStore((s) => s.startNextTournamentBout)
 
   const [selectedFighterId, setSelectedFighterId] = useState<string | null>(fight.fighter?.id ?? null)
-  const [interviewText, setInterviewText] = useState<string | null>(null)
-  const [interviewLoading, setInterviewLoading] = useState(false)
+  const [hypeLoading, setHypeLoading] = useState(false)
+  const [hypeError, setHypeError] = useState<string | null>(null)
   const [savingResult, setSavingResult] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [tournamentResult, setTournamentResult] = useState<{
@@ -352,14 +353,13 @@ export default function FightPage() {
   const eligibleFighters = cooldownReady.filter((f) => registeredThisWeek.includes(f.id))
   const unscheduledFighters = cooldownReady.filter((f) => !registeredThisWeek.includes(f.id))
 
-  // Wawancara pra-pertandingan: hanya untuk fighter terpilih di event tier nasional/internasional
+  // Press conference: fighter terpilih yang sudah punya lawan ter-booking di event minggu ini
   const selectedFighter = eligibleFighters.find((f) => f.id === selectedFighterId) ?? null
-  const selectedSlot = selectedFighter
-    ? todaysEvents.flatMap((e) => e.slots ?? []).find((s) => s.fighter_id === selectedFighter.id)
+  const selectedEvent = selectedFighter
+    ? todaysEvents.find((e) => (e.slots ?? []).some((s) => s.fighter_id === selectedFighter.id)) ?? null
     : null
-  const showInterview =
-    (todaysEvent?.tier === 'national' || todaysEvent?.tier === 'international') &&
-    !!selectedFighter && !!selectedSlot?.opponent
+  const selectedSlot = selectedEvent?.slots?.find((s) => s.fighter_id === selectedFighter?.id) ?? null
+  const showPressConference = !!selectedFighter && !!selectedSlot?.opponent
 
   // Info bracket Turnamen 8 Besar untuk fighter yang sedang bertarung
   const fightEvent = gym?.events.find((e) => (e.slots ?? []).some((s) => s.fighter_id === fight.fighter?.id)) ?? null
@@ -378,9 +378,9 @@ export default function FightPage() {
       : []
   const { my: liveMyStats, opp: liveOppStats } = aggregateTickStats(liveTicks)
 
-  // Reset wawancara pra-pertandingan saat ganti fighter terpilih
+  // Reset error press conference saat ganti fighter terpilih
   useEffect(() => {
-    setInterviewText(null)
+    setHypeError(null)
   }, [selectedFighterId])
 
   // Ambil saran corner dari AI saat masuk fase istirahat antar ronde
@@ -452,6 +452,10 @@ export default function FightPage() {
     // Multiplier sesuai tier event (Lokal/Regional/Nasional)
     purse = Math.round((purse * tierConfig.purseMult * slotPurseMult) / 100_000) * 100_000
     reputationChange = Math.round(reputationChange * tierConfig.reputationMult)
+
+    // Hype dari Press Conference: penonton lebih ramai = purse lebih besar
+    const hypeMult = slot?.press_conference?.attendance_mult ?? 1
+    purse = Math.round((purse * hypeMult) / 100_000) * 100_000
 
     // Bonus rivalitas: rematch melawan lawan yang pernah dihadapi menarik lebih banyak penonton
     if (opponent.isRival) {
@@ -531,7 +535,7 @@ export default function FightPage() {
             slots: (e.slots ?? []).map((s) => {
               if (s.fighter_id !== fighter.id) return s
               if (tournamentAdvance) return { ...s, bracket_round: bracketRound + 1 }
-              return { ...s, fighter_id: null, opponent: null, opponents: null, bracket_round: 0 }
+              return { ...s, fighter_id: null, opponent: null, opponents: null, bracket_round: 0, press_conference: null }
             }),
           }
         )
@@ -641,17 +645,51 @@ export default function FightPage() {
     setSavingResult(false)
   }
 
-  async function handleWatchInterview() {
-    if (!selectedFighter || !selectedSlot?.opponent || !todaysEvent) return
-    setInterviewLoading(true)
-    const text = await getPreFightInterview(
+  async function handleHype(style: HypeStyle) {
+    if (!gym || !selectedFighter || !selectedEvent || !selectedSlot?.opponent) return
+    setHypeLoading(true)
+    setHypeError(null)
+
+    const resolved = resolveHype(style, selectedFighter, selectedSlot.opponent.name)
+    const { myQuote, opponentQuote } = await getPressConferenceQuotes(
       selectedFighter,
       selectedSlot.opponent.name,
       selectedSlot.opponent.specialty,
-      todaysEvent.name
+      selectedEvent.name,
+      style,
+      resolved.outcome
     )
-    setInterviewText(text)
-    setInterviewLoading(false)
+
+    const newAttendance = Math.round(((selectedEvent.attendance ?? 0) * resolved.attendance_mult) / 50) * 50
+    const newEvents = gym.events.map((e) => {
+      if (e.id !== selectedEvent.id) return e
+      return {
+        ...e,
+        attendance: newAttendance,
+        slots: e.slots.map((s) =>
+          s.fighter_id !== selectedFighter.id
+            ? s
+            : {
+                ...s,
+                press_conference: {
+                  style,
+                  my_quote: myQuote,
+                  opp_quote: opponentQuote,
+                  ...resolved,
+                },
+              }
+        ),
+      }
+    })
+
+    const supabase = createClient()
+    const { data, error } = await supabase.from('gyms').update({ events: newEvents }).eq('id', gym.id).select().single()
+    if (error) {
+      setHypeError(error.message)
+    } else if (data) {
+      setGym(data as Gym)
+    }
+    setHypeLoading(false)
   }
 
   function handleStartFight() {
@@ -682,13 +720,18 @@ export default function FightPage() {
         }
       : generateOpponent(fighter, tier as EventTier)
 
+    // Press conference: dorongan/penurunan mental dari hasil hype sebelum laga
+    const pc = slot?.press_conference
+    const myMental = Math.max(0, Math.min(100, fighter.attrs.mental + (pc?.my_mental_delta ?? 0)))
+    const oppMental = Math.max(0, Math.min(100, opponent.attrs.mental + (pc?.opp_mental_delta ?? 0)))
+
     setFightFighter(fighter)
     setOpponent(opponent)
     setFightVitals({
       myStamina: fighter.attrs.cardio,
       oppStamina: opponent.attrs.cardio,
-      myMental: fighter.attrs.mental,
-      oppMental: opponent.attrs.mental,
+      myMental,
+      oppMental,
     })
     setFightPhase('gameplan')
   }
@@ -925,26 +968,51 @@ export default function FightPage() {
             </div>
           )}
 
-          {showInterview && (
+          {showPressConference && (
             <div className="rounded-lg border border-octagon-amber/30 bg-octagon-card p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-octagon-amber">
-                🎤 Wawancara Pra-Pertandingan
+                🎤 Press Conference
               </p>
               <p className="mt-1 text-xs text-gray-400">
-                {selectedFighter?.name} vs {selectedSlot?.opponent?.name} — {todaysEvent?.name}
+                {selectedFighter?.name} vs {selectedSlot?.opponent?.name} — {selectedEvent?.name}
               </p>
 
-              {interviewText ? (
-                <p className="mt-3 whitespace-pre-line text-sm italic text-gray-200">&ldquo;{interviewText}&rdquo;</p>
+              {selectedSlot?.press_conference ? (
+                <div className="mt-3 space-y-2">
+                  <div>
+                    <p className="text-sm italic text-gray-200">&ldquo;{selectedSlot.press_conference.my_quote}&rdquo;</p>
+                    <p className="mt-0.5 text-xs text-gray-500">— {selectedFighter?.name}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm italic text-gray-300">&ldquo;{selectedSlot.press_conference.opp_quote}&rdquo;</p>
+                    <p className="mt-0.5 text-xs text-gray-500">— {selectedSlot.opponent?.name}</p>
+                  </div>
+                  <p className="mt-2 rounded-md bg-octagon-dark px-3 py-2 text-xs text-octagon-amber">
+                    📰 {selectedSlot.press_conference.outcome}
+                  </p>
+                  {selectedEvent?.attendance && (
+                    <p className="text-xs text-gray-500">
+                      Estimasi penonton naik menjadi ~{formatNumber(selectedEvent.attendance)} orang.
+                    </p>
+                  )}
+                </div>
+              ) : hypeLoading ? (
+                <p className="mt-3 animate-pulse text-sm text-gray-500">Konferensi pers berlangsung...</p>
               ) : (
-                <button
-                  onClick={handleWatchInterview}
-                  disabled={interviewLoading}
-                  className="mt-3 rounded-md border border-octagon-border px-3 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:border-octagon-amber hover:text-octagon-amber disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {interviewLoading ? 'Memuat...' : 'Tonton Wawancara'}
-                </button>
+                <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {HYPE_STYLES.map((opt) => (
+                    <button
+                      key={opt.value}
+                      onClick={() => handleHype(opt.value)}
+                      className="rounded-lg border border-octagon-border bg-octagon-card p-3 text-left transition-colors hover:border-octagon-amber/40 hover:bg-octagon-amber/10"
+                    >
+                      <p className="font-semibold text-white">{opt.label}</p>
+                      <p className="text-xs text-gray-400">{opt.desc}</p>
+                    </button>
+                  ))}
+                </div>
               )}
+              {hypeError && <p className="mt-2 text-xs text-octagon-red">{hypeError}</p>}
             </div>
           )}
 

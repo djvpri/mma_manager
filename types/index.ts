@@ -27,6 +27,17 @@ export type Specialty =
 
 export type TrainingSession = 'striking' | 'grappling' | 'cardio' | 'analytics' | 'mental' | 'sparring' | 'rest'
 export type SponsorCategory = 'apparel' | 'energy' | 'supplement' | 'local'
+export type HypeStyle = 'confident' | 'provoke' | 'respect' | 'focus'
+
+export interface PressConferenceResult {
+  style: HypeStyle
+  my_quote: string
+  opp_quote: string
+  outcome: string
+  my_mental_delta: number
+  opp_mental_delta: number
+  attendance_mult: number
+}
 
 export interface SponsorContract {
   id: string
@@ -80,6 +91,7 @@ export interface EventSlot {
   // Khusus slot 'tournament': bracket 3 lawan (QF/SF/Final) + progress
   opponents?: EventSlotOpponent[] | null
   bracket_round?: number // 0 = belum mulai, 1 = lolos QF, 2 = lolos SF, 3 = juara
+  press_conference?: PressConferenceResult | null
 }
 
 export interface TournamentTitle {
