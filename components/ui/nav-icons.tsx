@@ -145,6 +145,18 @@ export function IconLogout(props: React.SVGProps<SVGSVGElement>) {
   )
 }
 
+export function IconSocial(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <circle cx="6" cy="12" r="2.5" />
+      <circle cx="17" cy="6" r="2.5" />
+      <circle cx="17" cy="18" r="2.5" />
+      <path d="M8.2 11 14.8 7" />
+      <path d="M8.2 13 14.8 17" />
+    </svg>
+  )
+}
+
 export const NAV_ITEMS = [
   { href: '/game/roster', label: 'Roster', icon: IconRoster },
   { href: '/game/fight', label: 'Fight Night', icon: IconFight },
@@ -155,6 +167,7 @@ export const NAV_ITEMS = [
   { href: '/game/staff', label: 'Staf', icon: IconStaff },
   { href: '/game/recruit', label: 'Rekrutmen', icon: IconRecruit },
   { href: '/game/leaderboard', label: 'Leaderboard', icon: IconLeaderboard },
+  { href: '/game/social', label: 'Sosial', icon: IconSocial },
 ]
 
 export function formatCurrency(value: number) {

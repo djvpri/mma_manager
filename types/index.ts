@@ -181,6 +181,7 @@ export interface Gym {
   last_sponsor_week: number | null
   rooms: GymRooms
   events: MmaEvent[]
+  friend_code: string
   created_at: string
 }
 
