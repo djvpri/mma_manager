@@ -5,7 +5,16 @@ import { createClient } from '@/lib/supabase'
 import { useGameStore } from '@/store/game-store'
 import { formatCurrency } from '@/lib/format'
 import { CATEGORY_LABELS } from '@/lib/sponsor-contracts'
-import type { Staff, SponsorContract } from '@/types'
+import {
+  LOAN_AMOUNTS,
+  LOAN_TERMS,
+  getLoanLimit,
+  previewLoan,
+  fetchActiveLoan,
+  takeBankLoan,
+  type BankLoan,
+} from '@/lib/bank-loans'
+import type { Gym, Staff, SponsorContract } from '@/types'
 
 const BASE_INCOME       = 5_000_000
 const REP_INCOME_RATE   = 250_000
@@ -15,8 +24,14 @@ const BASE_EXPENSE      = 15_000_000
 export default function FinancePage() {
   const gym     = useGameStore((s) => s.gym)
   const fighters = useGameStore((s) => s.fighters)
+  const setGym   = useGameStore((s) => s.setGym)
   const [staff, setStaff]           = useState<Staff[] | null>(null)
   const [contracts, setContracts]   = useState<SponsorContract[] | null>(null)
+  const [activeLoan, setActiveLoan] = useState<BankLoan | null | undefined>(undefined)
+  const [loanAmount, setLoanAmount] = useState<number>(LOAN_AMOUNTS[0])
+  const [loanWeeks, setLoanWeeks]   = useState<number>(LOAN_TERMS[0])
+  const [loanBusy, setLoanBusy]     = useState(false)
+  const [loanError, setLoanError]   = useState<string | null>(null)
 
   useEffect(() => {
     if (!gym) return
@@ -28,7 +43,27 @@ export default function FinancePage() {
       if (!staffRes.error)     setStaff((staffRes.data ?? []) as Staff[])
       if (!contractsRes.error) setContracts((contractsRes.data ?? []) as SponsorContract[])
     })
+    fetchActiveLoan(gym.id).then(setActiveLoan)
   }, [gym?.id])
+
+  async function handleTakeLoan() {
+    if (!gym) return
+    setLoanError(null)
+    setLoanBusy(true)
+    const { error } = await takeBankLoan(gym.id, loanAmount, loanWeeks)
+    if (error) {
+      setLoanError('Gagal mengajukan pinjaman: ' + error)
+    } else {
+      const supabase = createClient()
+      const [{ data: gymData }, loan] = await Promise.all([
+        supabase.from('gyms').select('*').eq('id', gym.id).single(),
+        fetchActiveLoan(gym.id),
+      ])
+      if (gymData) setGym(gymData as Gym)
+      setActiveLoan(loan)
+    }
+    setLoanBusy(false)
+  }
 
   if (!gym) return <p className="text-sm text-gray-400">Memuat...</p>
 
@@ -53,6 +88,9 @@ export default function FinancePage() {
     : null
 
   const maxBar = Math.max(projectedIncome, gym.monthly_expense, 1)
+
+  const loanLimit = getLoanLimit(gym.reputation)
+  const loanPreview = previewLoan(loanAmount, loanWeeks, gym.reputation)
 
   return (
     <div className="space-y-6">
@@ -93,6 +131,111 @@ export default function FinancePage() {
           </p>
         </div>
       )}
+
+      {/* Pinjaman Bank */}
+      <div className="rounded-lg border border-octagon-border bg-octagon-card p-4">
+        <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">Pinjaman Bank</h2>
+
+        {loanError && <p className="mb-2 text-xs text-octagon-red">{loanError}</p>}
+
+        {activeLoan === undefined ? (
+          <p className="text-sm text-gray-500">Memuat...</p>
+        ) : activeLoan ? (
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-gray-400">Pokok pinjaman</span>
+              <span className="text-white">{formatCurrency(activeLoan.principal)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">Cicilan/minggu</span>
+              <span className="text-octagon-red">−{formatCurrency(activeLoan.weekly_payment)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">Sisa tenor</span>
+              <span className="text-white">{activeLoan.weeks_remaining} / {activeLoan.weeks_total} minggu</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">Sisa total cicilan</span>
+              <span className="text-white">{formatCurrency(activeLoan.weekly_payment * activeLoan.weeks_remaining)}</span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-octagon-dark">
+              <div
+                className="h-full rounded-full bg-octagon-amber"
+                style={{ width: `${((activeLoan.weeks_total - activeLoan.weeks_remaining) / activeLoan.weeks_total) * 100}%` }}
+              />
+            </div>
+            <p className="text-xs text-gray-600">Cicilan terpotong otomatis saat &ldquo;Lanjut ke Minggu Berikutnya&rdquo;.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-xs text-gray-500">
+              Limit pinjaman saat ini (berdasarkan reputasi {gym.reputation}): <span className="text-octagon-amber">{formatCurrency(loanLimit)}</span>
+            </p>
+
+            <div>
+              <p className="mb-1.5 text-xs text-gray-500">Nominal</p>
+              <div className="flex flex-wrap gap-2">
+                {LOAN_AMOUNTS.map((amt) => (
+                  <button
+                    key={amt}
+                    onClick={() => setLoanAmount(amt)}
+                    disabled={amt > loanLimit}
+                    className={`rounded border px-2 py-1 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-30 ${
+                      loanAmount === amt
+                        ? 'border-octagon-amber text-octagon-amber'
+                        : 'border-octagon-border text-gray-400 hover:border-octagon-amber/60'
+                    }`}
+                  >
+                    {formatCurrency(amt)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="mb-1.5 text-xs text-gray-500">Tenor</p>
+              <div className="flex flex-wrap gap-2">
+                {LOAN_TERMS.map((w) => (
+                  <button
+                    key={w}
+                    onClick={() => setLoanWeeks(w)}
+                    className={`rounded border px-2 py-1 text-xs transition-colors ${
+                      loanWeeks === w
+                        ? 'border-octagon-amber text-octagon-amber'
+                        : 'border-octagon-border text-gray-400 hover:border-octagon-amber/60'
+                    }`}
+                  >
+                    {w} minggu
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-1 rounded border border-octagon-border/50 p-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-gray-400">Bunga total</span>
+                <span className="text-white">{Math.round(loanPreview.rate * 100)}%</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Total dibayar</span>
+                <span className="text-white">{formatCurrency(loanPreview.total)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Cicilan/minggu</span>
+                <span className="text-octagon-red">−{formatCurrency(loanPreview.weekly)}</span>
+              </div>
+            </div>
+
+            <button
+              onClick={handleTakeLoan}
+              disabled={loanBusy || loanAmount > loanLimit}
+              className="rounded bg-octagon-amber px-3 py-1.5 text-xs font-semibold text-octagon-dark transition-colors hover:bg-octagon-amber/90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {loanBusy ? 'Memproses...' : 'Ajukan Pinjaman'}
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* Visual cashflow bar */}
       <div className="rounded-lg border border-octagon-border bg-octagon-card p-4">
