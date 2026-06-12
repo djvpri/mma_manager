@@ -180,7 +180,7 @@ export default function FinancePage() {
                     key={amt}
                     onClick={() => setLoanAmount(amt)}
                     disabled={amt > loanLimit}
-                    className={`rounded border px-2 py-1 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-30 ${
+                    className={`rounded border px-1.5 py-1 text-[10px] transition-colors disabled:cursor-not-allowed disabled:opacity-30 sm:px-2 sm:text-xs ${
                       loanAmount === amt
                         ? 'border-octagon-amber text-octagon-amber'
                         : 'border-octagon-border text-gray-400 hover:border-octagon-amber/60'
@@ -337,9 +337,9 @@ export default function FinancePage() {
           <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">Detail Kontrak Fighter</h2>
           <div className="space-y-2">
             {activeFighters.map((f) => (
-              <div key={f.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-0.5 text-sm">
+              <div key={f.id} className="flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-x-4 sm:gap-y-0.5">
                 <span className="font-medium text-white">{f.name}</span>
-                <div className="flex items-center gap-4 text-xs text-gray-400">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs text-gray-400">
                   <span>Gaji <span className="text-gray-200">{formatCurrency(f.salary_monthly)}</span></span>
                   <span>Win bonus <span className="text-octagon-amber">{formatCurrency(f.win_bonus)}</span></span>
                   <span>Purse share <span className="text-gray-200">{f.purse_share_pct}%</span></span>

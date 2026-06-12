@@ -53,7 +53,7 @@ export default function MobileHeader() {
     <header className="sticky top-0 z-30 flex items-center justify-between border-b border-octagon-border bg-octagon-card px-4 py-3 lg:hidden">
       <div className="min-w-0">
         <p className="truncate text-sm font-semibold text-white">{gym?.name ?? 'Gym Belum Dibuat'}</p>
-        <p className="text-[11px] text-gray-400">
+        <p className="truncate text-[11px] text-gray-400">
           {gym?.city ?? '—'} · Minggu ke-{gym?.season_week ?? 1}
         </p>
       </div>

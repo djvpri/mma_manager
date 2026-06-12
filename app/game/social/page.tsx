@@ -103,9 +103,9 @@ export default function SocialPage() {
         ) : (
           <div className="space-y-2">
             {friends.map((f) => (
-              <div key={f.gym_id} className="flex flex-wrap items-center justify-between gap-2 rounded border border-octagon-border/50 px-3 py-2">
-                <div>
-                  <p className="text-sm font-semibold text-white">{f.name}</p>
+              <div key={f.gym_id} className="flex flex-col gap-2 rounded border border-octagon-border/50 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-white">{f.name}</p>
                   <p className="text-xs text-gray-500">{f.city} · Minggu ke-{f.season_week}</p>
                 </div>
                 <div className="flex items-center gap-4 text-xs">

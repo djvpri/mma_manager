@@ -146,68 +146,70 @@ export default function LeaderboardPage() {
           <p className="text-sm text-gray-400">Memuat...</p>
         ) : (
           <div className="overflow-hidden rounded-lg border border-octagon-border bg-octagon-card">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-octagon-border text-left text-xs uppercase text-gray-500">
-                  <th className="px-3 py-3">#</th>
-                  <th className="px-3 py-3">Gym & Fighter Terbaik</th>
-                  <th className="px-3 py-3 text-right">Rep</th>
-                  <th className="px-3 py-3 text-right hidden sm:table-cell">W-L</th>
-                  <th className="px-3 py-3 text-right hidden sm:table-cell">Win%</th>
-                </tr>
-              </thead>
-              <tbody>
-                {entries.map((entry, i) => {
-                  const tier    = getGymTier(entry.reputation)
-                  const isMe    = entry.gym_id === gym.id
-                  const total   = entry.total_wins + (entry.total_losses ?? 0)
-                  const winPct  = total > 0 ? Math.round((entry.total_wins / total) * 100) : 0
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-octagon-border text-left text-xs uppercase text-gray-500">
+                    <th className="px-3 py-3">#</th>
+                    <th className="px-3 py-3">Gym & Fighter Terbaik</th>
+                    <th className="px-3 py-3 text-right">Rep</th>
+                    <th className="px-3 py-3 text-right hidden sm:table-cell">W-L</th>
+                    <th className="px-3 py-3 text-right hidden sm:table-cell">Win%</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {entries.map((entry, i) => {
+                    const tier    = getGymTier(entry.reputation)
+                    const isMe    = entry.gym_id === gym.id
+                    const total   = entry.total_wins + (entry.total_losses ?? 0)
+                    const winPct  = total > 0 ? Math.round((entry.total_wins / total) * 100) : 0
 
-                  return (
-                    <tr key={entry.id}
-                      className={`border-b border-octagon-border last:border-0 ${isMe ? 'bg-octagon-red/10' : ''}`}
-                    >
-                      <td className="px-3 py-3">
-                        <span className={`font-bold ${i < 3 ? ['text-yellow-400','text-gray-300','text-amber-600'][i] : 'text-gray-500'}`}>
-                          {i + 1}
-                        </span>
-                      </td>
-                      <td className="px-3 py-3">
-                        <div className="flex items-center gap-2">
-                          <span className={`hidden rounded border px-1.5 py-0.5 text-[9px] font-bold sm:inline ${tier.badgeClass}`}>
-                            {tier.label}
+                    return (
+                      <tr key={entry.id}
+                        className={`border-b border-octagon-border last:border-0 ${isMe ? 'bg-octagon-red/10' : ''}`}
+                      >
+                        <td className="px-3 py-3">
+                          <span className={`font-bold ${i < 3 ? ['text-yellow-400','text-gray-300','text-amber-600'][i] : 'text-gray-500'}`}>
+                            {i + 1}
                           </span>
-                          <span className={`font-semibold ${isMe ? 'text-octagon-red' : 'text-white'}`}>
-                            {entry.gym_name}{isMe && ' ★'}
-                          </span>
-                        </div>
-                        {entry.top_fighters?.length > 0 && (
-                          <div className="mt-1 flex flex-wrap gap-1">
-                            {entry.top_fighters.map((f, j) => (
-                              <span key={j} className="inline-flex items-center gap-1 rounded border border-octagon-border bg-octagon-dark px-1.5 py-0.5 text-[10px] text-gray-300">
-                                <span className="font-medium text-white">{f.name}</span>
-                                <span className="text-gray-500">{f.record}</span>
-                              </span>
-                            ))}
+                        </td>
+                        <td className="px-3 py-3">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <span className={`hidden shrink-0 rounded border px-1.5 py-0.5 text-[9px] font-bold sm:inline ${tier.badgeClass}`}>
+                              {tier.label}
+                            </span>
+                            <span className={`truncate font-semibold ${isMe ? 'text-octagon-red' : 'text-white'}`}>
+                              {entry.gym_name}{isMe && ' ★'}
+                            </span>
                           </div>
-                        )}
-                      </td>
-                      <td className="px-3 py-3 text-right">
-                        <span className={`font-bold ${tier.textColor}`}>{entry.reputation}</span>
-                      </td>
-                      <td className="px-3 py-3 text-right text-gray-300 hidden sm:table-cell">
-                        {entry.total_wins}-{entry.total_losses ?? '?'}
-                      </td>
-                      <td className="px-3 py-3 text-right hidden sm:table-cell">
-                        <span className={winPct >= 60 ? 'font-semibold text-octagon-teal' : winPct >= 40 ? 'text-gray-300' : 'text-octagon-red'}>
-                          {winPct}%
-                        </span>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+                          {entry.top_fighters?.length > 0 && (
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {entry.top_fighters.map((f, j) => (
+                                <span key={j} className="inline-flex items-center gap-1 rounded border border-octagon-border bg-octagon-dark px-1.5 py-0.5 text-[10px] text-gray-300">
+                                  <span className="font-medium text-white">{f.name}</span>
+                                  <span className="text-gray-500">{f.record}</span>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-3 py-3 text-right">
+                          <span className={`font-bold ${tier.textColor}`}>{entry.reputation}</span>
+                        </td>
+                        <td className="px-3 py-3 text-right text-gray-300 hidden sm:table-cell">
+                          {entry.total_wins}-{entry.total_losses ?? '?'}
+                        </td>
+                        <td className="px-3 py-3 text-right hidden sm:table-cell">
+                          <span className={winPct >= 60 ? 'font-semibold text-octagon-teal' : winPct >= 40 ? 'text-gray-300' : 'text-octagon-red'}>
+                            {winPct}%
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         )
       )}
@@ -236,67 +238,69 @@ export default function LeaderboardPage() {
             <p className="text-sm text-gray-400">Tidak ada fighter di kelas {selectedWC}.</p>
           ) : (
             <div className="overflow-hidden rounded-lg border border-octagon-border bg-octagon-card">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-octagon-border text-left text-xs uppercase text-gray-500">
-                    <th className="px-3 py-3">#</th>
-                    <th className="px-3 py-3">Fighter</th>
-                    <th className="px-3 py-3 hidden sm:table-cell">Gym</th>
-                    <th className="px-3 py-3 text-right">Record</th>
-                    <th className="px-3 py-3 text-right">OVR</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rankedFighters.map((f, i) => {
-                    const isMyFighter = f.gym_id === gym.id
-                    const isFreeAgent = f.gym_id === null
-                    const ovr         = overallRating(f.attrs)
-                    const gymLabel    = gymLabelFor(f)
-                    const isChampion  = championForWC?.champion_fighter_id === f.id
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-octagon-border text-left text-xs uppercase text-gray-500">
+                      <th className="px-3 py-3">#</th>
+                      <th className="px-3 py-3">Fighter</th>
+                      <th className="px-3 py-3 hidden sm:table-cell">Gym</th>
+                      <th className="px-3 py-3 text-right">Record</th>
+                      <th className="px-3 py-3 text-right">OVR</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rankedFighters.map((f, i) => {
+                      const isMyFighter = f.gym_id === gym.id
+                      const isFreeAgent = f.gym_id === null
+                      const ovr         = overallRating(f.attrs)
+                      const gymLabel    = gymLabelFor(f)
+                      const isChampion  = championForWC?.champion_fighter_id === f.id
 
-                    return (
-                      <tr key={f.id}
-                        onClick={() => setSelectedFighter(f)}
-                        className={`cursor-pointer border-b border-octagon-border last:border-0 transition-colors hover:bg-octagon-dark/50 ${isMyFighter ? 'bg-octagon-red/10' : ''}`}
-                      >
-                        <td className="px-3 py-3">
-                          <span className={`font-bold ${i < 3 ? ['text-yellow-400','text-gray-300','text-amber-600'][i] : 'text-gray-500'}`}>
-                            {i + 1}
-                          </span>
-                        </td>
-                        <td className="px-3 py-3">
-                          <p className={`font-semibold ${isMyFighter ? 'text-octagon-red' : 'text-white'}`}>
-                            {isChampion && '🏆 '}{f.name}{isMyFighter && ' ★'}
-                          </p>
-                          <p className="text-xs text-gray-500">{f.specialty} · {f.age} th</p>
-                        </td>
-                        <td className="px-3 py-3 hidden sm:table-cell">
-                          <span className={`rounded border px-1.5 py-0.5 text-[10px] font-medium ${
-                            isMyFighter ? 'border-octagon-red/40 bg-octagon-red/10 text-octagon-red' :
-                            isFreeAgent ? 'border-gray-500/40 bg-gray-500/10 text-gray-400' :
-                                          'border-octagon-border text-gray-500'
-                          }`}>
-                            {gymLabel}
-                          </span>
-                        </td>
-                        <td className="px-3 py-3 text-right text-gray-300">
-                          {f.record.w}-{f.record.l}
-                        </td>
-                        <td className="px-3 py-3 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <div className="hidden w-16 overflow-hidden rounded-full bg-octagon-dark sm:block" style={{ height: 4 }}>
-                              <div className="h-full rounded-full bg-octagon-teal" style={{ width: `${ovr}%` }} />
-                            </div>
-                            <span className={`font-bold ${ovr >= 75 ? 'text-octagon-teal' : ovr >= 60 ? 'text-octagon-amber' : 'text-gray-400'}`}>
-                              {ovr}
+                      return (
+                        <tr key={f.id}
+                          onClick={() => setSelectedFighter(f)}
+                          className={`cursor-pointer border-b border-octagon-border last:border-0 transition-colors hover:bg-octagon-dark/50 ${isMyFighter ? 'bg-octagon-red/10' : ''}`}
+                        >
+                          <td className="px-3 py-3">
+                            <span className={`font-bold ${i < 3 ? ['text-yellow-400','text-gray-300','text-amber-600'][i] : 'text-gray-500'}`}>
+                              {i + 1}
                             </span>
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+                          </td>
+                          <td className="max-w-[160px] px-3 py-3 sm:max-w-none">
+                            <p className={`truncate font-semibold ${isMyFighter ? 'text-octagon-red' : 'text-white'}`}>
+                              {isChampion && '🏆 '}{f.name}{isMyFighter && ' ★'}
+                            </p>
+                            <p className="truncate text-xs text-gray-500">{f.specialty} · {f.age} th</p>
+                          </td>
+                          <td className="px-3 py-3 hidden sm:table-cell">
+                            <span className={`rounded border px-1.5 py-0.5 text-[10px] font-medium ${
+                              isMyFighter ? 'border-octagon-red/40 bg-octagon-red/10 text-octagon-red' :
+                              isFreeAgent ? 'border-gray-500/40 bg-gray-500/10 text-gray-400' :
+                                            'border-octagon-border text-gray-500'
+                            }`}>
+                              {gymLabel}
+                            </span>
+                          </td>
+                          <td className="px-3 py-3 text-right text-gray-300">
+                            {f.record.w}-{f.record.l}
+                          </td>
+                          <td className="px-3 py-3 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <div className="hidden w-16 overflow-hidden rounded-full bg-octagon-dark sm:block" style={{ height: 4 }}>
+                                <div className="h-full rounded-full bg-octagon-teal" style={{ width: `${ovr}%` }} />
+                              </div>
+                              <span className={`font-bold ${ovr >= 75 ? 'text-octagon-teal' : ovr >= 60 ? 'text-octagon-amber' : 'text-gray-400'}`}>
+                                {ovr}
+                              </span>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>
@@ -308,45 +312,47 @@ export default function LeaderboardPage() {
           <p className="text-sm text-gray-400">Memuat...</p>
         ) : (
           <div className="overflow-hidden rounded-lg border border-octagon-border bg-octagon-card">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-octagon-border text-left text-xs uppercase text-gray-500">
-                  <th className="px-3 py-3">Kelas</th>
-                  <th className="px-3 py-3">Champion</th>
-                  <th className="px-3 py-3 hidden sm:table-cell">Gym</th>
-                  <th className="px-3 py-3 text-right">Defenses</th>
-                </tr>
-              </thead>
-              <tbody>
-                {champions.map((c) => {
-                  const isMe   = c.champion_gym_id === gym.id
-                  const vacant = !c.champion_fighter_id
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-octagon-border text-left text-xs uppercase text-gray-500">
+                    <th className="px-3 py-3">Kelas</th>
+                    <th className="px-3 py-3">Champion</th>
+                    <th className="px-3 py-3 hidden sm:table-cell">Gym</th>
+                    <th className="px-3 py-3 text-right">Defenses</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {champions.map((c) => {
+                    const isMe   = c.champion_gym_id === gym.id
+                    const vacant = !c.champion_fighter_id
 
-                  return (
-                    <tr key={c.weight_class}
-                      className={`border-b border-octagon-border last:border-0 ${isMe ? 'bg-octagon-red/10' : ''}`}
-                    >
-                      <td className="px-3 py-3 font-semibold text-white">{c.weight_class}</td>
-                      <td className="px-3 py-3">
-                        {vacant ? (
-                          <span className="text-gray-500 italic">Vacant</span>
-                        ) : (
-                          <span className={`font-semibold ${isMe ? 'text-octagon-red' : 'text-yellow-400'}`}>
-                            🏆 {c.champion_name}{isMe && ' ★'}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-3 py-3 hidden text-gray-300 sm:table-cell">
-                        {c.champion_gym_name ?? '—'}
-                      </td>
-                      <td className="px-3 py-3 text-right text-gray-300">
-                        {vacant ? '—' : c.title_defenses}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+                    return (
+                      <tr key={c.weight_class}
+                        className={`border-b border-octagon-border last:border-0 ${isMe ? 'bg-octagon-red/10' : ''}`}
+                      >
+                        <td className="px-3 py-3 font-semibold text-white">{c.weight_class}</td>
+                        <td className="max-w-[140px] px-3 py-3 sm:max-w-none">
+                          {vacant ? (
+                            <span className="text-gray-500 italic">Vacant</span>
+                          ) : (
+                            <span className={`block truncate font-semibold ${isMe ? 'text-octagon-red' : 'text-yellow-400'}`}>
+                              🏆 {c.champion_name}{isMe && ' ★'}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-3 hidden text-gray-300 sm:table-cell">
+                          {c.champion_gym_name ?? '—'}
+                        </td>
+                        <td className="px-3 py-3 text-right text-gray-300">
+                          {vacant ? '—' : c.title_defenses}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         )
       )}

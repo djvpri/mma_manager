@@ -161,7 +161,7 @@ export default function EventsPage() {
                     return (
                       <div key={slot.type} className="flex flex-wrap items-center gap-3 px-4 py-3">
                         {/* Slot label */}
-                        <div className="w-28 shrink-0">
+                        <div className="w-20 shrink-0 sm:w-28">
                           <p className="text-xs font-semibold text-white">
                             {slotCfg.icon && <span className="mr-1">{slotCfg.icon}</span>}
                             {slotCfg.label}
