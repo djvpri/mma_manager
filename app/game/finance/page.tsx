@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase'
 import { useGameStore } from '@/store/game-store'
 import { formatCurrency } from '@/lib/format'
 import { CATEGORY_LABELS } from '@/lib/sponsor-contracts'
+import MemberSection from '@/components/finance/MemberSection'
 import {
   LOAN_AMOUNTS,
   LOAN_TERMS,
@@ -131,6 +132,9 @@ export default function FinancePage() {
           </p>
         </div>
       )}
+
+      {/* Member Gym */}
+      <MemberSection />
 
       {/* Pinjaman Bank */}
       <div className="rounded-lg border border-octagon-border bg-octagon-card p-4">

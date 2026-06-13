@@ -1,0 +1,293 @@
+From 6bd8954797f2cb0b4a28ef0be02c8e8ea7b84d7f Mon Sep 17 00:00:00 2001
+From: Claude <claude@anthropic.com>
+Date: Fri, 12 Jun 2026 16:58:38 +0000
+Subject: [PATCH] Tambah sistem member gym: pemasukan dinamis berbasis
+ reputasi, fasilitas, dan prestasi
+
+---
+ app/game/finance/page.tsx               |   4 +
+ components/finance/MemberSection.tsx    | 120 ++++++++++++++++++++++++
+ lib/gym-members.ts                      |  51 ++++++++++
+ supabase/migrations/047_gym_members.sql |  49 ++++++++++
+ types/index.ts                          |   2 +
+ 5 files changed, 226 insertions(+)
+ create mode 100644 components/finance/MemberSection.tsx
+ create mode 100644 lib/gym-members.ts
+ create mode 100644 supabase/migrations/047_gym_members.sql
+
+diff --git a/app/game/finance/page.tsx b/app/game/finance/page.tsx
+index c6d4884..df9f258 100644
+--- a/app/game/finance/page.tsx
++++ b/app/game/finance/page.tsx
+@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase'
+ import { useGameStore } from '@/store/game-store'
+ import { formatCurrency } from '@/lib/format'
+ import { CATEGORY_LABELS } from '@/lib/sponsor-contracts'
++import MemberSection from '@/components/finance/MemberSection'
+ import {
+   LOAN_AMOUNTS,
+   LOAN_TERMS,
+@@ -132,6 +133,9 @@ export default function FinancePage() {
+         </div>
+       )}
+ 
++      {/* Member Gym */}
++      <MemberSection />
++
+       {/* Pinjaman Bank */}
+       <div className="rounded-lg border border-octagon-border bg-octagon-card p-4">
+         <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">Pinjaman Bank</h2>
+diff --git a/components/finance/MemberSection.tsx b/components/finance/MemberSection.tsx
+new file mode 100644
+index 0000000..8055774
+--- /dev/null
++++ b/components/finance/MemberSection.tsx
+@@ -0,0 +1,120 @@
++// components/finance/MemberSection.tsx
++'use client'
++
++import { useEffect, useState } from 'react'
++import { createClient } from '@/lib/supabase'
++import { useGameStore } from '@/store/game-store'
++import { formatCurrency } from '@/lib/format'
++import {
++  FEE_OPTIONS,
++  STANDARD_FEE,
++  calcTargetMembers,
++  weeklyMemberIncome,
++  fetchRecentWins,
++  updateMemberFee,
++} from '@/lib/gym-members'
++import type { Gym } from '@/types'
++
++export default function MemberSection() {
++  const gym    = useGameStore((s) => s.gym)
++  const setGym = useGameStore((s) => s.setGym)
++  const [recentWins, setRecentWins] = useState<number>(0)
++  const [busy, setBusy]             = useState(false)
++  const [error, setError]           = useState<string | null>(null)
++
++  useEffect(() => {
++    if (!gym) return
++    fetchRecentWins(gym.id).then(setRecentWins)
++  }, [gym?.id])
++
++  if (!gym) return null
++
++  const target  = calcTargetMembers(gym, recentWins)
++  const income  = weeklyMemberIncome(gym)
++  const trend   = target - gym.member_count
++  const trendUp = trend > 5
++  const trendDn = trend < -5
++
++  async function handleFeeChange(fee: number) {
++    if (!gym || fee === gym.member_fee) return
++    setError(null)
++    setBusy(true)
++    const err = await updateMemberFee(gym.id, fee)
++    if (err) {
++      setError('Gagal mengubah iuran: ' + err)
++    } else {
++      const supabase = createClient()
++      const { data } = await supabase.from('gyms').select('*').eq('id', gym.id).single()
++      if (data) setGym(data as Gym)
++    }
++    setBusy(false)
++  }
++
++  return (
++    <div className="rounded-lg border border-octagon-border bg-octagon-card p-4">
++      <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">
++        Member Gym
++      </h2>
++
++      {error && <p className="mb-2 text-xs text-octagon-red">{error}</p>}
++
++      {/* Stat utama */}
++      <div className="mb-4 grid grid-cols-3 gap-3">
++        <div>
++          <p className="text-xs text-gray-500">Member aktif</p>
++          <p className="mt-0.5 text-lg font-bold text-white">
++            {gym.member_count}
++            {trendUp && <span className="ml-1.5 text-xs font-semibold text-octagon-teal">▲ naik</span>}
++            {trendDn && <span className="ml-1.5 text-xs font-semibold text-octagon-red">▼ turun</span>}
++          </p>
++        </div>
++        <div>
++          <p className="text-xs text-gray-500">Target</p>
++          <p className="mt-0.5 text-lg font-bold text-gray-300">{target}</p>
++        </div>
++        <div>
++          <p className="text-xs text-gray-500">Pemasukan/minggu</p>
++          <p className="mt-0.5 text-lg font-bold text-octagon-teal">{formatCurrency(income)}</p>
++        </div>
++      </div>
++
++      {/* Progress menuju target */}
++      <div className="mb-1 h-2 overflow-hidden rounded-full bg-octagon-dark">
++        <div
++          className={`h-full rounded-full ${gym.member_count >= target ? 'bg-octagon-teal' : 'bg-octagon-amber'}`}
++          style={{ width: `${Math.min(100, (gym.member_count / Math.max(target, 1)) * 100)}%` }}
++        />
++      </div>
++      <p className="mb-4 text-xs text-gray-600">
++        Member bergerak menuju target setiap minggu. Target dipengaruhi reputasi ({gym.reputation}),
++        level fasilitas, kemenangan 4 minggu terakhir ({recentWins}), dan iuran.
++      </p>
++
++      {/* Pengaturan iuran */}
++      <p className="mb-1.5 text-xs text-gray-500">Iuran member/bulan</p>
++      <div className="flex flex-wrap gap-2">
++        {FEE_OPTIONS.map((fee) => (
++          <button
++            key={fee}
++            disabled={busy}
++            onClick={() => handleFeeChange(fee)}
++            className={`rounded-md border px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50 ${
++              gym.member_fee === fee
++                ? 'border-octagon-amber bg-octagon-amber/10 text-octagon-amber'
++                : 'border-octagon-border text-gray-400 hover:border-gray-500 hover:text-gray-200'
++            }`}
++          >
++            {formatCurrency(fee)}
++          </button>
++        ))}
++      </div>
++      <p className="mt-2 text-xs text-gray-600">
++        {gym.member_fee > STANDARD_FEE
++          ? 'Iuran di atas standar — untung per member besar, tapi target member berkurang.'
++          : gym.member_fee < STANDARD_FEE
++          ? 'Iuran murah — menarik banyak member, tapi untung per member kecil.'
++          : 'Iuran standar pasar (Rp 350rb).'}
++      </p>
++    </div>
++  )
++}
+diff --git a/lib/gym-members.ts b/lib/gym-members.ts
+new file mode 100644
+index 0000000..ac34078
+--- /dev/null
++++ b/lib/gym-members.ts
+@@ -0,0 +1,51 @@
++// lib/gym-members.ts
++// Sistem member gym — kalkulasi target & update fee
++import { createClient } from '@/lib/supabase'
++import type { Gym } from '@/types'
++
++export const STANDARD_FEE = 350_000
++export const FEE_OPTIONS = [250_000, 300_000, 350_000, 400_000, 500_000, 650_000]
++
++/** Total level semua ruangan gym */
++export function totalRoomLevels(gym: Gym): number {
++  return Object.values(gym.rooms).reduce((s, r) => s + (r?.level ?? 0), 0)
++}
++
++/** Multiplier elastisitas harga: fee mahal → target member turun */
++export function feeMultiplier(fee: number): number {
++  return Math.max(0.5, Math.min(1.5, STANDARD_FEE / fee))
++}
++
++/**
++ * Target member — HARUS sama dengan rumus di migration 047 (process_gym_members):
++ * GREATEST(20, ROUND((40 + reputasi*3 + roomLevels*8 + recentWins*15) * feeMult))
++ */
++export function calcTargetMembers(gym: Gym, recentWins: number): number {
++  const base = 40 + gym.reputation * 3 + totalRoomLevels(gym) * 8 + recentWins * 15
++  return Math.max(20, Math.round(base * feeMultiplier(gym.member_fee)))
++}
++
++/** Pemasukan member per minggu */
++export function weeklyMemberIncome(gym: Gym): number {
++  return Math.floor((gym.member_count * gym.member_fee) / 4)
++}
++
++/** Jumlah kemenangan fighter dalam 28 hari terakhir */
++export async function fetchRecentWins(gymId: string): Promise<number> {
++  const supabase = createClient()
++  const since = new Date(Date.now() - 28 * 24 * 60 * 60 * 1000).toISOString()
++  const { count } = await supabase
++    .from('fight_results')
++    .select('id', { count: 'exact', head: true })
++    .eq('gym_id', gymId)
++    .eq('overall_winner', 'my')
++    .gt('created_at', since)
++  return count ?? 0
++}
++
++/** Update iuran member */
++export async function updateMemberFee(gymId: string, fee: number): Promise<string | null> {
++  const supabase = createClient()
++  const { error } = await supabase.from('gyms').update({ member_fee: fee }).eq('id', gymId)
++  return error ? error.message : null
++}
+diff --git a/supabase/migrations/047_gym_members.sql b/supabase/migrations/047_gym_members.sql
+new file mode 100644
+index 0000000..d5deb6e
+--- /dev/null
++++ b/supabase/migrations/047_gym_members.sql
+@@ -0,0 +1,49 @@
++-- 047: Sistem member gym — pemasukan dinamis berbasis reputasi & prestasi
++
++ALTER TABLE gyms
++  ADD COLUMN IF NOT EXISTS member_count integer NOT NULL DEFAULT 80,
++  ADD COLUMN IF NOT EXISTS member_fee   bigint  NOT NULL DEFAULT 350000;
++
++CREATE OR REPLACE FUNCTION process_gym_members()
++RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
++DECLARE
++  v_room_levels  integer;
++  v_recent_wins  integer;
++  v_target       integer;
++  v_fee_mult     numeric;
++  v_drift        integer;
++  v_income       bigint;
++BEGIN
++  IF NEW.season_week <= OLD.season_week THEN RETURN NEW; END IF;
++
++  SELECT COALESCE(SUM((value->>'level')::int), 0) INTO v_room_levels
++  FROM jsonb_each(NEW.rooms);
++
++  SELECT COUNT(*) INTO v_recent_wins
++  FROM fight_results
++  WHERE gym_id = NEW.id
++    AND overall_winner = 'my'
++    AND created_at > now() - interval '28 days';
++
++  v_fee_mult := GREATEST(0.5, LEAST(1.5, 350000.0 / NULLIF(NEW.member_fee, 0)));
++
++  v_target := GREATEST(20, ROUND(
++    (40 + NEW.reputation * 3 + v_room_levels * 8 + v_recent_wins * 15)
++    * v_fee_mult
++  ));
++
++  v_drift := ROUND((v_target - NEW.member_count) * 0.15)
++             + (FLOOR(RANDOM() * 11) - 5)::int;
++  NEW.member_count := GREATEST(10, NEW.member_count + v_drift);
++
++  v_income := (NEW.member_count::bigint * NEW.member_fee) / 4;
++  NEW.balance := NEW.balance + v_income;
++
++  RETURN NEW;
++END;
++$$;
++
++DROP TRIGGER IF EXISTS trg_gym_members ON gyms;
++CREATE TRIGGER trg_gym_members
++  BEFORE UPDATE OF season_week ON gyms
++  FOR EACH ROW EXECUTE FUNCTION process_gym_members();
+diff --git a/types/index.ts b/types/index.ts
+index 2c29b6b..2eb0d10 100644
+--- a/types/index.ts
++++ b/types/index.ts
+@@ -205,6 +205,8 @@ export interface Gym {
+   balance: number         // IDR
+   monthly_income: number
+   monthly_expense: number
++  member_count: number
++  member_fee: number
+   season_week: number
+   last_sponsor_week: number | null
+   rooms: GymRooms
+-- 
+2.43.0
+

@@ -205,6 +205,8 @@ export interface Gym {
   balance: number         // IDR
   monthly_income: number
   monthly_expense: number
+  member_count: number
+  member_fee: number
   season_week: number
   last_sponsor_week: number | null
   rooms: GymRooms
