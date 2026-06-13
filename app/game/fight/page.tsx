@@ -343,6 +343,7 @@ export default function FightPage() {
   const setAiLoading = useGameStore((s) => s.setAiLoading)
   const setFightResultSummary = useGameStore((s) => s.setFightResultSummary)
   const setGym = useGameStore((s) => s.setGym)
+  const setFighters = useGameStore((s) => s.setFighters)
   const updateFighter = useGameStore((s) => s.updateFighter)
   const advanceRound = useGameStore((s) => s.advanceRound)
   const resetFight = useGameStore((s) => s.resetFight)
@@ -867,6 +868,24 @@ export default function FightPage() {
     setAiNarration(generateClosingLine(anim.isFightOver))
     setRoundClock(0)
     setAnimation(null)
+  }
+
+  // "Pertarungan Baru": refetch fighters & gym terbaru dari DB sebelum reset,
+  // supaya perubahan dari trigger lain (scouting, title contention, dll) yang
+  // terjadi di luar alur fight ini ikut tersinkron tanpa perlu refresh manual.
+  async function handleNewFight() {
+    if (!gym) {
+      resetFight()
+      return
+    }
+    const supabase = createClient()
+    const [gymRes, fightersRes] = await Promise.all([
+      supabase.from('gyms').select('*').eq('id', gym.id).single(),
+      supabase.from('fighters').select('*').eq('gym_id', gym.id).order('created_at'),
+    ])
+    if (gymRes.data) setGym(gymRes.data as Gym)
+    if (fightersRes.data) setFighters(fightersRes.data as Fighter[])
+    resetFight()
   }
 
   function handleSkipAnimation() {
@@ -1888,7 +1907,7 @@ export default function FightPage() {
                 </button>
               ) : (
                 <button
-                  onClick={resetFight}
+                  onClick={handleNewFight}
                   className="rounded-md bg-octagon-red px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-octagon-red/90"
                 >
                   Pertarungan Baru
