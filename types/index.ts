@@ -63,8 +63,8 @@ export type WeeklySchedule = {
   sat: TrainingSession
 }
 
-export type GamePlan = 'pressure' | 'counter' | 'grapple' | 'technical'
-export type CornerAdvice = 'push' | 'patient' | 'takedown' | 'striking'
+export type GamePlan = 'pressure' | 'counter' | 'grapple' | 'technical' | 'brawler' | 'defensive'
+export type CornerAdvice = 'push' | 'patient' | 'takedown' | 'striking' | 'survive' | 'allout'
 export type FinishMethod = 'ko' | 'tko' | 'submission' | 'decision'
 
 export type EventTier = 'local' | 'regional' | 'national' | 'international'

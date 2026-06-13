@@ -53,6 +53,8 @@ const GAME_PLANS: { value: GamePlan; label: string; desc: string }[] = [
   { value: 'counter', label: 'Counter', desc: 'Sabar, balas serangan lawan' },
   { value: 'grapple', label: 'Grapple', desc: 'Takedown dan kontrol di canvas' },
   { value: 'technical', label: 'Technical', desc: 'Jaga jarak, striking terukur' },
+  { value: 'brawler', label: 'Brawler', desc: 'Adu jotos habis-habisan, risiko finish tinggi 2 arah' },
+  { value: 'defensive', label: 'Defensive', desc: 'Main aman, redam ofensif lawan, hemat stamina' },
 ]
 
 const CORNER_OPTIONS: { value: CornerAdvice; label: string; desc: string }[] = [
@@ -60,6 +62,8 @@ const CORNER_OPTIONS: { value: CornerAdvice; label: string; desc: string }[] = [
   { value: 'patient', label: 'Patient', desc: 'Jaga stamina, tetap stabil' },
   { value: 'takedown', label: 'Takedown', desc: 'Fokus bawa ke ground' },
   { value: 'striking', label: 'Striking', desc: 'Fokus pukulan jarak jauh' },
+  { value: 'survive', label: 'Survive', desc: 'Bertahan total, pulihkan stamina & mental — drastis kurangi risiko di-finish' },
+  { value: 'allout', label: 'All-Out', desc: 'Habis-habisan kejar finish, tapi pertahanan & stamina jadi taruhan' },
 ]
 
 const OPPONENT_NAMES = [

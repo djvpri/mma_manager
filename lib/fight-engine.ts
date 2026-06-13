@@ -36,6 +36,8 @@ const GAME_PLAN_MODS: Record<GamePlan, [number, number]> = {
   counter:   [1.06, 0.97],
   grapple:   [0.94, 1.14],
   technical: [1.04, 0.96],
+  brawler:   [1.18, 1.15],
+  defensive: [0.85, 0.75],
 }
 
 const CORNER_MODS: Record<CornerAdvice, [number, number]> = {
@@ -43,6 +45,8 @@ const CORNER_MODS: Record<CornerAdvice, [number, number]> = {
   patient:  [1.03, 1.00],
   takedown: [0.97, 1.10],
   striking: [1.10, 0.93],
+  survive:  [0.60, 0.85],
+  allout:   [1.25, 1.05],
 }
 
 // Skor ofensif: gabungan kekuatan/akurasi striking, grappling, kecepatan, dan fight IQ
@@ -132,6 +136,14 @@ export function simulateRound(config: FightConfig): RoundResult {
   const toughness = (loserAttrs.chin * 0.6 + loserAttrs.durability * 0.4) / 100
   finishChance *= 1 - toughness * 0.35
 
+  // Survive: kalau saya yang kalah ronde ini, drastis kurangi risiko di-finish lawan.
+  // All-out: risiko finish naik di kedua arah — saya lebih agresif tapi juga lebih terbuka.
+  if (cornerAdvice === 'survive' && winner === 'opp') {
+    finishChance *= 0.4
+  } else if (cornerAdvice === 'allout') {
+    finishChance *= winner === 'my' ? 1.5 : 1.4
+  }
+
   let finish: FinishMethod | null = null
   if (Math.random() < finishChance * 1.2) {
     const winnerAttrs = winner === 'my' ? a : o
@@ -195,7 +207,7 @@ export function simulateRound(config: FightConfig): RoundResult {
     ticks,
     my_stamina: clamp(myStamina - myStaminaLoss(gamePlan, cornerAdvice, a.cardio, a.recovery), 0, 100),
     opp_stamina: clamp(oppStamina - oppStaminaLoss(o.cardio, o.recovery), 0, 100),
-    my_mental: clamp(myMental + mentalChange(winner === 'my', dmgToMe, myFinished, a.mental), 0, 100),
+    my_mental: clamp(myMental + mentalChange(winner === 'my', dmgToMe, myFinished, a.mental) + (cornerAdvice === 'survive' ? 4 : 0), 0, 100),
     opp_mental: clamp(oppMental + mentalChange(winner === 'opp', dmgToOpp, oppFinished, o.mental), 0, 100),
     myStats,
     oppStats,
@@ -217,6 +229,8 @@ const GAME_PLAN_STAMINA_COST: Record<GamePlan, number> = {
   counter: 9,
   grapple: 12,
   technical: 8,
+  brawler: 17,
+  defensive: 6,
 }
 
 const CORNER_STAMINA_COST: Record<CornerAdvice, number> = {
@@ -224,6 +238,8 @@ const CORNER_STAMINA_COST: Record<CornerAdvice, number> = {
   patient: -3,
   takedown: 2,
   striking: 2,
+  survive: -6,
+  allout: 6,
 }
 
 function myStaminaLoss(gamePlan: GamePlan, cornerAdvice: CornerAdvice, cardio: number, recovery: number): number {
@@ -231,7 +247,9 @@ function myStaminaLoss(gamePlan: GamePlan, cornerAdvice: CornerAdvice, cardio: n
   const cardioRelief = (cardio - 70) * 0.08
   const recoveryRelief = (recovery - 70) * 0.04
   const variance = Math.random() * 4 - 2
-  return Math.max(3, Math.round(base - cardioRelief - recoveryRelief + variance))
+  // Floor -5 (bukan 3): kombinasi Defensive+Survive dengan cardio/recovery tinggi
+  // bisa benar-benar memulihkan stamina, bukan cuma memperlambat penurunan.
+  return Math.max(-5, Math.round(base - cardioRelief - recoveryRelief + variance))
 }
 
 function oppStaminaLoss(cardio: number, recovery: number): number {
@@ -293,6 +311,18 @@ function exchangeLines(attacker: string, defender: string, gamePlan: GamePlan): 
       `Kombinasi efisien dari ${attacker} menambah poin bersih di mata juri`,
       `Leg kick dari ${attacker} mulai membuat ${defender} pincang`,
     ],
+    brawler: [
+      `${attacker} dan ${defender} sama-sama melepas pertahanan, baku hantam habis-habisan di tengah oktagon`,
+      `${attacker} mendaratkan overhand telak — sebuah adu jotos murni tanpa kompromi`,
+      `Penonton berteriak histeris saat ${attacker} dan ${defender} saling tukar pukulan keras tanpa henti`,
+      `${attacker} mengambil risiko besar, maju lurus dan menghantam ${defender} dengan kombinasi brutal`,
+    ],
+    defensive: [
+      `${attacker} hanya melepas pukulan terukur sambil terus menjaga jarak aman dari ${defender}`,
+      `${attacker} memilih footwork rapi, membatasi ruang gerak ${defender} tanpa ambil risiko`,
+      `Sesekali ${attacker} mencuri poin dengan jab ringan lalu langsung kembali ke posisi aman`,
+      `${attacker} bermain sabar, memastikan ${defender} tidak punya celah untuk balas serius`,
+    ],
   }
   return pools[gamePlan]
 }
@@ -350,6 +380,8 @@ const STRIKE_TARGET_WEIGHTS: Record<GamePlan, [number, number, number]> = {
   counter:   [0.60, 0.25, 0.15],
   grapple:   [0.40, 0.40, 0.20],
   technical: [0.40, 0.20, 0.40],
+  brawler:   [0.65, 0.30, 0.05],
+  defensive: [0.35, 0.25, 0.40],
 }
 
 function pickTarget(gamePlan: GamePlan): 'head' | 'body' | 'leg' {
@@ -366,6 +398,8 @@ const TAKEDOWN_ATTEMPT_CHANCE: Record<GamePlan, number> = {
   counter: 0.08,
   grapple: 0.45,
   technical: 0.05,
+  brawler: 0.04,
+  defensive: 0.10,
 }
 
 // Hasilkan statistik (sig. strike / takedown) untuk satu exchange, dari sudut pandang attacker
