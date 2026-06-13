@@ -15,7 +15,8 @@ import {
   startScoutMission,
   type ScoutMission,
 } from './scouting'
-import type { Fighter, Gym, SponsorContract, Staff } from '@/types'
+import { ALL_ATTR_KEYS, ATTR_NAME_LABELS } from './attrs'
+import type { Fighter, FighterAttrs, Gym, SponsorContract, Staff } from '@/types'
 
 /** Asisten Manajer otomatis cari & tanda tangan sponsor 1x per minggu, jika ada slot kosong. */
 export async function runAssistantManagerSponsor(gym: Gym): Promise<{ gym: Gym; message: string | null }> {
@@ -162,4 +163,48 @@ export async function runAssistantManagerScouting(gym: Gym): Promise<{ message: 
   return {
     message: `🔎 Asisten Manajer memulai scouting untuk ${chosen.name} "${chosen.nickname}" (${duration} minggu).`,
   }
+}
+
+/**
+ * Asisten Manajer otomatis menetapkan fokus latihan untuk fighter yang belum
+ * punya training_focus — pilih atribut dengan selisih terbesar di bawah
+ * potensi (paling lemah relatif terhadap potensi, paling banyak ruang berkembang).
+ */
+export async function runAssistantManagerTrainingFocus(
+  gym: Gym
+): Promise<{ messages: string[]; updates: { id: string; training_focus: keyof FighterAttrs }[] }> {
+  if (!gym.assistant_manager_id) return { messages: [], updates: [] }
+  if (gym.assistant_tasks?.training_focus !== true) return { messages: [], updates: [] }
+
+  const supabase = createClient()
+  const { data } = await supabase
+    .from('fighters')
+    .select('id, name, attrs, potential')
+    .eq('gym_id', gym.id)
+    .eq('status', 'training')
+    .is('training_focus', null)
+
+  const fighters = (data ?? []) as Pick<Fighter, 'id' | 'name' | 'attrs' | 'potential'>[]
+  if (fighters.length === 0) return { messages: [], updates: [] }
+
+  const messages: string[] = []
+  const updates: { id: string; training_focus: keyof FighterAttrs }[] = []
+
+  for (const f of fighters) {
+    let bestKey: keyof FighterAttrs | null = null
+    let bestGap = -Infinity
+    for (const key of ALL_ATTR_KEYS) {
+      const gap = f.potential - f.attrs[key]
+      if (gap > bestGap) { bestGap = gap; bestKey = key }
+    }
+    if (!bestKey || bestGap <= 0) continue
+
+    const { error } = await supabase.from('fighters').update({ training_focus: bestKey }).eq('id', f.id)
+    if (!error) {
+      updates.push({ id: f.id, training_focus: bestKey })
+      messages.push(`🎯 Asisten Manajer mengatur fokus latihan ${f.name}: ${ATTR_NAME_LABELS[bestKey]}.`)
+    }
+  }
+
+  return { messages, updates }
 }

@@ -200,6 +200,7 @@ export interface AssistantTasks {
   sponsor: boolean
   event_registration: boolean
   scouting: boolean
+  training_focus: boolean
 }
 
 export interface Gym {

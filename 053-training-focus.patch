@@ -1,0 +1,132 @@
+From 7d3c3b650e5dd0f1b1d2a76efc9cf2ea7748b1bd Mon Sep 17 00:00:00 2001
+From: Claude <claude@anthropic.com>
+Date: Sat, 13 Jun 2026 04:42:56 +0000
+Subject: [PATCH] Asisten Manajer: auto-assign fokus latihan fighter baru
+ berdasarkan gap potensi
+
+---
+ app/game/roster/page.tsx | 12 +++++++++-
+ app/game/staff/page.tsx  |  1 +
+ lib/assistant-manager.ts | 47 +++++++++++++++++++++++++++++++++++++++-
+ types/index.ts           |  1 +
+ 4 files changed, 59 insertions(+), 2 deletions(-)
+
+diff --git a/app/game/roster/page.tsx b/app/game/roster/page.tsx
+index 611e362..1f834b0 100644
+--- a/app/game/roster/page.tsx
++++ b/app/game/roster/page.tsx
+@@ -10,7 +10,7 @@ import { buildWeeklyReport, type WeeklyReport } from '@/lib/weekly-report'
+ import { formatCurrency } from '@/lib/format'
+ import { ensureEventsForUpcomingWeeks, getBestAvailableSlot, PROMOTION_CONFIG } from '@/lib/generate-events'
+ import { recordRetirements } from '@/lib/hall-of-fame'
+-import { runAssistantManagerSponsor, runAssistantManagerEventRegistration, runAssistantManagerScouting } from '@/lib/assistant-manager'
++import { runAssistantManagerSponsor, runAssistantManagerEventRegistration, runAssistantManagerScouting, runAssistantManagerTrainingFocus } from '@/lib/assistant-manager'
+ import { getNotificationPermission, requestNotificationPermission, showWeeklyReportNotification } from '@/lib/notifications'
+ import type { Championship, Fighter, Gym, TournamentTitle } from '@/types'
+ 
+@@ -154,6 +154,16 @@ export default function RosterPage() {
+ 
+         const scoutResult = await runAssistantManagerScouting(latestGym)
+         if (scoutResult.message) weekEvents = [...weekEvents, scoutResult.message]
++
++        const focusResult = await runAssistantManagerTrainingFocus(latestGym)
++        if (focusResult.messages.length > 0) {
++          weekEvents = [...weekEvents, ...focusResult.messages]
++          const updatedFighters = newFighters.map((f) => {
++            const u = focusResult.updates.find((x) => x.id === f.id)
++            return u ? { ...f, training_focus: u.training_focus } : f
++          })
++          setFighters(updatedFighters)
++        }
+       }
+ 
+       const weeklyReport = buildWeeklyReport(
+diff --git a/app/game/staff/page.tsx b/app/game/staff/page.tsx
+index 2519041..a4fc70c 100644
+--- a/app/game/staff/page.tsx
++++ b/app/game/staff/page.tsx
+@@ -202,6 +202,7 @@ export default function StaffPage() {
+                 { key: 'sponsor', label: 'Sponsor', desc: 'Cari & tanda tangani sponsor baru saat ada slot kosong.' },
+                 { key: 'event_registration', label: 'Daftar Event', desc: 'Daftarkan fighter yang siap tanding ke event yang cocok.' },
+                 { key: 'scouting', label: 'Scouting', desc: 'Mulai misi scouting prospek terbaik saat ada slot Talent Scout kosong.' },
++                { key: 'training_focus', label: 'Fokus Latihan', desc: 'Atur fokus latihan otomatis untuk fighter baru berdasarkan atribut terlemah relatif potensi.' },
+               ] as { key: keyof Gym['assistant_tasks']; label: string; desc: string }[]).map((task) => {
+                 const active = gym.assistant_tasks?.[task.key] ?? false
+                 return (
+diff --git a/lib/assistant-manager.ts b/lib/assistant-manager.ts
+index 77cac74..03108c2 100644
+--- a/lib/assistant-manager.ts
++++ b/lib/assistant-manager.ts
+@@ -15,7 +15,8 @@ import {
+   startScoutMission,
+   type ScoutMission,
+ } from './scouting'
+-import type { Fighter, Gym, SponsorContract, Staff } from '@/types'
++import { ALL_ATTR_KEYS, ATTR_NAME_LABELS } from './attrs'
++import type { Fighter, FighterAttrs, Gym, SponsorContract, Staff } from '@/types'
+ 
+ /** Asisten Manajer otomatis cari & tanda tangan sponsor 1x per minggu, jika ada slot kosong. */
+ export async function runAssistantManagerSponsor(gym: Gym): Promise<{ gym: Gym; message: string | null }> {
+@@ -163,3 +164,47 @@ export async function runAssistantManagerScouting(gym: Gym): Promise<{ message:
+     message: `🔎 Asisten Manajer memulai scouting untuk ${chosen.name} "${chosen.nickname}" (${duration} minggu).`,
+   }
+ }
++
++/**
++ * Asisten Manajer otomatis menetapkan fokus latihan untuk fighter yang belum
++ * punya training_focus — pilih atribut dengan selisih terbesar di bawah
++ * potensi (paling lemah relatif terhadap potensi, paling banyak ruang berkembang).
++ */
++export async function runAssistantManagerTrainingFocus(
++  gym: Gym
++): Promise<{ messages: string[]; updates: { id: string; training_focus: keyof FighterAttrs }[] }> {
++  if (!gym.assistant_manager_id) return { messages: [], updates: [] }
++  if (gym.assistant_tasks?.training_focus !== true) return { messages: [], updates: [] }
++
++  const supabase = createClient()
++  const { data } = await supabase
++    .from('fighters')
++    .select('id, name, attrs, potential')
++    .eq('gym_id', gym.id)
++    .eq('status', 'training')
++    .is('training_focus', null)
++
++  const fighters = (data ?? []) as Pick<Fighter, 'id' | 'name' | 'attrs' | 'potential'>[]
++  if (fighters.length === 0) return { messages: [], updates: [] }
++
++  const messages: string[] = []
++  const updates: { id: string; training_focus: keyof FighterAttrs }[] = []
++
++  for (const f of fighters) {
++    let bestKey: keyof FighterAttrs | null = null
++    let bestGap = -Infinity
++    for (const key of ALL_ATTR_KEYS) {
++      const gap = f.potential - f.attrs[key]
++      if (gap > bestGap) { bestGap = gap; bestKey = key }
++    }
++    if (!bestKey || bestGap <= 0) continue
++
++    const { error } = await supabase.from('fighters').update({ training_focus: bestKey }).eq('id', f.id)
++    if (!error) {
++      updates.push({ id: f.id, training_focus: bestKey })
++      messages.push(`🎯 Asisten Manajer mengatur fokus latihan ${f.name}: ${ATTR_NAME_LABELS[bestKey]}.`)
++    }
++  }
++
++  return { messages, updates }
++}
+diff --git a/types/index.ts b/types/index.ts
+index f4abefd..3267e87 100644
+--- a/types/index.ts
++++ b/types/index.ts
+@@ -200,6 +200,7 @@ export interface AssistantTasks {
+   sponsor: boolean
+   event_registration: boolean
+   scouting: boolean
++  training_focus: boolean
+ }
+ 
+ export interface Gym {
+-- 
+2.43.0
+

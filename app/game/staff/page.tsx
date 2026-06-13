@@ -202,6 +202,7 @@ export default function StaffPage() {
                 { key: 'sponsor', label: 'Sponsor', desc: 'Cari & tanda tangani sponsor baru saat ada slot kosong.' },
                 { key: 'event_registration', label: 'Daftar Event', desc: 'Daftarkan fighter yang siap tanding ke event yang cocok.' },
                 { key: 'scouting', label: 'Scouting', desc: 'Mulai misi scouting prospek terbaik saat ada slot Talent Scout kosong.' },
+                { key: 'training_focus', label: 'Fokus Latihan', desc: 'Atur fokus latihan otomatis untuk fighter baru berdasarkan atribut terlemah relatif potensi.' },
               ] as { key: keyof Gym['assistant_tasks']; label: string; desc: string }[]).map((task) => {
                 const active = gym.assistant_tasks?.[task.key] ?? false
                 return (

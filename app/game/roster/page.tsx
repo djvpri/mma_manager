@@ -10,7 +10,7 @@ import { buildWeeklyReport, type WeeklyReport } from '@/lib/weekly-report'
 import { formatCurrency } from '@/lib/format'
 import { ensureEventsForUpcomingWeeks, getBestAvailableSlot, PROMOTION_CONFIG } from '@/lib/generate-events'
 import { recordRetirements } from '@/lib/hall-of-fame'
-import { runAssistantManagerSponsor, runAssistantManagerEventRegistration, runAssistantManagerScouting } from '@/lib/assistant-manager'
+import { runAssistantManagerSponsor, runAssistantManagerEventRegistration, runAssistantManagerScouting, runAssistantManagerTrainingFocus } from '@/lib/assistant-manager'
 import { getNotificationPermission, requestNotificationPermission, showWeeklyReportNotification } from '@/lib/notifications'
 import type { Championship, Fighter, Gym, TournamentTitle } from '@/types'
 
@@ -154,6 +154,16 @@ export default function RosterPage() {
 
         const scoutResult = await runAssistantManagerScouting(latestGym)
         if (scoutResult.message) weekEvents = [...weekEvents, scoutResult.message]
+
+        const focusResult = await runAssistantManagerTrainingFocus(latestGym)
+        if (focusResult.messages.length > 0) {
+          weekEvents = [...weekEvents, ...focusResult.messages]
+          const updatedFighters = newFighters.map((f) => {
+            const u = focusResult.updates.find((x) => x.id === f.id)
+            return u ? { ...f, training_focus: u.training_focus } : f
+          })
+          setFighters(updatedFighters)
+        }
       }
 
       const weeklyReport = buildWeeklyReport(
