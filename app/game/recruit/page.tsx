@@ -8,10 +8,20 @@ import { getPotentialLabel } from '@/lib/potential'
 import { getCategoryAverages } from '@/lib/attrs'
 import { formatCurrency } from '@/lib/format'
 import { poolFighterToCandidate, requiredReputation } from '@/lib/pool-fighter'
+import {
+  fetchScoutMissions,
+  startScoutMission,
+  scoutCapacity,
+  scoutDuration,
+  abilityStars,
+  potentialStars,
+  starString,
+  type ScoutMission,
+} from '@/lib/scouting'
 import NegotiationPanel from '@/components/recruit/NegotiationPanel'
 import FighterDetailModal from '@/components/roster/FighterDetailModal'
 import type { ContractOffer } from '@/lib/negotiation'
-import type { Fighter, WeightClass } from '@/types'
+import type { Fighter, Staff, WeightClass } from '@/types'
 
 const WEIGHT_CLASSES: WeightClass[] = [
   'Strawweight','Flyweight','Bantamweight','Featherweight',
@@ -36,6 +46,9 @@ export default function RecruitPage() {
   const [error, setError]           = useState<string | null>(null)
   const [info, setInfo]             = useState<string | null>(null)
   const [selectedFighter, setSelectedFighter] = useState<Fighter | null>(null)
+  const [missions, setMissions]     = useState<ScoutMission[]>([])
+  const [scoutStaff, setScoutStaff] = useState<Staff[]>([])
+  const [scoutBusyId, setScoutBusyId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!gym) return
@@ -49,6 +62,16 @@ export default function RecruitPage() {
     const { data, error: err } = await supabase
       .from('fighters').select('*').is('gym_id', null).eq('status', 'prospect').order('age')
     if (!err) setPool((data ?? []) as Fighter[])
+
+    if (gym) {
+      const [missionData, staffRes] = await Promise.all([
+        fetchScoutMissions(gym.id),
+        supabase.from('staff').select('*').eq('gym_id', gym.id).eq('is_hired', true),
+      ])
+      setMissions(missionData)
+      setScoutStaff((staffRes.data ?? []) as Staff[])
+    }
+
     setLoading(false)
   }
 
@@ -74,6 +97,19 @@ export default function RecruitPage() {
     } finally {
       setAiLoadingId(null)
     }
+  }
+
+  async function handleStartScouting(fighter: Fighter) {
+    if (!gym) return
+    setScoutBusyId(fighter.id)
+    const duration = scoutDuration(scoutStaff)
+    const { mission, error: err } = await startScoutMission(gym.id, fighter.id, duration)
+    if (err || !mission) {
+      setError(err ?? 'Gagal memulai scouting.')
+    } else {
+      setMissions((prev) => [...prev, mission])
+    }
+    setScoutBusyId(null)
   }
 
   async function handleSignContract(fighter: Fighter, offer: ContractOffer) {
@@ -110,6 +146,10 @@ export default function RecruitPage() {
 
   if (!gym) return <p className="text-sm text-gray-400">Memuat...</p>
 
+  const capacity      = scoutCapacity(scoutStaff)
+  const duration      = scoutDuration(scoutStaff)
+  const activeMissions = missions.filter((m) => m.status === 'in_progress').length
+
   return (
     <div className="space-y-6">
       <header>
@@ -120,6 +160,17 @@ export default function RecruitPage() {
           {' · '}Saldo: <span className="font-semibold text-octagon-amber">{formatCurrency(gym.balance)}</span>
         </p>
       </header>
+
+      <div className="rounded-lg border border-octagon-border bg-octagon-card p-3 text-xs text-gray-400">
+        {capacity === 0 ? (
+          <>Rekrut staf <span className="font-semibold text-octagon-amber">Talent Scout</span> di halaman Staf untuk membuka detail atribut & laporan AI prospek.</>
+        ) : (
+          <>
+            <span className="font-semibold text-octagon-teal">{capacity - activeMissions}</span> dari {capacity} slot scouting tersedia
+            {' · '}durasi misi <span className="font-semibold text-white">{duration} minggu</span>
+          </>
+        )}
+      </div>
 
       <div className="flex flex-wrap gap-2">
         <button
@@ -154,6 +205,9 @@ export default function RecruitPage() {
               const canRecruit = gym.reputation >= reqRep
               const candidate  = poolFighterToCandidate(fighter)
               const potLabel   = getPotentialLabel(fighter.potential)
+              const mission    = missions.find((m) => m.fighter_id === fighter.id)
+              const scouted    = mission?.status === 'completed'
+              const scouting   = mission?.status === 'in_progress'
 
               return (
                 <div key={fighter.id}
@@ -177,25 +231,45 @@ export default function RecruitPage() {
                     <span className="text-gray-300">
                       Rekor <span className="font-semibold text-white">{fighter.record.w}-{fighter.record.l}-{fighter.record.d}</span>
                     </span>
-                    <span className="text-xs text-gray-500">{fighter.personality}</span>
+                    <span className="text-xs text-gray-500">{scouted ? fighter.personality : '???'}</span>
                   </div>
 
-                  <div className="mt-1 flex items-center justify-between text-xs">
-                    <span className="text-gray-500">Potensi</span>
-                    <span className={`font-medium ${potLabel.colorClass}`}>{potLabel.label}</span>
-                  </div>
-
-                  <div className="mt-3 space-y-1.5">
-                    {getCategoryAverages(fighter.attrs).map(({ key, label, value }) => (
-                      <div key={key} className="flex items-center gap-2">
-                        <span className="w-8 text-[10px] font-medium text-gray-500">{label}</span>
-                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-octagon-dark">
-                          <div className="h-full rounded-full bg-octagon-teal" style={{ width: `${value}%` }} />
-                        </div>
-                        <span className="w-6 text-right text-[10px] text-gray-400">{value}</span>
+                  {scouted ? (
+                    <>
+                      <div className="mt-1 flex items-center justify-between text-xs">
+                        <span className="text-gray-500">Potensi</span>
+                        <span className={`font-medium ${potLabel.colorClass}`}>{potLabel.label}</span>
                       </div>
-                    ))}
-                  </div>
+
+                      <div className="mt-3 space-y-1.5">
+                        {getCategoryAverages(fighter.attrs).map(({ key, label, value }) => (
+                          <div key={key} className="flex items-center gap-2">
+                            <span className="w-8 text-[10px] font-medium text-gray-500">{label}</span>
+                            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-octagon-dark">
+                              <div className="h-full rounded-full bg-octagon-teal" style={{ width: `${value}%` }} />
+                            </div>
+                            <span className="w-6 text-right text-[10px] text-gray-400">{value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="mt-3 space-y-1.5 rounded-md border border-dashed border-octagon-border bg-octagon-dark/50 p-2.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-gray-500">Kemampuan saat ini</span>
+                        <span className="text-octagon-amber">{starString(abilityStars(fighter))}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-gray-500">Potensi</span>
+                        <span className="text-octagon-amber">{starString(potentialStars(fighter))}</span>
+                      </div>
+                      <p className="text-[10px] text-gray-600">
+                        {scouting
+                          ? `Sedang di-scout · ${mission?.weeks_remaining} minggu lagi`
+                          : 'Rincian atribut tersembunyi sampai di-scout'}
+                      </p>
+                    </div>
+                  )}
 
                   {!canRecruit && (
                     <p className="mt-2 text-[10px] text-octagon-red">
@@ -210,13 +284,27 @@ export default function RecruitPage() {
                   )}
 
                   <div className="mt-3 flex gap-2">
-                    <button
-                      onClick={() => handleAiScout(fighter)}
-                      disabled={aiLoadingId === fighter.id}
-                      className="flex-1 rounded-md border border-octagon-border px-3 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:border-octagon-teal hover:text-octagon-teal disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {aiLoadingId === fighter.id ? 'Memuat...' : 'Scouting AI'}
-                    </button>
+                    {scouted ? (
+                      <button
+                        onClick={() => handleAiScout(fighter)}
+                        disabled={aiLoadingId === fighter.id}
+                        className="flex-1 rounded-md border border-octagon-border px-3 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:border-octagon-teal hover:text-octagon-teal disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {aiLoadingId === fighter.id ? 'Memuat...' : 'Scouting AI'}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleStartScouting(fighter)}
+                        disabled={scouting || scoutBusyId === fighter.id || capacity === 0 || activeMissions >= capacity}
+                        className="flex-1 rounded-md border border-octagon-border px-3 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:border-octagon-amber hover:text-octagon-amber disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {scouting
+                          ? `${mission?.weeks_remaining} mgg lagi`
+                          : scoutBusyId === fighter.id
+                          ? 'Memulai...'
+                          : 'Mulai Scouting'}
+                      </button>
+                    )}
                     <button
                       onClick={() => setNegotiatingId((id) => id === fighter.id ? null : fighter.id)}
                       disabled={!canRecruit || signingId === fighter.id}

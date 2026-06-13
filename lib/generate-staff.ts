@@ -18,6 +18,7 @@ const ROLES: { role: string; specialty: string }[] = [
   { role: 'Fisioterapis', specialty: 'Pemulihan Cedera' },
   { role: 'Ahli Gizi', specialty: 'Nutrisi' },
   { role: 'Manajer Pertarungan', specialty: 'Matchmaking & Promosi' },
+  { role: 'Talent Scout', specialty: 'Scouting' },
 ]
 
 export function generateStaffCandidate(): StaffCandidate {
