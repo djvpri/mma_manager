@@ -1,0 +1,426 @@
+From 594ce1ab6daa48be3e53a6959c5cbbbe37ae122f Mon Sep 17 00:00:00 2001
+From: Claude <claude@anthropic.com>
+Date: Sat, 13 Jun 2026 11:47:45 +0000
+Subject: [PATCH] Title shot berbasis ranking top-5 (hapus klausul kontrak,
+ prioritas matchmaking championship)
+
+---
+ app/game/events/page.tsx                     |  2 +-
+ app/game/fight/page.tsx                      | 22 +------
+ app/game/recruit/page.tsx                    |  2 +-
+ app/game/roster/page.tsx                     |  2 +-
+ components/recruit/NegotiationPanel.tsx      | 16 +----
+ components/roster/FighterCard.tsx            | 14 ++--
+ lib/assistant-manager.ts                     |  2 +-
+ lib/generate-events.ts                       | 14 +++-
+ lib/negotiation.ts                           | 11 ----
+ store/game-store.ts                          |  4 --
+ supabase/migrations/068_title_contention.sql | 67 ++++++++++++++++++++
+ 11 files changed, 92 insertions(+), 64 deletions(-)
+ create mode 100644 supabase/migrations/068_title_contention.sql
+
+diff --git a/app/game/events/page.tsx b/app/game/events/page.tsx
+index 410ff6c..124c1fa 100644
+--- a/app/game/events/page.tsx
++++ b/app/game/events/page.tsx
+@@ -243,7 +243,7 @@ export default function EventsPage() {
+                               <div className="flex flex-col gap-1">
+                                 {eligible.length > 0 ? (
+                                   eligible
+-                                    .filter((f) => getBestAvailableSlot(event, f.record.w)?.type === slot.type)
++                                    .filter((f) => getBestAvailableSlot(event, f.record.w, f.title_shot_pending)?.type === slot.type)
+                                     .map((f) => (
+                                       <button
+                                         key={f.id}
+diff --git a/app/game/fight/page.tsx b/app/game/fight/page.tsx
+index 58a8817..fd87107 100644
+--- a/app/game/fight/page.tsx
++++ b/app/game/fight/page.tsx
+@@ -543,19 +543,12 @@ export default function FightPage() {
+     // Win bonus dibayar ke fighter (mengurangi balance gym) tiap kali menang
+     const winBonusPaid = result.winner === 'my' ? fighter.win_bonus : 0
+     const newWinStreak = result.winner === 'my' ? fighter.win_streak + 1 : 0
+-    const titleShotTriggered =
+-      fighter.title_shot_clause && !fighter.title_shot_pending && newWinStreak >= 3
+-
+-    let reputationBonus = 0
+-    if (titleShotTriggered) {
+-      reputationBonus = 8
+-    }
+ 
+     // Biaya Medis: upkeep cost saat fighter cedera, didiskon Fisioterapis
+     const medicalDiscount = specialties.includes('Pemulihan Cedera') ? 0.3 : 0
+     const medicalCost = injury ? Math.round(injury.weeks * 1_000_000 * (1 - medicalDiscount)) : 0
+ 
+-    // Morale: naik saat menang/dapat win bonus/title shot, turun saat kalah/cedera
++    // Morale: naik saat menang/dapat win bonus, turun saat kalah/cedera
+     let moraleChange = 0
+     if (result.winner === 'my') {
+       moraleChange += isFinish ? 5 : 3
+@@ -564,14 +557,13 @@ export default function FightPage() {
+       moraleChange -= isFinish ? 6 : 3
+     }
+     if (injury) moraleChange -= 5
+-    if (titleShotTriggered) moraleChange += 10
+     const newMorale = Math.max(0, Math.min(100, fighter.morale + moraleChange))
+ 
+     const sponsorWinBonus = result.winner === 'my'
+       ? activeSponsors.reduce((sum, s) => sum + s.win_bonus, 0)
+       : 0
+     const newBalance = gym.balance + purse + commission + sponsorWinBonus - winBonusPaid - medicalCost - purseShare
+-    const newReputation = Math.max(0, Math.min(100, gym.reputation + reputationChange + reputationBonus))
++    const newReputation = Math.max(0, Math.min(100, gym.reputation + reputationChange))
+     // Kosongkan slot fighter setelah bertanding — kecuali lanjut ke bout turnamen berikutnya
+     const newEvents = event
+       ? gym.events.map((e) =>
+@@ -609,7 +601,6 @@ export default function FightPage() {
+           next_fight_week: newNextFightWeek,
+           win_streak: newWinStreak,
+           morale: newMorale,
+-          ...(titleShotTriggered ? { title_shot_pending: true } : {}),
+           ...(injury
+             ? { status: 'injured', injury: injury.name, injury_weeks_left: injury.weeks }
+             : {}),
+@@ -683,11 +674,10 @@ export default function FightPage() {
+ 
+     setFightResultSummary(
+       purse,
+-      reputationChange + reputationBonus,
++      reputationChange,
+       newRecord,
+       injury,
+       winBonusPaid,
+-      titleShotTriggered,
+       titleBeltResult,
+       commission,
+       medicalCost,
+@@ -1849,12 +1839,6 @@ export default function FightPage() {
+                       dalam {fight.fightSummary.injury.weeks} minggu.
+                     </div>
+                   )}
+-                  {fight.fightSummary.titleShotTriggered && (
+-                    <div className="mt-2 rounded-md bg-octagon-amber/10 px-3 py-2 text-octagon-amber">
+-                      🏆 {fight.fighter!.name.split(' ')[0]} menang 3x beruntun dan menuntut Title Shot sesuai
+-                      klausul kontrak! Reputasi gym naik tambahan.
+-                    </div>
+-                  )}
+                   {fight.fightSummary.titleBeltResult === 'won' && (
+                     <div className="mt-2 rounded-md bg-yellow-500/10 px-3 py-2 font-semibold text-yellow-400">
+                       🏆 JUARA BARU! {fight.fighter!.name.split(' ')[0]} merebut gelar Indonesia Championship
+diff --git a/app/game/recruit/page.tsx b/app/game/recruit/page.tsx
+index fa98b7e..ccb540c 100644
+--- a/app/game/recruit/page.tsx
++++ b/app/game/recruit/page.tsx
+@@ -126,7 +126,7 @@ export default function RecruitPage() {
+       p_purse_share_pct:   offer.purseSharePct,
+       p_contract_fights:   offer.contractLength,
+       p_buyout_clause:     offer.buyoutClause,
+-      p_title_shot_clause: offer.titleShotClause,
++      p_title_shot_clause: false,
+       p_signing_bonus:     offer.bonus,
+     })
+ 
+diff --git a/app/game/roster/page.tsx b/app/game/roster/page.tsx
+index 8d3d029..473b62c 100644
+--- a/app/game/roster/page.tsx
++++ b/app/game/roster/page.tsx
+@@ -111,7 +111,7 @@ export default function RosterPage() {
+       if (e.weight_class !== f.weight_class) return false
+       const promoCfg = PROMOTION_CONFIG[e.promotion] ?? PROMOTION_CONFIG.lokal
+       if (f.record.w < promoCfg.minWins) return false
+-      return getBestAvailableSlot(e, f.record.w) !== null
++      return getBestAvailableSlot(e, f.record.w, f.title_shot_pending) !== null
+     })
+   })
+ 
+diff --git a/components/recruit/NegotiationPanel.tsx b/components/recruit/NegotiationPanel.tsx
+index 0f652c8..a80a7f4 100644
+--- a/components/recruit/NegotiationPanel.tsx
++++ b/components/recruit/NegotiationPanel.tsx
+@@ -63,7 +63,7 @@ export default function NegotiationPanel({
+     setRound(nextRound)
+     setLog((l) => [
+       ...l,
+-      `Tawaranmu: ${formatCurrency(offer.salary)}/minggu, win bonus ${formatCurrency(offer.winBonus)}, bagi hasil purse ${offer.purseSharePct}%, bonus tanda tangan ${formatCurrency(offer.bonus)}, kontrak ${offer.contractLength}x${offer.titleShotClause ? ', dengan klausul Title Shot' : ''}.`,
++      `Tawaranmu: ${formatCurrency(offer.salary)}/minggu, win bonus ${formatCurrency(offer.winBonus)}, bagi hasil purse ${offer.purseSharePct}%, bonus tanda tangan ${formatCurrency(offer.bonus)}, kontrak ${offer.contractLength}x.`,
+       result.message,
+     ])
+ 
+@@ -224,19 +224,6 @@ export default function NegotiationPanel({
+             </p>
+           </div>
+ 
+-          <label className="flex items-center justify-between gap-2 rounded-md border border-octagon-border px-2.5 py-2 text-[10px] text-gray-300">
+-            <span>
+-              Klausul Title Shot
+-              <span className="block text-gray-500">Menang 3x beruntun → berhak menuntut laga juara.</span>
+-            </span>
+-            <input
+-              type="checkbox"
+-              checked={offer.titleShotClause}
+-              onChange={(e) => setOffer((o) => ({ ...o, titleShotClause: e.target.checked }))}
+-              className="h-4 w-4 shrink-0 accent-octagon-red"
+-            />
+-          </label>
+-
+           <div className="flex gap-2">
+             {counterOffer && (
+               <button
+@@ -273,7 +260,6 @@ export default function NegotiationPanel({
+             Base Purse {formatCurrency(finalOffer.salary)}/minggu · Win bonus {formatCurrency(finalOffer.winBonus)} ·
+             Bagi hasil purse {finalOffer.purseSharePct}% · Bonus tanda tangan {formatCurrency(finalOffer.bonus)} ·
+             Kontrak {finalOffer.contractLength}x pertarungan · Buyout {formatCurrency(finalOffer.buyoutClause)}
+-            {finalOffer.titleShotClause ? ' · Klausul Title Shot' : ''}
+           </p>
+           {insufficientBalance && (
+             <p className="text-[10px] text-octagon-red">Saldo tidak cukup untuk membayar bonus tanda tangan.</p>
+diff --git a/components/roster/FighterCard.tsx b/components/roster/FighterCard.tsx
+index 789e0ee..3d3173b 100644
+--- a/components/roster/FighterCard.tsx
++++ b/components/roster/FighterCard.tsx
+@@ -107,7 +107,7 @@ export default function FighterCard({ fighter, titleDefenses, tournamentTitles }
+     alerts.push({ key: 'tournament', text: `🏆 Turnamen 8 Besar ×${tournamentTitles}`, className: ALERT_YELLOW })
+   }
+   if (fighter.title_shot_pending) {
+-    alerts.push({ key: 'titleshot', text: '🏆 Title Shot Pending', className: ALERT_AMBER })
++    alerts.push({ key: 'titleshot', text: '🎯 Top 5 Kontender', className: ALERT_AMBER })
+   }
+   if (fighter.injury) {
+     alerts.push({
+@@ -429,7 +429,7 @@ export default function FighterCard({ fighter, titleDefenses, tournamentTitles }
+ 
+           {fighter.title_shot_pending && (
+             <p className="text-xs font-semibold text-octagon-amber">
+-              🏆 Berhak menuntut Title Shot sesuai klausul kontrak.
++              🎯 Masuk top 5 kontender {fighter.weight_class} — berhak atas title shot.
+             </p>
+           )}
+ 
+@@ -459,12 +459,10 @@ export default function FighterCard({ fighter, titleDefenses, tournamentTitles }
+                 <span>Klausul Buyout</span>
+                 <span className="text-gray-200">{formatCurrency(fighter.buyout_clause)}</span>
+               </div>
+-              {fighter.title_shot_clause && (
+-                <div className="flex items-center justify-between">
+-                  <span>Win Streak</span>
+-                  <span className="text-gray-200">{fighter.win_streak}x</span>
+-                </div>
+-              )}
++              <div className="flex items-center justify-between">
++                <span>Win Streak</span>
++                <span className="text-gray-200">{fighter.win_streak}x</span>
++              </div>
+             </div>
+           )}
+ 
+diff --git a/lib/assistant-manager.ts b/lib/assistant-manager.ts
+index 61ddce0..6243fe3 100644
+--- a/lib/assistant-manager.ts
++++ b/lib/assistant-manager.ts
+@@ -103,7 +103,7 @@ export async function runAssistantManagerEventRegistration(
+       .filter((e) => {
+         const promoCfg = PROMOTION_CONFIG[e.promotion] ?? PROMOTION_CONFIG.lokal
+         if (fighter.record.w < promoCfg.minWins) return false
+-        return getBestAvailableSlot(e, fighter.record.w) !== null
++        return getBestAvailableSlot(e, fighter.record.w, fighter.title_shot_pending) !== null
+       })
+       .sort((a, b) => a.week - b.week)[0]
+ 
+diff --git a/lib/generate-events.ts b/lib/generate-events.ts
+index c1c93cd..d4f6bae 100644
+--- a/lib/generate-events.ts
++++ b/lib/generate-events.ts
+@@ -240,8 +240,16 @@ export function getEventsForMonth(events: MmaEvent[], seasonWeek: number): MmaEv
+     .sort((a, b) => a.week - b.week)
+ }
+ 
+-/** Tentukan slot terbaik yang bisa didapat fighter (berdasarkan wins). */
+-export function getBestAvailableSlot(event: MmaEvent, fighterWins: number): EventSlot | null {
++/** Tentukan slot terbaik yang bisa didapat fighter (berdasarkan wins).
++ *  Fighter top-5 kontender (title_shot_pending) diprioritaskan ke slot "main"
++ *  event championship, bypass syarat min_wins — posisi rankingnya sudah
++ *  membuktikan kelayakannya untuk laga title. */
++export function getBestAvailableSlot(event: MmaEvent, fighterWins: number, titleShotPending = false): EventSlot | null {
++  if (titleShotPending && event.promotion === 'championship') {
++    const mainSlot = event.slots.find((s) => s.type === 'main')
++    if (mainSlot && mainSlot.fighter_id === null) return mainSlot
++  }
++
+   const order: EventSlotType[] = event.promotion === 'turnamen'
+     ? ['tournament']
+     : ['main','comain','featured','undercard']
+@@ -353,7 +361,7 @@ export async function registerFighterToEvent(
+   const event = gym.events.find((e) => e.id === eventId)
+   if (!event) return null
+ 
+-  const slot = getBestAvailableSlot(event, fighter.record.w)
++  const slot = getBestAvailableSlot(event, fighter.record.w, fighter.title_shot_pending)
+   if (!slot) return null
+ 
+   let updatedEvents: MmaEvent[]
+diff --git a/lib/negotiation.ts b/lib/negotiation.ts
+index 4eb7ecd..75fee84 100644
+--- a/lib/negotiation.ts
++++ b/lib/negotiation.ts
+@@ -9,7 +9,6 @@ export interface ContractOffer {
+   purseSharePct: number // 0-30: persentase purse yang jadi hak fighter tiap pertandingan
+   bonus: number // Bonus tanda tangan
+   contractLength: number
+-  titleShotClause: boolean // Jika menang 3x beruntun, berhak menuntut title shot
+   buyoutClause: number // Biaya gym jika memutus kontrak sebelum waktunya
+ }
+ 
+@@ -113,7 +112,6 @@ export function getInitialExpectation(candidate: RecruitCandidate, reputation: n
+     purseSharePct: clamp(Math.round((8 + profile.purseShareDesire * 14) * repFactor * leverage), 5, MAX_PURSE_SHARE_PCT),
+     bonus: 0,
+     contractLength: profile.contractPref,
+-    titleShotClause: profile.titleShotDesire * leverage >= 0.6,
+     buyoutClause: profile.buyoutFlexPref * leverage >= 0.5
+       ? roundTo(candidate.salary_monthly * 3 / Math.max(0.7, leverage), 500_000)
+       : roundTo(candidate.salary_monthly * 8, 500_000),
+@@ -129,7 +127,6 @@ export function getOpeningOffer(candidate: RecruitCandidate): ContractOffer {
+     purseSharePct: Math.round((8 + profile.purseShareDesire * 14) * 0.4),
+     bonus: 0,
+     contractLength: 3,
+-    titleShotClause: false,
+     buyoutClause: roundTo(candidate.salary_monthly * 8, 500_000),
+   }
+ }
+@@ -166,10 +163,6 @@ export function evaluateOffer(
+ 
+   let satisfaction = payRatio * 0.5 + bonusRatio * 0.3 + contractScore * 0.2
+ 
+-  if (profile.titleShotDesire >= 0.6) {
+-    satisfaction += offer.titleShotClause ? 0.05 : -0.07
+-  }
+-
+   const buyoutRef = candidate.salary_monthly * BUYOUT_REFERENCE_MULT
+   const buyoutRatio = clamp(offer.buyoutClause / buyoutRef, 0, 1)
+   satisfaction -= buyoutRatio * 0.08 * profile.buyoutFlexPref
+@@ -205,14 +198,10 @@ export function evaluateOffer(
+       MIN_CONTRACT_LENGTH,
+       MAX_CONTRACT_LENGTH
+     ),
+-    titleShotClause: expectation.titleShotClause,
+     buyoutClause: expectation.buyoutClause,
+   }
+ 
+   const clauseNotes: string[] = []
+-  if (profile.titleShotDesire >= 0.6 && !offer.titleShotClause) {
+-    clauseNotes.push('minta klausul Title Shot jika menang 3x beruntun')
+-  }
+   if (profile.buyoutFlexPref >= 0.5 && offer.buyoutClause > expectation.buyoutClause) {
+     clauseNotes.push('keberatan dengan klausul buyout setinggi itu')
+   }
+diff --git a/store/game-store.ts b/store/game-store.ts
+index a02cee3..c8aff89 100644
+--- a/store/game-store.ts
++++ b/store/game-store.ts
+@@ -37,7 +37,6 @@ interface FightState {
+     newRecord: Fighter['record']
+     injury: { name: string; weeks: number } | null
+     winBonusPaid: number
+-    titleShotTriggered: boolean
+     titleBeltResult: TitleFightResult
+     commission: number
+     medicalCost: number
+@@ -79,7 +78,6 @@ interface GameStore {
+     newRecord: Fighter['record'],
+     injury: { name: string; weeks: number } | null,
+     winBonusPaid: number,
+-    titleShotTriggered: boolean,
+     titleBeltResult: TitleFightResult,
+     commission: number,
+     medicalCost: number,
+@@ -163,7 +161,6 @@ export const useGameStore = create<GameStore>()(
+         newRecord,
+         injury,
+         winBonusPaid,
+-        titleShotTriggered,
+         titleBeltResult,
+         commission,
+         medicalCost,
+@@ -180,7 +177,6 @@ export const useGameStore = create<GameStore>()(
+               newRecord,
+               injury,
+               winBonusPaid,
+-              titleShotTriggered,
+               titleBeltResult,
+               commission,
+               medicalCost,
+diff --git a/supabase/migrations/068_title_contention.sql b/supabase/migrations/068_title_contention.sql
+new file mode 100644
+index 0000000..ffaa05b
+--- /dev/null
++++ b/supabase/migrations/068_title_contention.sql
+@@ -0,0 +1,67 @@
++-- 068: Title shot sekarang berbasis RANKING (top 5 weight class), bukan klausul
++-- kontrak. title_shot_clause sudah tidak dipakai aplikasi (kolom dibiarkan,
++-- tidak di-drop demi keamanan).
++--
++-- Setiap advance_week, untuk fighter milik pemain: hitung skor & rank dalam
++-- weight class-nya (mencakup semua fighter aktif/training, termasuk roster
++-- CPU). title_shot_pending = true jika rank <= 5 dan dia bukan champion saat
++-- ini. Kalau tergeser dari top 5, title_shot_pending kembali false.
++
++-- Skor sederhana: rata-rata semua atribut + bonus win streak + selisih W-L.
++CREATE OR REPLACE FUNCTION fighter_rank_score(p_attrs jsonb, p_win_streak integer, p_record jsonb)
++RETURNS numeric LANGUAGE sql IMMUTABLE AS $$
++  SELECT
++    (SELECT AVG((value)::numeric) FROM jsonb_each_text(p_attrs))
++    + COALESCE(p_win_streak, 0) * 1.5
++    + (COALESCE((p_record->>'w')::int, 0) - COALESCE((p_record->>'l')::int, 0));
++$$;
++
++CREATE OR REPLACE FUNCTION process_title_contention()
++RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
++DECLARE
++  r record;
++  v_score numeric;
++  v_rank integer;
++  v_champion_id uuid;
++BEGIN
++  IF NEW.season_week <= OLD.season_week THEN RETURN NEW; END IF;
++
++  FOR r IN
++    SELECT id, name, weight_class, attrs, win_streak, record, title_shot_pending
++    FROM fighters
++    WHERE gym_id = NEW.id AND status IN ('training','active')
++  LOOP
++    v_score := fighter_rank_score(r.attrs, r.win_streak, r.record);
++
++    SELECT COUNT(*) + 1 INTO v_rank
++    FROM fighters f2
++    WHERE f2.gym_id IS NOT NULL
++      AND f2.weight_class = r.weight_class
++      AND f2.status IN ('training','active')
++      AND f2.id <> r.id
++      AND fighter_rank_score(f2.attrs, f2.win_streak, f2.record) > v_score;
++
++    SELECT champion_fighter_id INTO v_champion_id
++    FROM championships WHERE weight_class = r.weight_class;
++
++    IF v_rank <= 5 AND r.id IS DISTINCT FROM v_champion_id THEN
++      IF NOT r.title_shot_pending THEN
++        UPDATE fighters SET title_shot_pending = true WHERE id = r.id;
++        INSERT INTO fighter_news (gym_id, season_week, message)
++        VALUES (NEW.id, NEW.season_week, '🎯 ' || r.name || ' kini masuk top 5 kontender ' || r.weight_class || ' (rank #' || v_rank || ') dan berhak atas title shot!');
++      END IF;
++    ELSE
++      IF r.title_shot_pending THEN
++        UPDATE fighters SET title_shot_pending = false WHERE id = r.id;
++      END IF;
++    END IF;
++  END LOOP;
++
++  RETURN NEW;
++END;
++$$;
++
++DROP TRIGGER IF EXISTS trg_title_contention ON gyms;
++CREATE TRIGGER trg_title_contention
++  BEFORE UPDATE OF season_week ON gyms
++  FOR EACH ROW EXECUTE FUNCTION process_title_contention();
+-- 
+2.43.0
+

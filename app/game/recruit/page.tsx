@@ -126,7 +126,7 @@ export default function RecruitPage() {
       p_purse_share_pct:   offer.purseSharePct,
       p_contract_fights:   offer.contractLength,
       p_buyout_clause:     offer.buyoutClause,
-      p_title_shot_clause: offer.titleShotClause,
+      p_title_shot_clause: false,
       p_signing_bonus:     offer.bonus,
     })
 

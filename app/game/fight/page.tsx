@@ -543,19 +543,12 @@ export default function FightPage() {
     // Win bonus dibayar ke fighter (mengurangi balance gym) tiap kali menang
     const winBonusPaid = result.winner === 'my' ? fighter.win_bonus : 0
     const newWinStreak = result.winner === 'my' ? fighter.win_streak + 1 : 0
-    const titleShotTriggered =
-      fighter.title_shot_clause && !fighter.title_shot_pending && newWinStreak >= 3
-
-    let reputationBonus = 0
-    if (titleShotTriggered) {
-      reputationBonus = 8
-    }
 
     // Biaya Medis: upkeep cost saat fighter cedera, didiskon Fisioterapis
     const medicalDiscount = specialties.includes('Pemulihan Cedera') ? 0.3 : 0
     const medicalCost = injury ? Math.round(injury.weeks * 1_000_000 * (1 - medicalDiscount)) : 0
 
-    // Morale: naik saat menang/dapat win bonus/title shot, turun saat kalah/cedera
+    // Morale: naik saat menang/dapat win bonus, turun saat kalah/cedera
     let moraleChange = 0
     if (result.winner === 'my') {
       moraleChange += isFinish ? 5 : 3
@@ -564,14 +557,13 @@ export default function FightPage() {
       moraleChange -= isFinish ? 6 : 3
     }
     if (injury) moraleChange -= 5
-    if (titleShotTriggered) moraleChange += 10
     const newMorale = Math.max(0, Math.min(100, fighter.morale + moraleChange))
 
     const sponsorWinBonus = result.winner === 'my'
       ? activeSponsors.reduce((sum, s) => sum + s.win_bonus, 0)
       : 0
     const newBalance = gym.balance + purse + commission + sponsorWinBonus - winBonusPaid - medicalCost - purseShare
-    const newReputation = Math.max(0, Math.min(100, gym.reputation + reputationChange + reputationBonus))
+    const newReputation = Math.max(0, Math.min(100, gym.reputation + reputationChange))
     // Kosongkan slot fighter setelah bertanding — kecuali lanjut ke bout turnamen berikutnya
     const newEvents = event
       ? gym.events.map((e) =>
@@ -609,7 +601,6 @@ export default function FightPage() {
           next_fight_week: newNextFightWeek,
           win_streak: newWinStreak,
           morale: newMorale,
-          ...(titleShotTriggered ? { title_shot_pending: true } : {}),
           ...(injury
             ? { status: 'injured', injury: injury.name, injury_weeks_left: injury.weeks }
             : {}),
@@ -683,11 +674,10 @@ export default function FightPage() {
 
     setFightResultSummary(
       purse,
-      reputationChange + reputationBonus,
+      reputationChange,
       newRecord,
       injury,
       winBonusPaid,
-      titleShotTriggered,
       titleBeltResult,
       commission,
       medicalCost,
@@ -1847,12 +1837,6 @@ export default function FightPage() {
                     <div className="mt-2 rounded-md bg-octagon-red/10 px-3 py-2 text-octagon-red">
                       ⚠ {fight.fighter!.name.split(' ')[0]} mengalami {fight.fightSummary.injury.name} — pulih
                       dalam {fight.fightSummary.injury.weeks} minggu.
-                    </div>
-                  )}
-                  {fight.fightSummary.titleShotTriggered && (
-                    <div className="mt-2 rounded-md bg-octagon-amber/10 px-3 py-2 text-octagon-amber">
-                      🏆 {fight.fighter!.name.split(' ')[0]} menang 3x beruntun dan menuntut Title Shot sesuai
-                      klausul kontrak! Reputasi gym naik tambahan.
                     </div>
                   )}
                   {fight.fightSummary.titleBeltResult === 'won' && (

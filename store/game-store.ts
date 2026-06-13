@@ -37,7 +37,6 @@ interface FightState {
     newRecord: Fighter['record']
     injury: { name: string; weeks: number } | null
     winBonusPaid: number
-    titleShotTriggered: boolean
     titleBeltResult: TitleFightResult
     commission: number
     medicalCost: number
@@ -79,7 +78,6 @@ interface GameStore {
     newRecord: Fighter['record'],
     injury: { name: string; weeks: number } | null,
     winBonusPaid: number,
-    titleShotTriggered: boolean,
     titleBeltResult: TitleFightResult,
     commission: number,
     medicalCost: number,
@@ -163,7 +161,6 @@ export const useGameStore = create<GameStore>()(
         newRecord,
         injury,
         winBonusPaid,
-        titleShotTriggered,
         titleBeltResult,
         commission,
         medicalCost,
@@ -180,7 +177,6 @@ export const useGameStore = create<GameStore>()(
               newRecord,
               injury,
               winBonusPaid,
-              titleShotTriggered,
               titleBeltResult,
               commission,
               medicalCost,

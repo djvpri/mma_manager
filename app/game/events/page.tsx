@@ -243,7 +243,7 @@ export default function EventsPage() {
                               <div className="flex flex-col gap-1">
                                 {eligible.length > 0 ? (
                                   eligible
-                                    .filter((f) => getBestAvailableSlot(event, f.record.w)?.type === slot.type)
+                                    .filter((f) => getBestAvailableSlot(event, f.record.w, f.title_shot_pending)?.type === slot.type)
                                     .map((f) => (
                                       <button
                                         key={f.id}

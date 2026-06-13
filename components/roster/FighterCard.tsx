@@ -107,7 +107,7 @@ export default function FighterCard({ fighter, titleDefenses, tournamentTitles }
     alerts.push({ key: 'tournament', text: `🏆 Turnamen 8 Besar ×${tournamentTitles}`, className: ALERT_YELLOW })
   }
   if (fighter.title_shot_pending) {
-    alerts.push({ key: 'titleshot', text: '🏆 Title Shot Pending', className: ALERT_AMBER })
+    alerts.push({ key: 'titleshot', text: '🎯 Top 5 Kontender', className: ALERT_AMBER })
   }
   if (fighter.injury) {
     alerts.push({
@@ -429,7 +429,7 @@ export default function FighterCard({ fighter, titleDefenses, tournamentTitles }
 
           {fighter.title_shot_pending && (
             <p className="text-xs font-semibold text-octagon-amber">
-              🏆 Berhak menuntut Title Shot sesuai klausul kontrak.
+              🎯 Masuk top 5 kontender {fighter.weight_class} — berhak atas title shot.
             </p>
           )}
 
@@ -459,12 +459,10 @@ export default function FighterCard({ fighter, titleDefenses, tournamentTitles }
                 <span>Klausul Buyout</span>
                 <span className="text-gray-200">{formatCurrency(fighter.buyout_clause)}</span>
               </div>
-              {fighter.title_shot_clause && (
-                <div className="flex items-center justify-between">
-                  <span>Win Streak</span>
-                  <span className="text-gray-200">{fighter.win_streak}x</span>
-                </div>
-              )}
+              <div className="flex items-center justify-between">
+                <span>Win Streak</span>
+                <span className="text-gray-200">{fighter.win_streak}x</span>
+              </div>
             </div>
           )}
 

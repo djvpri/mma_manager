@@ -63,7 +63,7 @@ export default function NegotiationPanel({
     setRound(nextRound)
     setLog((l) => [
       ...l,
-      `Tawaranmu: ${formatCurrency(offer.salary)}/minggu, win bonus ${formatCurrency(offer.winBonus)}, bagi hasil purse ${offer.purseSharePct}%, bonus tanda tangan ${formatCurrency(offer.bonus)}, kontrak ${offer.contractLength}x${offer.titleShotClause ? ', dengan klausul Title Shot' : ''}.`,
+      `Tawaranmu: ${formatCurrency(offer.salary)}/minggu, win bonus ${formatCurrency(offer.winBonus)}, bagi hasil purse ${offer.purseSharePct}%, bonus tanda tangan ${formatCurrency(offer.bonus)}, kontrak ${offer.contractLength}x.`,
       result.message,
     ])
 
@@ -224,19 +224,6 @@ export default function NegotiationPanel({
             </p>
           </div>
 
-          <label className="flex items-center justify-between gap-2 rounded-md border border-octagon-border px-2.5 py-2 text-[10px] text-gray-300">
-            <span>
-              Klausul Title Shot
-              <span className="block text-gray-500">Menang 3x beruntun → berhak menuntut laga juara.</span>
-            </span>
-            <input
-              type="checkbox"
-              checked={offer.titleShotClause}
-              onChange={(e) => setOffer((o) => ({ ...o, titleShotClause: e.target.checked }))}
-              className="h-4 w-4 shrink-0 accent-octagon-red"
-            />
-          </label>
-
           <div className="flex gap-2">
             {counterOffer && (
               <button
@@ -273,7 +260,6 @@ export default function NegotiationPanel({
             Base Purse {formatCurrency(finalOffer.salary)}/minggu · Win bonus {formatCurrency(finalOffer.winBonus)} ·
             Bagi hasil purse {finalOffer.purseSharePct}% · Bonus tanda tangan {formatCurrency(finalOffer.bonus)} ·
             Kontrak {finalOffer.contractLength}x pertarungan · Buyout {formatCurrency(finalOffer.buyoutClause)}
-            {finalOffer.titleShotClause ? ' · Klausul Title Shot' : ''}
           </p>
           {insufficientBalance && (
             <p className="text-[10px] text-octagon-red">Saldo tidak cukup untuk membayar bonus tanda tangan.</p>

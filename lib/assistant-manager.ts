@@ -103,7 +103,7 @@ export async function runAssistantManagerEventRegistration(
       .filter((e) => {
         const promoCfg = PROMOTION_CONFIG[e.promotion] ?? PROMOTION_CONFIG.lokal
         if (fighter.record.w < promoCfg.minWins) return false
-        return getBestAvailableSlot(e, fighter.record.w) !== null
+        return getBestAvailableSlot(e, fighter.record.w, fighter.title_shot_pending) !== null
       })
       .sort((a, b) => a.week - b.week)[0]
 

@@ -111,7 +111,7 @@ export default function RosterPage() {
       if (e.weight_class !== f.weight_class) return false
       const promoCfg = PROMOTION_CONFIG[e.promotion] ?? PROMOTION_CONFIG.lokal
       if (f.record.w < promoCfg.minWins) return false
-      return getBestAvailableSlot(e, f.record.w) !== null
+      return getBestAvailableSlot(e, f.record.w, f.title_shot_pending) !== null
     })
   })
 

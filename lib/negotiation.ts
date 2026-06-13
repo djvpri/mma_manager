@@ -9,7 +9,6 @@ export interface ContractOffer {
   purseSharePct: number // 0-30: persentase purse yang jadi hak fighter tiap pertandingan
   bonus: number // Bonus tanda tangan
   contractLength: number
-  titleShotClause: boolean // Jika menang 3x beruntun, berhak menuntut title shot
   buyoutClause: number // Biaya gym jika memutus kontrak sebelum waktunya
 }
 
@@ -113,7 +112,6 @@ export function getInitialExpectation(candidate: RecruitCandidate, reputation: n
     purseSharePct: clamp(Math.round((8 + profile.purseShareDesire * 14) * repFactor * leverage), 5, MAX_PURSE_SHARE_PCT),
     bonus: 0,
     contractLength: profile.contractPref,
-    titleShotClause: profile.titleShotDesire * leverage >= 0.6,
     buyoutClause: profile.buyoutFlexPref * leverage >= 0.5
       ? roundTo(candidate.salary_monthly * 3 / Math.max(0.7, leverage), 500_000)
       : roundTo(candidate.salary_monthly * 8, 500_000),
@@ -129,7 +127,6 @@ export function getOpeningOffer(candidate: RecruitCandidate): ContractOffer {
     purseSharePct: Math.round((8 + profile.purseShareDesire * 14) * 0.4),
     bonus: 0,
     contractLength: 3,
-    titleShotClause: false,
     buyoutClause: roundTo(candidate.salary_monthly * 8, 500_000),
   }
 }
@@ -166,10 +163,6 @@ export function evaluateOffer(
 
   let satisfaction = payRatio * 0.5 + bonusRatio * 0.3 + contractScore * 0.2
 
-  if (profile.titleShotDesire >= 0.6) {
-    satisfaction += offer.titleShotClause ? 0.05 : -0.07
-  }
-
   const buyoutRef = candidate.salary_monthly * BUYOUT_REFERENCE_MULT
   const buyoutRatio = clamp(offer.buyoutClause / buyoutRef, 0, 1)
   satisfaction -= buyoutRatio * 0.08 * profile.buyoutFlexPref
@@ -205,14 +198,10 @@ export function evaluateOffer(
       MIN_CONTRACT_LENGTH,
       MAX_CONTRACT_LENGTH
     ),
-    titleShotClause: expectation.titleShotClause,
     buyoutClause: expectation.buyoutClause,
   }
 
   const clauseNotes: string[] = []
-  if (profile.titleShotDesire >= 0.6 && !offer.titleShotClause) {
-    clauseNotes.push('minta klausul Title Shot jika menang 3x beruntun')
-  }
   if (profile.buyoutFlexPref >= 0.5 && offer.buyoutClause > expectation.buyoutClause) {
     clauseNotes.push('keberatan dengan klausul buyout setinggi itu')
   }

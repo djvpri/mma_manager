@@ -240,8 +240,16 @@ export function getEventsForMonth(events: MmaEvent[], seasonWeek: number): MmaEv
     .sort((a, b) => a.week - b.week)
 }
 
-/** Tentukan slot terbaik yang bisa didapat fighter (berdasarkan wins). */
-export function getBestAvailableSlot(event: MmaEvent, fighterWins: number): EventSlot | null {
+/** Tentukan slot terbaik yang bisa didapat fighter (berdasarkan wins).
+ *  Fighter top-5 kontender (title_shot_pending) diprioritaskan ke slot "main"
+ *  event championship, bypass syarat min_wins — posisi rankingnya sudah
+ *  membuktikan kelayakannya untuk laga title. */
+export function getBestAvailableSlot(event: MmaEvent, fighterWins: number, titleShotPending = false): EventSlot | null {
+  if (titleShotPending && event.promotion === 'championship') {
+    const mainSlot = event.slots.find((s) => s.type === 'main')
+    if (mainSlot && mainSlot.fighter_id === null) return mainSlot
+  }
+
   const order: EventSlotType[] = event.promotion === 'turnamen'
     ? ['tournament']
     : ['main','comain','featured','undercard']
@@ -353,7 +361,7 @@ export async function registerFighterToEvent(
   const event = gym.events.find((e) => e.id === eventId)
   if (!event) return null
 
-  const slot = getBestAvailableSlot(event, fighter.record.w)
+  const slot = getBestAvailableSlot(event, fighter.record.w, fighter.title_shot_pending)
   if (!slot) return null
 
   let updatedEvents: MmaEvent[]
