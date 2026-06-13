@@ -10,7 +10,7 @@ import { buildWeeklyReport, type WeeklyReport } from '@/lib/weekly-report'
 import { formatCurrency } from '@/lib/format'
 import { ensureEventsForUpcomingWeeks, getBestAvailableSlot, PROMOTION_CONFIG } from '@/lib/generate-events'
 import { recordRetirements } from '@/lib/hall-of-fame'
-import { runAssistantManagerSponsor, runAssistantManagerEventRegistration } from '@/lib/assistant-manager'
+import { runAssistantManagerSponsor, runAssistantManagerEventRegistration, runAssistantManagerScouting } from '@/lib/assistant-manager'
 import { getNotificationPermission, requestNotificationPermission, showWeeklyReportNotification } from '@/lib/notifications'
 import type { Championship, Fighter, Gym, TournamentTitle } from '@/types'
 
@@ -151,6 +151,9 @@ export default function RosterPage() {
         if (eventResult.messages.length > 0) weekEvents = [...weekEvents, ...eventResult.messages]
         latestGym = eventResult.gym
         setGym(latestGym)
+
+        const scoutResult = await runAssistantManagerScouting(latestGym)
+        if (scoutResult.message) weekEvents = [...weekEvents, scoutResult.message]
       }
 
       const weeklyReport = buildWeeklyReport(

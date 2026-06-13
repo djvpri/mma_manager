@@ -1,0 +1,245 @@
+From 61167eaf8e9882040ef24114f6c1dcc681f824e6 Mon Sep 17 00:00:00 2001
+From: Claude <claude@anthropic.com>
+Date: Sat, 13 Jun 2026 04:21:09 +0000
+Subject: [PATCH] UI pengaturan tugas Asisten Manajer + auto-scouting prospek
+ terbaik
+
+---
+ app/game/roster/page.tsx                    |  5 +-
+ app/game/staff/page.tsx                     | 51 ++++++++++++++++-
+ lib/assistant-manager.ts                    | 61 ++++++++++++++++++++-
+ supabase/migrations/051_assistant_tasks.sql |  9 +++
+ types/index.ts                              |  7 +++
+ 5 files changed, 129 insertions(+), 4 deletions(-)
+ create mode 100644 supabase/migrations/051_assistant_tasks.sql
+
+diff --git a/app/game/roster/page.tsx b/app/game/roster/page.tsx
+index d3f0877..611e362 100644
+--- a/app/game/roster/page.tsx
++++ b/app/game/roster/page.tsx
+@@ -10,7 +10,7 @@ import { buildWeeklyReport, type WeeklyReport } from '@/lib/weekly-report'
+ import { formatCurrency } from '@/lib/format'
+ import { ensureEventsForUpcomingWeeks, getBestAvailableSlot, PROMOTION_CONFIG } from '@/lib/generate-events'
+ import { recordRetirements } from '@/lib/hall-of-fame'
+-import { runAssistantManagerSponsor, runAssistantManagerEventRegistration } from '@/lib/assistant-manager'
++import { runAssistantManagerSponsor, runAssistantManagerEventRegistration, runAssistantManagerScouting } from '@/lib/assistant-manager'
+ import { getNotificationPermission, requestNotificationPermission, showWeeklyReportNotification } from '@/lib/notifications'
+ import type { Championship, Fighter, Gym, TournamentTitle } from '@/types'
+ 
+@@ -151,6 +151,9 @@ export default function RosterPage() {
+         if (eventResult.messages.length > 0) weekEvents = [...weekEvents, ...eventResult.messages]
+         latestGym = eventResult.gym
+         setGym(latestGym)
++
++        const scoutResult = await runAssistantManagerScouting(latestGym)
++        if (scoutResult.message) weekEvents = [...weekEvents, scoutResult.message]
+       }
+ 
+       const weeklyReport = buildWeeklyReport(
+diff --git a/app/game/staff/page.tsx b/app/game/staff/page.tsx
+index 5a4d0c0..2519041 100644
+--- a/app/game/staff/page.tsx
++++ b/app/game/staff/page.tsx
+@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase'
+ import { useGameStore } from '@/store/game-store'
+ import { formatCurrency } from '@/lib/format'
+ import { generateStaffPool, type StaffCandidate } from '@/lib/generate-staff'
+-import type { Staff } from '@/types'
++import type { Gym, Staff } from '@/types'
+ 
+ const POOL_SIZE = 4
+ 
+@@ -150,6 +150,23 @@ export default function StaffPage() {
+     setBusyId(null)
+   }
+ 
++  async function handleToggleTask(task: keyof Gym['assistant_tasks']) {
++    if (!gym) return
++    setError(null)
++    const updated = { ...gym.assistant_tasks, [task]: !gym.assistant_tasks?.[task] }
++    const supabase = createClient()
++    const { error: gymError } = await supabase
++      .from('gyms')
++      .update({ assistant_tasks: updated })
++      .eq('id', gym.id)
++
++    if (gymError) {
++      setError(gymError.message)
++      return
++    }
++    setGym({ ...gym, assistant_tasks: updated })
++  }
++
+   return (
+     <div className="space-y-6">
+       <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+@@ -174,8 +191,38 @@ export default function StaffPage() {
+       <div>
+         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-400">Staf Aktif</h2>
+         <p className="mb-3 text-xs text-gray-500">
+-          Jadikan satu staf sebagai Asisten Manajer agar setiap minggu otomatis: (1) mencari & menandatangani kontrak sponsor baru saat ada slot kosong — staf dengan rating lebih tinggi memilih penawaran yang lebih menguntungkan, dan (2) mendaftarkan fighter yang sudah siap tanding ke event yang cocok.
++          Jadikan satu staf sebagai Asisten Manajer, lalu pilih tugas mana saja yang dijalankan otomatis tiap minggu.
+         </p>
++
++        {gym.assistant_manager_id && (
++          <div className="mb-4 rounded-lg border border-octagon-teal/30 bg-octagon-card p-4">
++            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-octagon-teal">Tugas Asisten Manajer</h3>
++            <div className="space-y-2.5">
++              {([
++                { key: 'sponsor', label: 'Sponsor', desc: 'Cari & tanda tangani sponsor baru saat ada slot kosong.' },
++                { key: 'event_registration', label: 'Daftar Event', desc: 'Daftarkan fighter yang siap tanding ke event yang cocok.' },
++                { key: 'scouting', label: 'Scouting', desc: 'Mulai misi scouting prospek terbaik saat ada slot Talent Scout kosong.' },
++              ] as { key: keyof Gym['assistant_tasks']; label: string; desc: string }[]).map((task) => {
++                const active = gym.assistant_tasks?.[task.key] ?? false
++                return (
++                  <div key={task.key} className="flex items-center justify-between gap-3">
++                    <div className="min-w-0">
++                      <p className="text-sm text-gray-200">{task.label}</p>
++                      <p className="text-[11px] text-gray-500">{task.desc}</p>
++                    </div>
++                    <button
++                      onClick={() => handleToggleTask(task.key)}
++                      className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${active ? 'bg-octagon-teal' : 'bg-octagon-border'}`}
++                      aria-label={`Toggle ${task.label}`}
++                    >
++                      <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${active ? 'translate-x-4' : 'translate-x-0.5'}`} />
++                    </button>
++                  </div>
++                )
++              })}
++            </div>
++          </div>
++        )}
+         {hired === null ? (
+           <p className="text-sm text-gray-400">Memuat...</p>
+         ) : hired.length === 0 ? (
+diff --git a/lib/assistant-manager.ts b/lib/assistant-manager.ts
+index 128ff6c..77cac74 100644
+--- a/lib/assistant-manager.ts
++++ b/lib/assistant-manager.ts
+@@ -7,11 +7,20 @@ import {
+   registerFighterToEvent,
+   PROMOTION_CONFIG,
+ } from './generate-events'
+-import type { Fighter, Gym, SponsorContract } from '@/types'
++import {
++  scoutCapacity,
++  scoutDuration,
++  abilityStars,
++  potentialStars,
++  startScoutMission,
++  type ScoutMission,
++} from './scouting'
++import type { Fighter, Gym, SponsorContract, Staff } from '@/types'
+ 
+ /** Asisten Manajer otomatis cari & tanda tangan sponsor 1x per minggu, jika ada slot kosong. */
+ export async function runAssistantManagerSponsor(gym: Gym): Promise<{ gym: Gym; message: string | null }> {
+   if (!gym.assistant_manager_id) return { gym, message: null }
++  if (gym.assistant_tasks?.sponsor === false) return { gym, message: null }
+   if (gym.last_sponsor_week === gym.season_week) return { gym, message: null }
+ 
+   const supabase = createClient()
+@@ -67,6 +76,7 @@ export async function runAssistantManagerEventRegistration(
+   fighters: Fighter[]
+ ): Promise<{ gym: Gym; messages: string[] }> {
+   if (!gym.assistant_manager_id) return { gym, messages: [] }
++  if (gym.assistant_tasks?.event_registration === false) return { gym, messages: [] }
+ 
+   const messages: string[] = []
+   let currentGym = await ensureEventsForUpcomingWeeks(gym)
+@@ -104,3 +114,52 @@ export async function runAssistantManagerEventRegistration(
+ 
+   return { gym: currentGym, messages }
+ }
++
++/**
++ * Asisten Manajer otomatis mulai misi scouting untuk prospek terbaik yang belum
++ * di-scout, jika ada slot Talent Scout kosong. Rating staf Asisten Manajer
++ * menentukan ketajaman pilihan: rating tinggi -> pilih prospek terbaik secara
++ * konsisten, rating rendah -> pilihan lebih acak dari kandidat teratas.
++ */
++export async function runAssistantManagerScouting(gym: Gym): Promise<{ message: string | null }> {
++  if (!gym.assistant_manager_id) return { message: null }
++  if (gym.assistant_tasks?.scouting !== true) return { message: null }
++
++  const supabase = createClient()
++  const [{ data: poolData }, { data: missionData }, { data: staffData }, { data: managerData }] = await Promise.all([
++    supabase.from('fighters').select('*').is('gym_id', null).eq('status', 'prospect'),
++    supabase.from('scout_missions').select('*').eq('gym_id', gym.id),
++    supabase.from('staff').select('*').eq('gym_id', gym.id).eq('is_hired', true),
++    supabase.from('staff').select('rating').eq('id', gym.assistant_manager_id).single(),
++  ])
++
++  const pool     = (poolData ?? []) as Fighter[]
++  const missions = (missionData ?? []) as ScoutMission[]
++  const staff    = (staffData ?? []) as Staff[]
++  const managerRating = managerData?.rating ?? 3
++
++  const capacity = scoutCapacity(staff)
++  const active   = missions.filter((m) => m.status === 'in_progress').length
++  if (capacity === 0 || active >= capacity) return { message: null }
++
++  const scoutedIds = new Set(missions.map((m) => m.fighter_id))
++  const candidates = pool.filter((f) => !scoutedIds.has(f.id))
++  if (candidates.length === 0) return { message: null }
++
++  const ranked = [...candidates].sort(
++    (a, b) => (abilityStars(b) + potentialStars(b)) - (abilityStars(a) + potentialStars(a))
++  )
++
++  const pickFrom = managerRating >= 4 ? ranked.slice(0, 1)
++    : managerRating >= 2 ? ranked.slice(0, 3)
++    : ranked
++  const chosen = pickFrom[Math.floor(Math.random() * pickFrom.length)]
++
++  const duration = scoutDuration(staff)
++  const { mission, error } = await startScoutMission(gym.id, chosen.id, duration)
++  if (error || !mission) return { message: null }
++
++  return {
++    message: `🔎 Asisten Manajer memulai scouting untuk ${chosen.name} "${chosen.nickname}" (${duration} minggu).`,
++  }
++}
+diff --git a/supabase/migrations/051_assistant_tasks.sql b/supabase/migrations/051_assistant_tasks.sql
+new file mode 100644
+index 0000000..9263b70
+--- /dev/null
++++ b/supabase/migrations/051_assistant_tasks.sql
+@@ -0,0 +1,9 @@
++-- 051: Pengaturan tugas Asisten Manajer — toggle per tugas, bukan on/off global.
++-- Default sponsor & event_registration = true (sama seperti perilaku sebelumnya).
++-- scouting = false (opsional, baru tersedia setelah ada Talent Scout).
++
++ALTER TABLE gyms ADD COLUMN IF NOT EXISTS assistant_tasks jsonb NOT NULL DEFAULT '{
++  "sponsor": true,
++  "event_registration": true,
++  "scouting": false
++}'::jsonb;
+diff --git a/types/index.ts b/types/index.ts
+index 2eb0d10..f4abefd 100644
+--- a/types/index.ts
++++ b/types/index.ts
+@@ -196,6 +196,12 @@ export interface GymRooms {
+   analytics: RoomLevel
+ }
+ 
++export interface AssistantTasks {
++  sponsor: boolean
++  event_registration: boolean
++  scouting: boolean
++}
++
+ export interface Gym {
+   id: string
+   user_id: string
+@@ -213,6 +219,7 @@ export interface Gym {
+   events: MmaEvent[]
+   friend_code: string
+   assistant_manager_id: string | null
++  assistant_tasks: AssistantTasks
+   created_at: string
+ }
+ 
+-- 
+2.43.0
+

@@ -196,6 +196,12 @@ export interface GymRooms {
   analytics: RoomLevel
 }
 
+export interface AssistantTasks {
+  sponsor: boolean
+  event_registration: boolean
+  scouting: boolean
+}
+
 export interface Gym {
   id: string
   user_id: string
@@ -213,6 +219,7 @@ export interface Gym {
   events: MmaEvent[]
   friend_code: string
   assistant_manager_id: string | null
+  assistant_tasks: AssistantTasks
   created_at: string
 }
 

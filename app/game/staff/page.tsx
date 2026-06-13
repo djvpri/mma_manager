@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase'
 import { useGameStore } from '@/store/game-store'
 import { formatCurrency } from '@/lib/format'
 import { generateStaffPool, type StaffCandidate } from '@/lib/generate-staff'
-import type { Staff } from '@/types'
+import type { Gym, Staff } from '@/types'
 
 const POOL_SIZE = 4
 
@@ -150,6 +150,23 @@ export default function StaffPage() {
     setBusyId(null)
   }
 
+  async function handleToggleTask(task: keyof Gym['assistant_tasks']) {
+    if (!gym) return
+    setError(null)
+    const updated = { ...gym.assistant_tasks, [task]: !gym.assistant_tasks?.[task] }
+    const supabase = createClient()
+    const { error: gymError } = await supabase
+      .from('gyms')
+      .update({ assistant_tasks: updated })
+      .eq('id', gym.id)
+
+    if (gymError) {
+      setError(gymError.message)
+      return
+    }
+    setGym({ ...gym, assistant_tasks: updated })
+  }
+
   return (
     <div className="space-y-6">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -174,8 +191,38 @@ export default function StaffPage() {
       <div>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-400">Staf Aktif</h2>
         <p className="mb-3 text-xs text-gray-500">
-          Jadikan satu staf sebagai Asisten Manajer agar setiap minggu otomatis: (1) mencari & menandatangani kontrak sponsor baru saat ada slot kosong — staf dengan rating lebih tinggi memilih penawaran yang lebih menguntungkan, dan (2) mendaftarkan fighter yang sudah siap tanding ke event yang cocok.
+          Jadikan satu staf sebagai Asisten Manajer, lalu pilih tugas mana saja yang dijalankan otomatis tiap minggu.
         </p>
+
+        {gym.assistant_manager_id && (
+          <div className="mb-4 rounded-lg border border-octagon-teal/30 bg-octagon-card p-4">
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-octagon-teal">Tugas Asisten Manajer</h3>
+            <div className="space-y-2.5">
+              {([
+                { key: 'sponsor', label: 'Sponsor', desc: 'Cari & tanda tangani sponsor baru saat ada slot kosong.' },
+                { key: 'event_registration', label: 'Daftar Event', desc: 'Daftarkan fighter yang siap tanding ke event yang cocok.' },
+                { key: 'scouting', label: 'Scouting', desc: 'Mulai misi scouting prospek terbaik saat ada slot Talent Scout kosong.' },
+              ] as { key: keyof Gym['assistant_tasks']; label: string; desc: string }[]).map((task) => {
+                const active = gym.assistant_tasks?.[task.key] ?? false
+                return (
+                  <div key={task.key} className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm text-gray-200">{task.label}</p>
+                      <p className="text-[11px] text-gray-500">{task.desc}</p>
+                    </div>
+                    <button
+                      onClick={() => handleToggleTask(task.key)}
+                      className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${active ? 'bg-octagon-teal' : 'bg-octagon-border'}`}
+                      aria-label={`Toggle ${task.label}`}
+                    >
+                      <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${active ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
         {hired === null ? (
           <p className="text-sm text-gray-400">Memuat...</p>
         ) : hired.length === 0 ? (

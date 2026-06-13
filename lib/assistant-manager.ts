@@ -7,11 +7,20 @@ import {
   registerFighterToEvent,
   PROMOTION_CONFIG,
 } from './generate-events'
-import type { Fighter, Gym, SponsorContract } from '@/types'
+import {
+  scoutCapacity,
+  scoutDuration,
+  abilityStars,
+  potentialStars,
+  startScoutMission,
+  type ScoutMission,
+} from './scouting'
+import type { Fighter, Gym, SponsorContract, Staff } from '@/types'
 
 /** Asisten Manajer otomatis cari & tanda tangan sponsor 1x per minggu, jika ada slot kosong. */
 export async function runAssistantManagerSponsor(gym: Gym): Promise<{ gym: Gym; message: string | null }> {
   if (!gym.assistant_manager_id) return { gym, message: null }
+  if (gym.assistant_tasks?.sponsor === false) return { gym, message: null }
   if (gym.last_sponsor_week === gym.season_week) return { gym, message: null }
 
   const supabase = createClient()
@@ -67,6 +76,7 @@ export async function runAssistantManagerEventRegistration(
   fighters: Fighter[]
 ): Promise<{ gym: Gym; messages: string[] }> {
   if (!gym.assistant_manager_id) return { gym, messages: [] }
+  if (gym.assistant_tasks?.event_registration === false) return { gym, messages: [] }
 
   const messages: string[] = []
   let currentGym = await ensureEventsForUpcomingWeeks(gym)
@@ -103,4 +113,53 @@ export async function runAssistantManagerEventRegistration(
   }
 
   return { gym: currentGym, messages }
+}
+
+/**
+ * Asisten Manajer otomatis mulai misi scouting untuk prospek terbaik yang belum
+ * di-scout, jika ada slot Talent Scout kosong. Rating staf Asisten Manajer
+ * menentukan ketajaman pilihan: rating tinggi -> pilih prospek terbaik secara
+ * konsisten, rating rendah -> pilihan lebih acak dari kandidat teratas.
+ */
+export async function runAssistantManagerScouting(gym: Gym): Promise<{ message: string | null }> {
+  if (!gym.assistant_manager_id) return { message: null }
+  if (gym.assistant_tasks?.scouting !== true) return { message: null }
+
+  const supabase = createClient()
+  const [{ data: poolData }, { data: missionData }, { data: staffData }, { data: managerData }] = await Promise.all([
+    supabase.from('fighters').select('*').is('gym_id', null).eq('status', 'prospect'),
+    supabase.from('scout_missions').select('*').eq('gym_id', gym.id),
+    supabase.from('staff').select('*').eq('gym_id', gym.id).eq('is_hired', true),
+    supabase.from('staff').select('rating').eq('id', gym.assistant_manager_id).single(),
+  ])
+
+  const pool     = (poolData ?? []) as Fighter[]
+  const missions = (missionData ?? []) as ScoutMission[]
+  const staff    = (staffData ?? []) as Staff[]
+  const managerRating = managerData?.rating ?? 3
+
+  const capacity = scoutCapacity(staff)
+  const active   = missions.filter((m) => m.status === 'in_progress').length
+  if (capacity === 0 || active >= capacity) return { message: null }
+
+  const scoutedIds = new Set(missions.map((m) => m.fighter_id))
+  const candidates = pool.filter((f) => !scoutedIds.has(f.id))
+  if (candidates.length === 0) return { message: null }
+
+  const ranked = [...candidates].sort(
+    (a, b) => (abilityStars(b) + potentialStars(b)) - (abilityStars(a) + potentialStars(a))
+  )
+
+  const pickFrom = managerRating >= 4 ? ranked.slice(0, 1)
+    : managerRating >= 2 ? ranked.slice(0, 3)
+    : ranked
+  const chosen = pickFrom[Math.floor(Math.random() * pickFrom.length)]
+
+  const duration = scoutDuration(staff)
+  const { mission, error } = await startScoutMission(gym.id, chosen.id, duration)
+  if (error || !mission) return { message: null }
+
+  return {
+    message: `🔎 Asisten Manajer memulai scouting untuk ${chosen.name} "${chosen.nickname}" (${duration} minggu).`,
+  }
 }
