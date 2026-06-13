@@ -6,6 +6,7 @@ import { useGameStore } from '@/store/game-store'
 import { formatCurrency } from '@/lib/format'
 import { CATEGORY_LABELS } from '@/lib/sponsor-contracts'
 import MemberSection from '@/components/finance/MemberSection'
+import { weeklyMemberIncome } from '@/lib/gym-members'
 import {
   LOAN_AMOUNTS,
   LOAN_TERMS,
@@ -72,7 +73,8 @@ export default function FinancePage() {
   const repBonus        = gym.reputation * REP_INCOME_RATE
   const fighterBonus    = activeFighters.length * FIGHTER_INCOME_RATE
   const sponsorIncome   = (contracts ?? []).reduce((s, c) => s + c.weekly_income, 0)
-  const projectedIncome = BASE_INCOME + repBonus + fighterBonus + sponsorIncome
+  const memberIncome    = weeklyMemberIncome(gym)
+  const projectedIncome = BASE_INCOME + repBonus + fighterBonus + sponsorIncome + memberIncome
 
   const fighterSalaries = activeFighters.reduce((s, f) => s + f.salary_monthly, 0)
   const staffSalaries   = (staff ?? []).reduce((s, x) => s + x.salary, 0)
@@ -280,6 +282,10 @@ export default function FinancePage() {
             <span className="text-gray-400">Bonus roster ({activeFighters.length} fighter)</span>
             <span className="text-white">{formatCurrency(fighterBonus)}</span>
           </div>
+          <div className="flex justify-between">
+            <span className="text-gray-400">Pemasukan member ({gym.member_count} member)</span>
+            <span className="text-white">{formatCurrency(memberIncome)}</span>
+          </div>
 
           {/* Sponsor contracts */}
           {(contracts ?? []).length > 0 && (
@@ -304,7 +310,7 @@ export default function FinancePage() {
             <span className="text-octagon-teal">{formatCurrency(projectedIncome)}</span>
           </div>
 
-          {projectedIncome !== gym.monthly_income && (
+          {(projectedIncome - memberIncome) !== gym.monthly_income && (
             <p className="text-xs text-gray-600">
               Berlaku setelah klik &ldquo;Lanjut ke Minggu Berikutnya&rdquo; di tab Roster.
             </p>
