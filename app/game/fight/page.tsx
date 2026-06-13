@@ -1072,12 +1072,12 @@ export default function FightPage() {
                 disabled={!selectedFighterId}
                 className="flex w-full items-center justify-center gap-2 rounded-lg bg-octagon-red px-5 py-3 text-sm font-bold uppercase tracking-wide text-white transition-colors hover:bg-octagon-red/90 disabled:cursor-not-allowed disabled:bg-octagon-border disabled:text-gray-500"
               >
-                ⚡ Cari Lawan
+                {showPressConference ? '▶ Lanjut' : '⚡ Cari Lawan'}
               </button>
             </div>
           )}
 
-          {unscheduledFighters.length > 0 && (
+          {!showPressConference && unscheduledFighters.length > 0 && (
             <div>
               <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Belum Terdaftar Event
@@ -1103,7 +1103,7 @@ export default function FightPage() {
             </div>
           )}
 
-          {cooldownFighters.length > 0 && (
+          {!showPressConference && cooldownFighters.length > 0 && (
             <div>
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Masih Pemulihan</p>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
