@@ -201,6 +201,11 @@ export interface AssistantTasks {
   event_registration: boolean
   scouting: boolean
   training_focus: boolean
+  contract_renewal: boolean
+  training_load: boolean
+  roster_filler: boolean
+  member_fee: boolean
+  press_conference: boolean
 }
 
 export interface Gym {

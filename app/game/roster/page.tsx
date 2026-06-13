@@ -10,7 +10,17 @@ import { buildWeeklyReport, type WeeklyReport } from '@/lib/weekly-report'
 import { formatCurrency } from '@/lib/format'
 import { ensureEventsForUpcomingWeeks, getBestAvailableSlot, PROMOTION_CONFIG } from '@/lib/generate-events'
 import { recordRetirements } from '@/lib/hall-of-fame'
-import { runAssistantManagerSponsor, runAssistantManagerEventRegistration, runAssistantManagerScouting, runAssistantManagerTrainingFocus } from '@/lib/assistant-manager'
+import {
+  runAssistantManagerSponsor,
+  runAssistantManagerEventRegistration,
+  runAssistantManagerScouting,
+  runAssistantManagerTrainingFocus,
+  runAssistantManagerContractRenewal,
+  runAssistantManagerTrainingLoad,
+  runAssistantManagerRosterFiller,
+  runAssistantManagerMemberFee,
+  runAssistantManagerPressConference,
+} from '@/lib/assistant-manager'
 import { getNotificationPermission, requestNotificationPermission, showWeeklyReportNotification } from '@/lib/notifications'
 import type { Championship, Fighter, Gym, TournamentTitle } from '@/types'
 
@@ -156,13 +166,51 @@ export default function RosterPage() {
         if (scoutResult.message) weekEvents = [...weekEvents, scoutResult.message]
 
         const focusResult = await runAssistantManagerTrainingFocus(latestGym)
+        let workingFighters = newFighters
         if (focusResult.messages.length > 0) {
           weekEvents = [...weekEvents, ...focusResult.messages]
-          const updatedFighters = newFighters.map((f) => {
+          workingFighters = workingFighters.map((f) => {
             const u = focusResult.updates.find((x) => x.id === f.id)
             return u ? { ...f, training_focus: u.training_focus } : f
           })
-          setFighters(updatedFighters)
+          setFighters(workingFighters)
+        }
+
+        const renewalResult = await runAssistantManagerContractRenewal(latestGym)
+        if (renewalResult.messages.length > 0) {
+          weekEvents = [...weekEvents, ...renewalResult.messages]
+          latestGym = { ...latestGym, monthly_expense: latestGym.monthly_expense + renewalResult.expenseDelta }
+          setGym(latestGym)
+        }
+
+        const loadResult = await runAssistantManagerTrainingLoad(latestGym)
+        if (loadResult.messages.length > 0) weekEvents = [...weekEvents, ...loadResult.messages]
+
+        const fillerResult = await runAssistantManagerRosterFiller(latestGym, workingFighters)
+        if (fillerResult.message) {
+          weekEvents = [...weekEvents, fillerResult.message]
+          if (fillerResult.newFighter) workingFighters = [...workingFighters, fillerResult.newFighter]
+          setFighters(workingFighters)
+          latestGym = {
+            ...latestGym,
+            monthly_expense: latestGym.monthly_expense + fillerResult.expenseDelta,
+            balance: latestGym.balance + fillerResult.balanceDelta,
+          }
+          setGym(latestGym)
+        }
+
+        const feeResult = await runAssistantManagerMemberFee(latestGym)
+        if (feeResult.message && feeResult.newFee !== null) {
+          weekEvents = [...weekEvents, feeResult.message]
+          latestGym = { ...latestGym, member_fee: feeResult.newFee }
+          setGym(latestGym)
+        }
+
+        const pressResult = await runAssistantManagerPressConference(latestGym)
+        if (pressResult.message && pressResult.events) {
+          weekEvents = [...weekEvents, pressResult.message]
+          latestGym = { ...latestGym, events: pressResult.events }
+          setGym(latestGym)
         }
       }
 

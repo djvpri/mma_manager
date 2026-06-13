@@ -203,6 +203,11 @@ export default function StaffPage() {
                 { key: 'event_registration', label: 'Daftar Event', desc: 'Daftarkan fighter yang siap tanding ke event yang cocok.' },
                 { key: 'scouting', label: 'Scouting', desc: 'Mulai misi scouting prospek terbaik saat ada slot Talent Scout kosong.' },
                 { key: 'training_focus', label: 'Fokus Latihan', desc: 'Atur fokus latihan otomatis untuk fighter baru berdasarkan atribut terlemah relatif potensi.' },
+                { key: 'contract_renewal', label: 'Perpanjangan Kontrak', desc: 'Perpanjang kontrak fighter berprestasi yang sisa kontraknya hampir habis.' },
+                { key: 'training_load', label: 'Manajemen Beban Latihan', desc: 'Turunkan intensitas latihan fighter yang beban latihannya terlalu tinggi.' },
+                { key: 'roster_filler', label: 'Pengisi Roster', desc: 'Rekrut prospek murah dari pool untuk mengisi weight class yang kosong.' },
+                { key: 'member_fee', label: 'Optimasi Iuran Member', desc: 'Sesuaikan iuran member otomatis berdasarkan tren jumlah member.' },
+                { key: 'press_conference', label: 'Konferensi Pers', desc: 'Tampil di konferensi pers (gaya Fokus) untuk laga minggu depan yang belum direspons.' },
               ] as { key: keyof Gym['assistant_tasks']; label: string; desc: string }[]).map((task) => {
                 const active = gym.assistant_tasks?.[task.key] ?? false
                 return (
