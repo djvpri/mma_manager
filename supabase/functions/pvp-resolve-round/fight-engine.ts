@@ -1,3 +1,4 @@
+// @ts-nocheck — file Deno (Supabase Edge Function), bukan bagian aplikasi Next.js.
 import type { EdgeFighter, FighterAttrs, GamePlan, CornerAdvice, RoundResult, RoundTick, TickStat, FightStats, FinishMethod } from './types.ts'
 
 export interface FightConfig {

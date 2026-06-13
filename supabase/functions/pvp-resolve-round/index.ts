@@ -1,3 +1,8 @@
+// @ts-nocheck — file ini untuk Deno (Supabase Edge Function), bukan Next.js.
+// Next.js type-checker tidak mengenal specifier 'npm:' meski folder ini sudah
+// di-exclude di tsconfig.json. Type-checking sesungguhnya dilakukan oleh Deno
+// saat `supabase functions deploy`.
+//
 // Edge Function: pvp-resolve-round
 // Dipanggil client (challenger atau opponent, siapapun yang lebih dulu) setelah
 // keduanya submit corner advice ronde berjalan. Menghitung hasil ronde

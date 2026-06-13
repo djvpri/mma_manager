@@ -1,3 +1,4 @@
+// @ts-nocheck — file Deno (Supabase Edge Function), bukan bagian aplikasi Next.js.
 // Salinan minimal tipe yang dibutuhkan fight-engine.ts, disesuaikan untuk Deno
 // (Edge Function tidak bisa import dari '@/types' app Next.js).
 // Sinkronkan manual kalau ada perubahan struktural di types/index.ts.
