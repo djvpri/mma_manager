@@ -599,6 +599,13 @@ export default function FightPage() {
         .eq('id', gym.id)
         .select()
         .single(),
+      opponent.id
+        ? supabase.rpc('record_cpu_fight_result', {
+            p_opponent_id: opponent.id,
+            p_player_won: result.winner === 'my',
+            p_draw: result.winner === 'draw',
+          })
+        : Promise.resolve(null),
     ])
 
     let titleBeltResult: Awaited<ReturnType<typeof resolveTitleFight>> = null
