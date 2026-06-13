@@ -26,6 +26,7 @@ import { syncLeaderboard } from '@/lib/leaderboard'
 import { isTitleFight, resolveTitleFight } from '@/lib/championship'
 import { ATTR_GROUPS, ALL_ATTR_KEYS } from '@/lib/attrs'
 import { EVENT_TIER_CONFIG, EVENT_TIER_BADGE_CLASS } from '@/lib/generate-events'
+import { generateScoutingReport } from '@/lib/scouting-report'
 import type { Fighter, FighterAttrs, GamePlan, CornerAdvice, Specialty, RoundResult, RoundTick, FightStats, EventTier, EventSlotOpponent, HypeStyle, Gym } from '@/types'
 
 const TOTAL_ROUNDS = 3
@@ -91,6 +92,10 @@ type Opponent = {
 
 function randInt(min: number, max: number) {
   return Math.floor(Math.random() * (max - min + 1)) + min
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value))
 }
 
 const ROUND_DURATION_SEC = 5 * 60
@@ -366,6 +371,8 @@ export default function FightPage() {
   const [roundClock, setRoundClock] = useState(ROUND_DURATION_SEC)
   const [speed, setSpeed] = useState(1)
   const [showInstructionPicker, setShowInstructionPicker] = useState(false)
+  const [weightCut, setWeightCut] = useState(false)
+  const [weightCutResult, setWeightCutResult] = useState<string | null>(null)
 
   const seasonWeek = gym?.season_week ?? 1
   // Ambil semua event minggu ini (bisa lebih dari satu untuk weight class berbeda)
@@ -493,6 +500,12 @@ export default function FightPage() {
     if (opponent.isRival) {
       purse = Math.round((purse * 1.25) / 100_000) * 100_000
       if (result.winner === 'my') reputationChange += 2
+    }
+
+    // Bonus PPV Title Fight: laga perebutan sabuk juara menarik penonton jauh lebih banyak
+    if (isTitleFight(event, slot)) {
+      purse = Math.round((purse * 1.5) / 100_000) * 100_000
+      if (result.winner === 'my') reputationChange += 5
     }
 
     // Bonus juara Turnamen 8 Besar: menang 3 bout beruntun dalam satu fight night
@@ -732,6 +745,9 @@ export default function FightPage() {
   }
 
   function handleStartFight() {
+    setWeightCut(false)
+    setWeightCutResult(null)
+
     const fighter = eligibleFighters.find((f) => f.id === selectedFighterId)
     if (!fighter) return
 
@@ -776,7 +792,30 @@ export default function FightPage() {
   }
 
   function handleStartFighting() {
-    if (!fight.gamePlan) return
+    if (!fight.gamePlan || !fight.fighter) return
+
+    if (weightCut) {
+      const { cardio, durability, mental } = fight.fighter.attrs
+      const successChance = clamp((cardio + durability) / 2 / 100, 0.3, 0.85)
+      if (Math.random() < successChance) {
+        setFightVitals({
+          myStamina: clamp(fight.myStamina + 8, 0, 100),
+          oppStamina: fight.oppStamina,
+          myMental: clamp(fight.myMental + 5, 0, 100),
+          oppMental: fight.oppMental,
+        })
+        setWeightCutResult('✅ Potong berat sukses — badan terasa ringan dan lincah di awal laga (+stamina, +mental).')
+      } else {
+        setFightVitals({
+          myStamina: clamp(fight.myStamina - 15, 0, 100),
+          oppStamina: fight.oppStamina,
+          myMental: clamp(fight.myMental - 8, 0, 100),
+          oppMental: fight.oppMental,
+        })
+        setWeightCutResult('⚠️ Potong berat terlalu ekstrem — fighter terlihat lemas & kurang fokus di awal laga (-stamina, -mental).')
+      }
+    }
+
     setFightPhase('fighting')
   }
 
@@ -1220,6 +1259,31 @@ export default function FightPage() {
             </div>
           </div>
 
+          {(() => {
+            const analyticsLevel = gym?.rooms?.analytics?.level ?? 0
+            const report = generateScoutingReport(
+              fight.fighter.specialty,
+              fight.fighter.attrs,
+              fight.opponent!.specialty,
+              fight.opponent!.attrs,
+              analyticsLevel
+            )
+            return (
+              <div className="rounded-lg border border-octagon-border bg-octagon-card p-4">
+                <p className="mb-2 text-xs font-semibold uppercase text-gray-500">📊 Laporan Intel (Analytics Lv.{analyticsLevel})</p>
+                {report.insights.length > 0 ? (
+                  <ul className="space-y-1.5 text-sm text-gray-300">
+                    {report.insights.map((line, i) => (
+                      <li key={i}>• {line}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-gray-500">Upgrade room Analytics di Gym untuk membuka laporan intel lawan sebelum laga.</p>
+                )}
+              </div>
+            )
+          })()}
+
           <div>
             <p className="mb-2 text-sm font-semibold text-white">Pilih Game Plan</p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -1268,6 +1332,22 @@ export default function FightPage() {
             </div>
           </div>
 
+          <label className="flex items-center justify-between gap-3 rounded-lg border border-octagon-border bg-octagon-card p-3">
+            <div>
+              <p className="text-sm font-semibold text-white">⚖️ Potong Berat Ekstra</p>
+              <p className="text-xs text-gray-400">
+                Risiko/reward sebelum laga: sukses = +stamina &amp; +mental awal. Gagal = -stamina &amp; -mental.
+                Peluang sukses berdasar Cardio &amp; Durability.
+              </p>
+            </div>
+            <input
+              type="checkbox"
+              checked={weightCut}
+              onChange={(e) => setWeightCut(e.target.checked)}
+              className="h-5 w-5 shrink-0 accent-octagon-red"
+            />
+          </label>
+
           <button
             onClick={handleStartFighting}
             disabled={!fight.gamePlan}
@@ -1280,6 +1360,12 @@ export default function FightPage() {
 
       {fight.phase === 'fighting' && fight.fighter && fight.opponent && (
         <div className="space-y-6">
+          {fight.currentRound === 1 && weightCutResult && (
+            <div className="rounded-lg border border-octagon-amber/30 bg-octagon-amber/5 p-3 text-sm text-octagon-amber">
+              {weightCutResult}
+            </div>
+          )}
+
           <div className="rounded-lg border border-octagon-border bg-octagon-card p-4">
             <div className="flex items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-2">

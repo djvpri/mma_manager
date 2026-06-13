@@ -29,7 +29,7 @@ const SPECIALTY_MATCHUP: Record<string, Partial<Record<string, number>>> = {
   'All-rounder':    { 'Counter Fighter': 1.02 },
 }
 
-function matchupMult(attackerSpecialty: string, defenderSpecialty: string): number {
+export function matchupMult(attackerSpecialty: string, defenderSpecialty: string): number {
   return SPECIALTY_MATCHUP[attackerSpecialty]?.[defenderSpecialty] ?? 1
 }
 
