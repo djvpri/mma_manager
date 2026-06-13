@@ -1,8 +1,8 @@
-import type { Fighter, FighterAttrs, GamePlan, CornerAdvice, RoundResult, RoundTick, TickStat, FightStats, FinishMethod } from '@/types'
+import type { EdgeFighter, FighterAttrs, GamePlan, CornerAdvice, RoundResult, RoundTick, TickStat, FightStats, FinishMethod } from './types.ts'
 
 export interface FightConfig {
-  myFighter: Fighter
-  opponent: { name: string; attrs: FighterAttrs; specialty: string }
+  myFighter: EdgeFighter
+  opponent: EdgeFighter
   gamePlan: GamePlan
   cornerAdvice: CornerAdvice
   roundNum: number
