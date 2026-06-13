@@ -14,6 +14,8 @@ export interface FightConfig {
   oppHP: number
   /** my_pct ronde sebelumnya dari sudut pandang lawan (100 - my_pct), untuk adaptasi AI corner lawan. Undefined di ronde 1. */
   prevOppPct?: number
+  /** Jumlah tick exchange per ronde (default EXCHANGE_TICKS). Mode "Full Fight" pakai FULL_EXCHANGE_TICKS. */
+  exchangeTicks?: number
 }
 
 // Matchup gaya bertarung: bonus/penalti skor ofensif berdasarkan spesialisasi
@@ -40,7 +42,7 @@ const GAME_PLAN_MODS: Record<GamePlan, [number, number]> = {
   defensive: [0.85, 0.75],
 }
 
-const CORNER_MODS: Record<CornerAdvice, [number, number]> = {
+export const CORNER_MODS: Record<CornerAdvice, [number, number]> = {
   push:     [1.08, 0.95],
   patient:  [1.03, 1.00],
   takedown: [0.97, 1.10],
@@ -74,7 +76,7 @@ function defenseScore(attrs: FighterAttrs): number {
 }
 
 export function simulateRound(config: FightConfig): RoundResult {
-  const { myFighter, opponent, gamePlan, cornerAdvice, roundNum, myStamina, oppStamina, myMental, oppMental, myHP, oppHP, prevOppPct } = config
+  const { myFighter, opponent, gamePlan, cornerAdvice, roundNum, myStamina, oppStamina, myMental, oppMental, myHP, oppHP, prevOppPct, exchangeTicks } = config
   const a = myFighter.attrs
   const o = opponent.attrs
 
@@ -159,7 +161,7 @@ export function simulateRound(config: FightConfig): RoundResult {
   const winnerName = winner === 'my' ? myFirst : oppFirst
   const loserName = winner === 'my' ? oppFirst : myFirst
 
-  const ticks = generateTicks(roundNum, myFirst, oppFirst, gamePlan, dmgToMe, dmgToOpp, finish, winnerName, loserName, a, o)
+  const ticks = generateTicks(roundNum, myFirst, oppFirst, gamePlan, dmgToMe, dmgToOpp, finish, winnerName, loserName, a, o, exchangeTicks ?? EXCHANGE_TICKS)
   const { my: myStats, opp: oppStats } = aggregateTickStats(ticks)
 
   const myFinished = finish !== null && winner === 'opp'
@@ -357,10 +359,11 @@ const FIGHT_END_CLOSERS: string[] = [
   'Kedua petarung saling merangkul di tengah oktagon, menghormati perjuangan masing-masing.',
 ]
 
-const EXCHANGE_TICKS = 4
+export const EXCHANGE_TICKS = 4
+export const FULL_EXCHANGE_TICKS = 9
 
 // Bagi `total` menjadi `parts` angka non-negatif yang jumlahnya tetap `total`.
-function splitTotal(total: number, parts: number): number[] {
+export function splitTotal(total: number, parts: number): number[] {
   if (total <= 0) return Array(parts).fill(0)
   const cuts = Array.from({ length: parts - 1 }, () => Math.random()).sort((a, b) => a - b)
   const points = [0, ...cuts, 1]
@@ -496,12 +499,13 @@ function generateTicks(
   winnerName: string,
   loserName: string,
   myAttrs: FighterAttrs,
-  oppAttrs: FighterAttrs
+  oppAttrs: FighterAttrs,
+  exchangeTicks: number
 ): RoundTick[] {
   const opener: RoundTick = { text: pick(NARRATION_OPENERS)(roundNum), my_dmg: 0, opp_dmg: 0 }
 
-  const myDmgParts = splitTotal(dmgToMe, EXCHANGE_TICKS)
-  const oppDmgParts = splitTotal(dmgToOpp, EXCHANGE_TICKS)
+  const myDmgParts = splitTotal(dmgToMe, exchangeTicks)
+  const oppDmgParts = splitTotal(dmgToOpp, exchangeTicks)
 
   const exchanges: RoundTick[] = myDmgParts.map((myDmg, i) => {
     const oppDmg = oppDmgParts[i]

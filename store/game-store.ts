@@ -19,6 +19,7 @@ interface FightState {
   currentRound: number
   gamePlan: GamePlan | null
   cornerAdvice: CornerAdvice
+  viewMode: 'highlights' | 'full'
   roundResults: RoundResult[]
   myHP: number
   oppHP: number
@@ -64,6 +65,7 @@ interface GameStore {
   setFightPhase: (phase: FightState['phase']) => void
   setGamePlan: (plan: GamePlan) => void
   setCornerAdvice: (advice: CornerAdvice) => void
+  setViewMode: (mode: FightState['viewMode']) => void
   addRoundResult: (result: RoundResult) => void
   setMyHP: (hp: number) => void
   setOppHP: (hp: number) => void
@@ -96,6 +98,7 @@ const defaultFight: FightState = {
   currentRound: 1,
   gamePlan: null,
   cornerAdvice: 'patient',
+  viewMode: 'highlights',
   roundResults: [],
   myHP: 100,
   oppHP: 100,
@@ -141,6 +144,8 @@ export const useGameStore = create<GameStore>()(
         set((s) => ({ fight: { ...s.fight, gamePlan: plan } })),
       setCornerAdvice: (advice) =>
         set((s) => ({ fight: { ...s.fight, cornerAdvice: advice } })),
+      setViewMode: (mode) =>
+        set((s) => ({ fight: { ...s.fight, viewMode: mode } })),
       addRoundResult: (result) =>
         set((s) => ({ fight: { ...s.fight, roundResults: [...s.fight.roundResults, result] } })),
       setMyHP: (hp) => set((s) => ({ fight: { ...s.fight, myHP: hp } })),
