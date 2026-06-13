@@ -1,0 +1,30 @@
+git apply 070-rebalance-gameplan.patch
+git statusFrom db34400cc8f00ec4ee7a8ebf08a7a34bfdbdac01 Mon Sep 17 00:00:00 2001
+From: Claude <claude@anthropic.com>
+Date: Sat, 13 Jun 2026 12:36:36 +0000
+Subject: [PATCH] Rebalance GAME_PLAN_MODS: Pressure terlalu OP, Grapple net
+ negatif
+
+---
+ lib/fight-engine.ts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/lib/fight-engine.ts b/lib/fight-engine.ts
+index 602dd23..734cc58 100644
+--- a/lib/fight-engine.ts
++++ b/lib/fight-engine.ts
+@@ -34,9 +34,9 @@ export function matchupMult(attackerSpecialty: string, defenderSpecialty: string
+ }
+ 
+ const GAME_PLAN_MODS: Record<GamePlan, [number, number]> = {
+-  pressure:  [1.12, 0.92],
++  pressure:  [1.08, 0.96],
+   counter:   [1.06, 0.97],
+-  grapple:   [0.94, 1.14],
++  grapple:   [1.00, 1.06],
+   technical: [1.04, 0.96],
+   brawler:   [1.18, 1.15],
+   defensive: [0.85, 0.75],
+-- 
+2.43.0
+

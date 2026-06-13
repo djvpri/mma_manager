@@ -34,9 +34,9 @@ export function matchupMult(attackerSpecialty: string, defenderSpecialty: string
 }
 
 const GAME_PLAN_MODS: Record<GamePlan, [number, number]> = {
-  pressure:  [1.12, 0.92],
+  pressure:  [1.08, 0.96],
   counter:   [1.06, 0.97],
-  grapple:   [0.94, 1.14],
+  grapple:   [1.00, 1.06],
   technical: [1.04, 0.96],
   brawler:   [1.18, 1.15],
   defensive: [0.85, 0.75],
