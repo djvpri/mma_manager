@@ -331,6 +331,14 @@ export interface RoundResult {
   opp_mental?: number
   myStats?: FightStats
   oppStats?: FightStats
+  // Rincian kriteria juri ala MMA: persentase dominasi per area
+  criteria?: {
+    striking: { my: number; opp: number }
+    grappling: { my: number; opp: number }
+  }
+  // Skor ronde ala 10-point must system (10-9 / 10-8)
+  my_round_score?: number
+  opp_round_score?: number
 }
 
 export interface GameState {

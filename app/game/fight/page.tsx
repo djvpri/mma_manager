@@ -772,6 +772,8 @@ export default function FightPage() {
   function handleSimulateRound() {
     if (!fight.fighter || !fight.opponent || !fight.gamePlan) return
 
+    const lastRound = fight.roundResults[fight.roundResults.length - 1]
+
     const result = simulateRound({
       myFighter: fight.fighter,
       opponent: { name: fight.opponent.name, attrs: fight.opponent.attrs, specialty: fight.opponent.specialty },
@@ -782,6 +784,9 @@ export default function FightPage() {
       oppStamina: fight.oppStamina,
       myMental: fight.myMental,
       oppMental: fight.oppMental,
+      myHP: fight.myHP,
+      oppHP: fight.oppHP,
+      prevOppPct: lastRound?.opp_pct,
     })
 
     const ticks = result.ticks ?? []
@@ -1411,6 +1416,41 @@ export default function FightPage() {
               </div>
             </div>
           </div>
+
+          {(() => {
+            const lastRound = fight.roundResults[fight.roundResults.length - 1]
+            if (!lastRound?.criteria) return null
+            return (
+              <div className="rounded-lg border border-octagon-border bg-octagon-card p-4">
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Hasil Ronde {lastRound.round}</p>
+                  <p className="text-sm font-bold text-white">
+                    {lastRound.my_round_score}–{lastRound.opp_round_score}
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <div>
+                    <div className="mb-1 flex justify-between text-[10px] text-gray-500">
+                      <span>Striking</span>
+                      <span>{lastRound.criteria.striking.my}% – {lastRound.criteria.striking.opp}%</span>
+                    </div>
+                    <div className="h-1.5 overflow-hidden rounded-full bg-octagon-dark">
+                      <div className="h-full bg-octagon-teal" style={{ width: `${lastRound.criteria.striking.my}%` }} />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="mb-1 flex justify-between text-[10px] text-gray-500">
+                      <span>Grappling</span>
+                      <span>{lastRound.criteria.grappling.my}% – {lastRound.criteria.grappling.opp}%</span>
+                    </div>
+                    <div className="h-1.5 overflow-hidden rounded-full bg-octagon-dark">
+                      <div className="h-full bg-octagon-amber" style={{ width: `${lastRound.criteria.grappling.my}%` }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
 
           <div className="rounded-lg border border-octagon-border bg-octagon-card p-4">
             <p className="mb-2 text-xs font-semibold uppercase text-gray-500">Saran Corner</p>

@@ -10,6 +10,25 @@ export interface FightConfig {
   oppStamina: number
   myMental: number
   oppMental: number
+  myHP: number
+  oppHP: number
+  /** my_pct ronde sebelumnya dari sudut pandang lawan (100 - my_pct), untuk adaptasi AI corner lawan. Undefined di ronde 1. */
+  prevOppPct?: number
+}
+
+// Matchup gaya bertarung: bonus/penalti skor ofensif berdasarkan spesialisasi
+// penyerang vs spesialisasi lawan. Nilai 1 = netral. Merepresentasikan
+// keunggulan situasional ala rock-paper-scissors MMA (wrestler vs striker, dst).
+const SPECIALTY_MATCHUP: Record<string, Partial<Record<string, number>>> = {
+  Wrestler:         { Striker: 1.10, 'Counter Fighter': 1.06, Grappler: 0.97 },
+  Striker:          { Grappler: 1.06, Wrestler: 0.95 },
+  Grappler:         { Wrestler: 1.04, 'All-rounder': 1.02, Striker: 0.96 },
+  'Counter Fighter': { Striker: 1.08, Wrestler: 0.95 },
+  'All-rounder':    { 'Counter Fighter': 1.02 },
+}
+
+function matchupMult(attackerSpecialty: string, defenderSpecialty: string): number {
+  return SPECIALTY_MATCHUP[attackerSpecialty]?.[defenderSpecialty] ?? 1
 }
 
 const GAME_PLAN_MODS: Record<GamePlan, [number, number]> = {
@@ -51,7 +70,7 @@ function defenseScore(attrs: FighterAttrs): number {
 }
 
 export function simulateRound(config: FightConfig): RoundResult {
-  const { myFighter, opponent, gamePlan, cornerAdvice, roundNum, myStamina, oppStamina, myMental, oppMental } = config
+  const { myFighter, opponent, gamePlan, cornerAdvice, roundNum, myStamina, oppStamina, myMental, oppMental, myHP, oppHP, prevOppPct } = config
   const a = myFighter.attrs
   const o = opponent.attrs
 
@@ -59,10 +78,26 @@ export function simulateRound(config: FightConfig): RoundResult {
   let myScore = offenseScore(a) * (1 - (defenseScore(o) - 50) / 250)
   let opScore = offenseScore(o) * (1 - (defenseScore(a) - 50) / 250)
 
+  // Style matchup: keunggulan/kerugian situasional berdasarkan spesialisasi
+  myScore *= matchupMult(myFighter.specialty, opponent.specialty)
+  opScore *= matchupMult(opponent.specialty, myFighter.specialty)
+
   const [mm, om] = GAME_PLAN_MODS[gamePlan]
   const [cm, co] = CORNER_MODS[cornerAdvice]
   myScore *= mm * cm
   opScore *= om * co
+
+  // AI corner lawan beradaptasi dari ronde sebelumnya: kalau lawan didominasi
+  // (my_pct ronde lalu tinggi), corner-nya mendorong lebih agresif (desperation);
+  // kalau lawan mendominasi, mereka justru main aman dan membuka sedikit ruang.
+  if (prevOppPct !== undefined) {
+    if (prevOppPct < 35) {
+      opScore *= 1.07
+    } else if (prevOppPct > 65) {
+      opScore *= 0.97
+      myScore *= 1.03
+    }
+  }
 
   // Stamina & mental yang sudah terkuras dari ronde sebelumnya menggerus performa
   myScore *= 0.85 + (myStamina / 100) * 0.15
@@ -78,23 +113,30 @@ export function simulateRound(config: FightConfig): RoundResult {
   const myPct = Math.round((myScore / total) * 100)
   const winner = myScore > opScore ? 'my' : 'opp'
 
-  // Finish chance — makin besar jika lawan kehabisan stamina/mental, diredam oleh chin & daya tahan lawan
-  let finishChance = winner === 'my'
-    ? Math.max(0, (myScore - opScore) / total * 1.8 - 0.1)
-    : 0
-  if (winner === 'my') {
-    if (oppStamina < 30) finishChance += (30 - oppStamina) * 0.01
-    if (oppMental < 40) finishChance += (40 - oppMental) * 0.01
-    const toughness = (o.chin * 0.6 + o.durability * 0.4) / 100
-    finishChance *= 1 - toughness * 0.35
-  }
+  // Finish chance (simetris) — makin besar jika pihak yang kalah ronde sudah
+  // kehabisan stamina/mental, atau sudah babak belur (HP rendah). Diredam
+  // oleh chin & daya tahan pihak yang kalah.
+  const margin = Math.abs(myScore - opScore) / total
+  let finishChance = Math.max(0, margin * 1.8 - 0.1)
+
+  const loserStamina = winner === 'my' ? oppStamina : myStamina
+  const loserMental = winner === 'my' ? oppMental : myMental
+  const loserHP = winner === 'my' ? oppHP : myHP
+  const loserAttrs = winner === 'my' ? o : a
+
+  if (loserStamina < 30) finishChance += (30 - loserStamina) * 0.01
+  if (loserMental < 40) finishChance += (40 - loserMental) * 0.01
+  // Babak belur (HP < 35): makin rentan finish, wasit mulai waspada
+  if (loserHP < 35) finishChance += (35 - loserHP) * 0.015
+
+  const toughness = (loserAttrs.chin * 0.6 + loserAttrs.durability * 0.4) / 100
+  finishChance *= 1 - toughness * 0.35
 
   let finish: FinishMethod | null = null
   if (Math.random() < finishChance * 1.2) {
-    const roll = Math.random()
-    finish = gamePlan === 'grapple'
-      ? 'submission'
-      : roll < 0.5 ? 'ko' : 'tko'
+    const winnerAttrs = winner === 'my' ? a : o
+    const subBias = winnerAttrs.submission > 70 && Math.random() < 0.4
+    finish = subBias ? 'submission' : (Math.random() < 0.5 ? 'ko' : 'tko')
   }
 
   const dmgToOpp = Math.round(myPct * 0.25)
@@ -111,6 +153,37 @@ export function simulateRound(config: FightConfig): RoundResult {
   const myFinished = finish !== null && winner === 'opp'
   const oppFinished = finish !== null && winner === 'my'
 
+  // Kriteria juri: striking effectiveness & grappling/control, masing-masing
+  // sebagai persentase dominasi (mirip statistik FightMetric).
+  const myStrikeScore = a.punch_power * 0.3 + a.kick_power * 0.25 + a.accuracy * 0.35 + a.speed * 0.1
+  const opStrikeScore = o.punch_power * 0.3 + o.kick_power * 0.25 + o.accuracy * 0.35 + o.speed * 0.1
+  const myStrikeAdj = myStrikeScore * (1 - (o.striking_defense - 50) / 250)
+  const opStrikeAdj = opStrikeScore * (1 - (a.striking_defense - 50) / 250)
+  const strikeTotal = myStrikeAdj + opStrikeAdj
+  const myStrikingPct = Math.round((myStrikeAdj / strikeTotal) * 100)
+
+  const myGrappleScore = a.takedowns * 0.35 + a.ground_control * 0.35 + a.submission * 0.3
+  const opGrappleScore = o.takedowns * 0.35 + o.ground_control * 0.35 + o.submission * 0.3
+  const myGrappleAdj = myGrappleScore * (1 - (o.takedown_defense - 50) / 250)
+  const opGrappleAdj = opGrappleScore * (1 - (a.takedown_defense - 50) / 250)
+  const grappleTotal = myGrappleAdj + opGrappleAdj
+  const myGrapplingPct = Math.round((myGrappleAdj / grappleTotal) * 100)
+
+  // Skor 10-point must: ronde dominan (margin >= 15%) dapat 10-8, sisanya 10-9
+  const dominant = Math.abs(myPct - 50) >= 15
+  let myRoundScore: number
+  let oppRoundScore: number
+  if (finish) {
+    myRoundScore = winner === 'my' ? 10 : 9
+    oppRoundScore = winner === 'opp' ? 10 : 9
+  } else if (winner === 'my') {
+    myRoundScore = 10
+    oppRoundScore = dominant ? 8 : 9
+  } else {
+    oppRoundScore = 10
+    myRoundScore = dominant ? 8 : 9
+  }
+
   return {
     round: roundNum,
     winner,
@@ -126,6 +199,12 @@ export function simulateRound(config: FightConfig): RoundResult {
     opp_mental: clamp(oppMental + mentalChange(winner === 'opp', dmgToOpp, oppFinished, o.mental), 0, 100),
     myStats,
     oppStats,
+    criteria: {
+      striking: { my: myStrikingPct, opp: 100 - myStrikingPct },
+      grappling: { my: myGrapplingPct, opp: 100 - myGrapplingPct },
+    },
+    my_round_score: myRoundScore,
+    opp_round_score: oppRoundScore,
   }
 }
 
@@ -425,12 +504,10 @@ export function calculateFightResult(rounds: RoundResult[]): {
   if (finish) {
     return { winner: finish.winner, method: finish.finish!, scorecard: '' }
   }
-  const myWins = rounds.filter(r => r.winner === 'my').length
-  const oppWins = rounds.filter(r => r.winner === 'opp').length
-  const myScore = rounds.reduce((a, r) => a + (r.winner === 'my' ? 10 : 9), 0)
-  const oppScore = rounds.reduce((a, r) => a + (r.winner === 'opp' ? 10 : 9), 0)
+  const myScore = rounds.reduce((a, r) => a + (r.my_round_score ?? (r.winner === 'my' ? 10 : 9)), 0)
+  const oppScore = rounds.reduce((a, r) => a + (r.opp_round_score ?? (r.winner === 'opp' ? 10 : 9)), 0)
   return {
-    winner: myWins > oppWins ? 'my' : myWins < oppWins ? 'opp' : 'draw',
+    winner: myScore > oppScore ? 'my' : myScore < oppScore ? 'opp' : 'draw',
     method: 'decision',
     scorecard: `${myScore}–${oppScore}`,
   }
