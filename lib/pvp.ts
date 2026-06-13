@@ -68,6 +68,51 @@ export async function setPvpGamePlan(matchId: string, gamePlan: GamePlan): Promi
   return { error: error?.message ?? null }
 }
 
+export async function fetchPvpMatch(matchId: string): Promise<PvpMatch | null> {
+  const supabase = createClient()
+  const { data, error } = await supabase.rpc('pvp_get_match', { p_match_id: matchId })
+  if (error || !data || data.length === 0) return null
+  return data[0] as PvpMatch
+}
+
+/** Subscribe ke perubahan realtime pada 1 baris pvp_matches. Mengembalikan
+ *  fungsi unsubscribe. Payload realtime hanya kolom mentah tabel (tanpa
+ *  nama gym/fighter dari JOIN) — merge dengan state yang sudah ada di caller. */
+export function subscribeToPvpMatch(matchId: string, onUpdate: (raw: Record<string, unknown>) => void): () => void {
+  const supabase = createClient()
+  const channel = supabase
+    .channel(`pvp_match_${matchId}`)
+    .on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'pvp_matches', filter: `id=eq.${matchId}` },
+      (payload) => onUpdate(payload.new as Record<string, unknown>)
+    )
+    .subscribe()
+
+  return () => {
+    supabase.removeChannel(channel)
+  }
+}
+
+export async function submitPvpCorner(matchId: string, corner: CornerAdvice): Promise<{ error: string | null }> {
+  const supabase = createClient()
+  const { error } = await supabase.rpc('pvp_submit_corner', {
+    p_match_id: matchId,
+    p_corner: corner,
+  })
+  return { error: error?.message ?? null }
+}
+
+/** Panggil Edge Function pvp-resolve-round. Idempotent — aman dipanggil dari
+ *  kedua sisi, panggilan kedua akan no-op (skipped). */
+export async function resolvePvpRound(matchId: string): Promise<{ error: string | null }> {
+  const supabase = createClient()
+  const { error } = await supabase.functions.invoke('pvp-resolve-round', {
+    body: { match_id: matchId },
+  })
+  return { error: error?.message ?? null }
+}
+
 export async function cancelPvpChallenge(matchId: string): Promise<{ error: string | null }> {
   const supabase = createClient()
   const { error } = await supabase.rpc('pvp_cancel_challenge', { p_match_id: matchId })

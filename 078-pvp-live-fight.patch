@@ -1,0 +1,408 @@
+From 0696ad528696cd46f7df3ebc0c508daf9a50d7fe Mon Sep 17 00:00:00 2001
+From: Claude <claude@anthropic.com>
+Date: Sat, 13 Jun 2026 15:44:53 +0000
+Subject: [PATCH] PvP Fase 4: halaman laga real-time (Realtime sync + corner
+ advice + edge function resolve)
+
+---
+ app/game/pvp/[matchId]/page.tsx           | 218 ++++++++++++++++++++++
+ app/game/social/page.tsx                  |  17 +-
+ lib/pvp.ts                                |  45 +++++
+ supabase/migrations/077_pvp_get_match.sql |  64 +++++++
+ 4 files changed, 340 insertions(+), 4 deletions(-)
+ create mode 100644 app/game/pvp/[matchId]/page.tsx
+ create mode 100644 supabase/migrations/077_pvp_get_match.sql
+
+diff --git a/app/game/pvp/[matchId]/page.tsx b/app/game/pvp/[matchId]/page.tsx
+new file mode 100644
+index 0000000..72a3a2a
+--- /dev/null
++++ b/app/game/pvp/[matchId]/page.tsx
+@@ -0,0 +1,218 @@
++'use client'
++
++import { useEffect, useState, useCallback } from 'react'
++import { useParams, useRouter } from 'next/navigation'
++import {
++  fetchPvpMatch,
++  subscribeToPvpMatch,
++  submitPvpCorner,
++  resolvePvpRound,
++  type PvpMatch,
++} from '@/lib/pvp'
++import type { CornerAdvice, RoundResult } from '@/types'
++
++const CORNER_OPTIONS: { value: CornerAdvice; label: string; desc: string }[] = [
++  { value: 'push', label: 'Push', desc: 'Tambah agresivitas striking' },
++  { value: 'patient', label: 'Patient', desc: 'Jaga stamina, tetap stabil' },
++  { value: 'takedown', label: 'Takedown', desc: 'Fokus bawa ke ground' },
++  { value: 'striking', label: 'Striking', desc: 'Fokus pukulan jarak jauh' },
++  { value: 'survive', label: 'Survive', desc: 'Bertahan total, pulihkan stamina & mental' },
++  { value: 'allout', label: 'All-Out', desc: 'Habis-habisan kejar finish, defense jadi taruhan' },
++]
++
++function Bar({ value, color }: { value: number; color: string }) {
++  return (
++    <div className="h-1.5 w-full overflow-hidden rounded-full bg-octagon-dark">
++      <div className={`h-full rounded-full ${color}`} style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
++    </div>
++  )
++}
++
++/** RoundResult tersimpan dari sudut pandang challenger ("my"=challenger).
++ *  Untuk pemain di sisi opponent, flip sudut pandangnya. */
++function myView(r: RoundResult, isChallenger: boolean) {
++  if (isChallenger) {
++    return { myPct: r.my_pct, oppPct: r.opp_pct, won: r.winner === 'my', myScore: r.my_round_score, oppScore: r.opp_round_score }
++  }
++  return { myPct: r.opp_pct, oppPct: r.my_pct, won: r.winner === 'opp', myScore: r.opp_round_score, oppScore: r.my_round_score }
++}
++
++export default function PvpFightPage() {
++  const params = useParams<{ matchId: string }>()
++  const router = useRouter()
++  const matchId = params.matchId
++
++  const [match, setMatch] = useState<PvpMatch | null>(null)
++  const [busy, setBusy] = useState(false)
++  const [error, setError] = useState<string | null>(null)
++
++  const refresh = useCallback(async () => {
++    setMatch(await fetchPvpMatch(matchId))
++  }, [matchId])
++
++  useEffect(() => {
++    refresh()
++    const unsub = subscribeToPvpMatch(matchId, (raw) => {
++      setMatch((prev) => (prev ? ({ ...prev, ...raw } as PvpMatch) : prev))
++    })
++    return unsub
++  }, [matchId, refresh])
++
++  // Begitu kedua corner advice terisi & status masih active, minta server
++  // (Edge Function) menghitung ronde. Idempotent — aman dipanggil dari kedua
++  // sisi, panggilan kedua otomatis no-op.
++  useEffect(() => {
++    if (!match) return
++    if (match.status === 'active' && match.challenger_corner && match.opponent_corner) {
++      resolvePvpRound(matchId)
++    }
++  }, [match?.challenger_corner, match?.opponent_corner, match?.status, matchId])
++
++  if (!match) return <p className="text-sm text-gray-400">Memuat laga...</p>
++
++  const isChallenger = match.my_side === 'challenger'
++  const myName = (isChallenger ? match.challenger_fighter_name : match.opponent_fighter_name) ?? 'Fighter-mu'
++  const oppName = (isChallenger ? match.opponent_fighter_name : match.challenger_fighter_name) ?? 'Lawan'
++  const opponentGymName = isChallenger ? match.opponent_gym_name : match.challenger_gym_name
++  const myHP = isChallenger ? match.challenger_hp : match.opponent_hp
++  const oppHP = isChallenger ? match.opponent_hp : match.challenger_hp
++  const myStamina = isChallenger ? match.challenger_stamina : match.opponent_stamina
++  const oppStamina = isChallenger ? match.opponent_stamina : match.challenger_stamina
++  const myMental = isChallenger ? match.challenger_mental : match.opponent_mental
++  const oppMental = isChallenger ? match.opponent_mental : match.challenger_mental
++  const myCorner = isChallenger ? match.challenger_corner : match.opponent_corner
++  const oppCorner = isChallenger ? match.opponent_corner : match.challenger_corner
++
++  const won = match.status === 'finished' && match.winner_gym_id === (isChallenger ? match.challenger_gym_id : match.opponent_gym_id)
++  const draw = match.status === 'finished' && match.winner_gym_id === null
++
++  async function handleCorner(c: CornerAdvice) {
++    setError(null)
++    setBusy(true)
++    const { error } = await submitPvpCorner(matchId, c)
++    if (error) setError(error)
++    setBusy(false)
++  }
++
++  return (
++    <div className="space-y-6">
++      <header>
++        <h1 className="text-2xl font-bold text-white">⚔️ {myName} vs {oppName}</h1>
++        <p className="text-sm text-gray-400">
++          {opponentGymName} {match.status === 'finished' ? '· Selesai' : `· Ronde ${match.current_round}/3`}
++        </p>
++      </header>
++
++      {error && <p className="rounded-md border border-octagon-red/30 bg-octagon-red/5 p-2 text-xs text-octagon-red">{error}</p>}
++
++      {/* Vitals */}
++      <div className="grid grid-cols-2 gap-4 rounded-lg border border-octagon-border bg-octagon-card p-4">
++        <div className="space-y-2">
++          <p className="text-sm font-semibold text-white">{myName} (kamu)</p>
++          <div>
++            <p className="mb-0.5 text-[10px] text-gray-500">HP {myHP}</p>
++            <Bar value={myHP} color="bg-octagon-teal" />
++          </div>
++          <div>
++            <p className="mb-0.5 text-[10px] text-gray-500">Stamina {myStamina}</p>
++            <Bar value={myStamina} color="bg-octagon-amber" />
++          </div>
++          <div>
++            <p className="mb-0.5 text-[10px] text-gray-500">Mental {myMental}</p>
++            <Bar value={myMental} color="bg-octagon-red/70" />
++          </div>
++        </div>
++        <div className="space-y-2 text-right">
++          <p className="text-sm font-semibold text-white">{oppName}</p>
++          <div>
++            <p className="mb-0.5 text-[10px] text-gray-500">HP {oppHP}</p>
++            <Bar value={oppHP} color="bg-octagon-teal" />
++          </div>
++          <div>
++            <p className="mb-0.5 text-[10px] text-gray-500">Stamina {oppStamina}</p>
++            <Bar value={oppStamina} color="bg-octagon-amber" />
++          </div>
++          <div>
++            <p className="mb-0.5 text-[10px] text-gray-500">Mental {oppMental}</p>
++            <Bar value={oppMental} color="bg-octagon-red/70" />
++          </div>
++        </div>
++      </div>
++
++      {/* Hasil akhir */}
++      {match.status === 'finished' && (
++        <div className="rounded-lg border border-octagon-border bg-octagon-card p-4 text-center">
++          <p className={`text-2xl font-bold ${draw ? 'text-gray-300' : won ? 'text-octagon-teal' : 'text-octagon-red'}`}>
++            {draw ? '🤝 SERI' : won ? '🏆 MENANG!' : '💀 KALAH'}
++          </p>
++          {match.finish_method && (
++            <p className="mt-1 text-sm text-gray-400">Metode: {match.finish_method.toUpperCase()}</p>
++          )}
++          <button
++            onClick={() => router.push('/game/social')}
++            className="mt-4 rounded-md bg-octagon-red px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-octagon-red/90"
++          >
++            Kembali ke Sosial
++          </button>
++        </div>
++      )}
++
++      {/* Corner advice picker */}
++      {match.status === 'active' && (
++        myCorner ? (
++          <div className="rounded-lg border border-octagon-border bg-octagon-card p-4 text-center">
++            <p className="text-sm text-gray-300">
++              ✅ Instruksimu: <span className="font-semibold text-white">{CORNER_OPTIONS.find((c) => c.value === myCorner)?.label}</span>
++            </p>
++            <p className="mt-1 text-xs text-gray-500">
++              {oppCorner ? '⏳ Menghitung hasil ronde...' : `Menunggu ${opponentGymName} memberi instruksi...`}
++            </p>
++          </div>
++        ) : (
++          <div className="rounded-lg border border-octagon-border bg-octagon-card p-4">
++            <p className="mb-3 text-sm font-semibold text-white">Pilih instruksi untuk Ronde {match.current_round}</p>
++            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
++              {CORNER_OPTIONS.map((c) => (
++                <button
++                  key={c.value}
++                  onClick={() => handleCorner(c.value)}
++                  disabled={busy}
++                  className="rounded-md border border-octagon-border bg-octagon-dark p-2.5 text-left transition-colors hover:border-octagon-red/40 hover:bg-octagon-red/5 disabled:opacity-50"
++                >
++                  <p className="text-xs font-semibold text-white">{c.label}</p>
++                  <p className="text-[10px] text-gray-500">{c.desc}</p>
++                </button>
++              ))}
++            </div>
++          </div>
++        )
++      )}
++
++      {/* Riwayat ronde */}
++      {match.round_results.length > 0 && (
++        <div className="space-y-3">
++          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Riwayat Ronde</p>
++          {match.round_results.map((r, i) => {
++            const v = myView(r, isChallenger)
++            return (
++              <div key={i} className="rounded-lg border border-octagon-border bg-octagon-card p-4">
++                <div className="mb-2 flex items-center justify-between">
++                  <p className="text-sm font-semibold text-white">Ronde {r.round}</p>
++                  <span className={`text-xs font-semibold ${v.won ? 'text-octagon-teal' : 'text-octagon-red'}`}>
++                    {v.won ? 'Menang' : 'Kalah'} Ronde {v.myScore ?? '-'}-{v.oppScore ?? '-'}
++                    {r.finish ? ` (${r.finish.toUpperCase()})` : ''}
++                  </span>
++                </div>
++                <ul className="space-y-1 text-sm text-gray-300">
++                  {r.events.map((line, j) => (
++                    <li key={j}>• {line}</li>
++                  ))}
++                </ul>
++              </div>
++            )
++          })}
++        </div>
++      )}
++    </div>
++  )
++}
+diff --git a/app/game/social/page.tsx b/app/game/social/page.tsx
+index 9f877bf..682ba5c 100644
+--- a/app/game/social/page.tsx
++++ b/app/game/social/page.tsx
+@@ -1,6 +1,7 @@
+ 'use client'
+ 
+ import { useEffect, useState } from 'react'
++import Link from 'next/link'
+ import { useGameStore } from '@/store/game-store'
+ import { fetchFriendGyms, addGymFriend, buildWhatsAppInviteUrl, type FriendGym } from '@/lib/social'
+ import {
+@@ -315,15 +316,23 @@ export default function SocialPage() {
+                   {m.status === 'active' && (
+                     <div className="flex items-center justify-between text-xs">
+                       <p className="text-gray-400">🔴 Ronde {m.current_round}/3 — {myFighterName} (HP {myHP}) vs {oppHP} HP</p>
++                      <Link href={`/game/pvp/${m.id}`} className="rounded bg-octagon-red px-3 py-1 font-semibold text-white hover:bg-octagon-red/90">
++                        🎮 Lanjutkan
++                      </Link>
+                     </div>
+                   )}
+ 
+                   {/* Finished */}
+                   {m.status === 'finished' && (
+-                    <p className={`text-xs font-semibold ${draw ? 'text-gray-400' : won ? 'text-octagon-teal' : 'text-octagon-red'}`}>
+-                      {draw ? '🤝 Seri' : won ? '🏆 Menang' : '💀 Kalah'}
+-                      {m.finish_method && m.finish_method !== 'decision' ? ` via ${m.finish_method.toUpperCase()}` : ''}
+-                    </p>
++                    <div className="flex items-center justify-between">
++                      <p className={`text-xs font-semibold ${draw ? 'text-gray-400' : won ? 'text-octagon-teal' : 'text-octagon-red'}`}>
++                        {draw ? '🤝 Seri' : won ? '🏆 Menang' : '💀 Kalah'}
++                        {m.finish_method && m.finish_method !== 'decision' ? ` via ${m.finish_method.toUpperCase()}` : ''}
++                      </p>
++                      <Link href={`/game/pvp/${m.id}`} className="text-xs text-gray-500 hover:text-octagon-amber">
++                        📜 Detail
++                      </Link>
++                    </div>
+                   )}
+                 </div>
+               )
+diff --git a/lib/pvp.ts b/lib/pvp.ts
+index a7fd6e1..de7227f 100644
+--- a/lib/pvp.ts
++++ b/lib/pvp.ts
+@@ -68,6 +68,51 @@ export async function setPvpGamePlan(matchId: string, gamePlan: GamePlan): Promi
+   return { error: error?.message ?? null }
+ }
+ 
++export async function fetchPvpMatch(matchId: string): Promise<PvpMatch | null> {
++  const supabase = createClient()
++  const { data, error } = await supabase.rpc('pvp_get_match', { p_match_id: matchId })
++  if (error || !data || data.length === 0) return null
++  return data[0] as PvpMatch
++}
++
++/** Subscribe ke perubahan realtime pada 1 baris pvp_matches. Mengembalikan
++ *  fungsi unsubscribe. Payload realtime hanya kolom mentah tabel (tanpa
++ *  nama gym/fighter dari JOIN) — merge dengan state yang sudah ada di caller. */
++export function subscribeToPvpMatch(matchId: string, onUpdate: (raw: Record<string, unknown>) => void): () => void {
++  const supabase = createClient()
++  const channel = supabase
++    .channel(`pvp_match_${matchId}`)
++    .on(
++      'postgres_changes',
++      { event: 'UPDATE', schema: 'public', table: 'pvp_matches', filter: `id=eq.${matchId}` },
++      (payload) => onUpdate(payload.new as Record<string, unknown>)
++    )
++    .subscribe()
++
++  return () => {
++    supabase.removeChannel(channel)
++  }
++}
++
++export async function submitPvpCorner(matchId: string, corner: CornerAdvice): Promise<{ error: string | null }> {
++  const supabase = createClient()
++  const { error } = await supabase.rpc('pvp_submit_corner', {
++    p_match_id: matchId,
++    p_corner: corner,
++  })
++  return { error: error?.message ?? null }
++}
++
++/** Panggil Edge Function pvp-resolve-round. Idempotent — aman dipanggil dari
++ *  kedua sisi, panggilan kedua akan no-op (skipped). */
++export async function resolvePvpRound(matchId: string): Promise<{ error: string | null }> {
++  const supabase = createClient()
++  const { error } = await supabase.functions.invoke('pvp-resolve-round', {
++    body: { match_id: matchId },
++  })
++  return { error: error?.message ?? null }
++}
++
+ export async function cancelPvpChallenge(matchId: string): Promise<{ error: string | null }> {
+   const supabase = createClient()
+   const { error } = await supabase.rpc('pvp_cancel_challenge', { p_match_id: matchId })
+diff --git a/supabase/migrations/077_pvp_get_match.sql b/supabase/migrations/077_pvp_get_match.sql
+new file mode 100644
+index 0000000..67925b7
+--- /dev/null
++++ b/supabase/migrations/077_pvp_get_match.sql
+@@ -0,0 +1,64 @@
++-- 077: RPC ambil 1 pvp_match (dengan nama gym/fighter via JOIN) untuk initial
++-- load halaman laga PvP. Update live selanjutnya via Supabase Realtime pada
++-- tabel pvp_matches (kolom mentah tanpa JOIN, di-merge di client).
++
++CREATE OR REPLACE FUNCTION pvp_get_match(p_match_id uuid)
++RETURNS TABLE (
++  id uuid,
++  challenger_gym_id uuid,
++  opponent_gym_id uuid,
++  challenger_gym_name text,
++  opponent_gym_name text,
++  challenger_fighter_id uuid,
++  opponent_fighter_id uuid,
++  challenger_fighter_name text,
++  opponent_fighter_name text,
++  status text,
++  current_round integer,
++  challenger_game_plan text,
++  opponent_game_plan text,
++  challenger_corner text,
++  opponent_corner text,
++  round_results jsonb,
++  challenger_hp integer,
++  opponent_hp integer,
++  challenger_stamina integer,
++  opponent_stamina integer,
++  challenger_mental integer,
++  opponent_mental integer,
++  winner_gym_id uuid,
++  finish_method text,
++  created_at timestamptz,
++  updated_at timestamptz,
++  my_side text
++) LANGUAGE plpgsql SECURITY DEFINER AS $$
++DECLARE
++  v_gym_id uuid;
++BEGIN
++  SELECT id INTO v_gym_id FROM gyms WHERE user_id = auth.uid();
++
++  RETURN QUERY
++  SELECT
++    m.id, m.challenger_gym_id, m.opponent_gym_id,
++    cg.name, og.name,
++    m.challenger_fighter_id, m.opponent_fighter_id,
++    cf.name, opf.name,
++    m.status, m.current_round,
++    m.challenger_game_plan, m.opponent_game_plan,
++    m.challenger_corner, m.opponent_corner,
++    m.round_results,
++    m.challenger_hp, m.opponent_hp,
++    m.challenger_stamina, m.opponent_stamina,
++    m.challenger_mental, m.opponent_mental,
++    m.winner_gym_id, m.finish_method,
++    m.created_at, m.updated_at,
++    CASE WHEN m.challenger_gym_id = v_gym_id THEN 'challenger' ELSE 'opponent' END
++  FROM pvp_matches m
++  JOIN gyms cg ON cg.id = m.challenger_gym_id
++  JOIN gyms og ON og.id = m.opponent_gym_id
++  LEFT JOIN fighters cf ON cf.id = m.challenger_fighter_id
++  LEFT JOIN fighters opf ON opf.id = m.opponent_fighter_id
++  WHERE m.id = p_match_id
++    AND (m.challenger_gym_id = v_gym_id OR m.opponent_gym_id = v_gym_id);
++END;
++$$;
+-- 
+2.43.0
+

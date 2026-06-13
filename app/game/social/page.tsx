@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useGameStore } from '@/store/game-store'
 import { fetchFriendGyms, addGymFriend, buildWhatsAppInviteUrl, type FriendGym } from '@/lib/social'
 import {
@@ -315,15 +316,23 @@ export default function SocialPage() {
                   {m.status === 'active' && (
                     <div className="flex items-center justify-between text-xs">
                       <p className="text-gray-400">🔴 Ronde {m.current_round}/3 — {myFighterName} (HP {myHP}) vs {oppHP} HP</p>
+                      <Link href={`/game/pvp/${m.id}`} className="rounded bg-octagon-red px-3 py-1 font-semibold text-white hover:bg-octagon-red/90">
+                        🎮 Lanjutkan
+                      </Link>
                     </div>
                   )}
 
                   {/* Finished */}
                   {m.status === 'finished' && (
-                    <p className={`text-xs font-semibold ${draw ? 'text-gray-400' : won ? 'text-octagon-teal' : 'text-octagon-red'}`}>
-                      {draw ? '🤝 Seri' : won ? '🏆 Menang' : '💀 Kalah'}
-                      {m.finish_method && m.finish_method !== 'decision' ? ` via ${m.finish_method.toUpperCase()}` : ''}
-                    </p>
+                    <div className="flex items-center justify-between">
+                      <p className={`text-xs font-semibold ${draw ? 'text-gray-400' : won ? 'text-octagon-teal' : 'text-octagon-red'}`}>
+                        {draw ? '🤝 Seri' : won ? '🏆 Menang' : '💀 Kalah'}
+                        {m.finish_method && m.finish_method !== 'decision' ? ` via ${m.finish_method.toUpperCase()}` : ''}
+                      </p>
+                      <Link href={`/game/pvp/${m.id}`} className="text-xs text-gray-500 hover:text-octagon-amber">
+                        📜 Detail
+                      </Link>
+                    </div>
                   )}
                 </div>
               )
