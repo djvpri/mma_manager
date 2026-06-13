@@ -8,6 +8,7 @@ import {
   getInitialExpectation,
   getOpeningOffer,
   evaluateOffer,
+  getLeverage,
   MIN_CONTRACT_LENGTH,
   MAX_CONTRACT_LENGTH,
   MAX_NEGOTIATION_ROUNDS,
@@ -46,6 +47,15 @@ export default function NegotiationPanel({
   const bonusMax = Math.round((candidate.cost * 1.8) / 500_000) * 500_000
   const buyoutMin = Math.round((candidate.salary_monthly * 2) / 500_000) * 500_000
   const buyoutMax = Math.round((candidate.salary_monthly * 15) / 500_000) * 500_000
+
+  const leverage = getLeverage(candidate)
+  const leverageHint = leverage >= 1.3
+    ? '🔥 Banyak gym lain yang minat dengannya — dia tahu betul nilainya, jangan coba meremehkan.'
+    : leverage >= 1.05
+    ? '💪 Cukup percaya diri dengan kemampuannya, ekspektasinya di atas rata-rata.'
+    : leverage <= 0.75
+    ? '🙏 Bersyukur mendapat kesempatan ini, cenderung fleksibel soal angka.'
+    : null
 
   function handleSubmit() {
     const nextRound = round + 1
@@ -87,6 +97,10 @@ export default function NegotiationPanel({
           Putaran {round}/{MAX_NEGOTIATION_ROUNDS}
         </span>
       </div>
+
+      {leverageHint && (
+        <p className="text-[11px] italic text-octagon-amber">{leverageHint}</p>
+      )}
 
       <div className="max-h-28 space-y-1 overflow-y-auto rounded bg-black/30 p-2 text-[11px] leading-relaxed text-gray-300">
         {log.length === 0 ? (

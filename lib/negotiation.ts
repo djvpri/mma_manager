@@ -1,6 +1,7 @@
 import type { FighterPersonality } from '@/types'
 import type { RecruitCandidate } from './generate-recruits'
 import { formatCurrency } from './format'
+import { overallRating } from './attrs'
 
 export interface ContractOffer {
   salary: number // Base Purse (gaji mingguan tetap)
@@ -74,6 +75,29 @@ function clamp(value: number, min: number, max: number) {
 }
 
 /**
+ * Daya tawar fighter, ~0.6 (rendah) - 1.6 (tinggi), berdasarkan kemampuan
+ * saat ini, potensi, rekor amatir, dan usia. Fighter dengan leverage tinggi
+ * menuntut lebih banyak, kurang fleksibel, dan lebih cepat tidak sabar
+ * terhadap tawaran rendah — merepresentasikan "banyak gym lain yang minat".
+ * Fighter leverage rendah lebih bersyukur dengan tawaran apa pun.
+ */
+export function getLeverage(candidate: RecruitCandidate): number {
+  const ability = overallRating(candidate.attrs)
+  const totalFights = candidate.record.w + candidate.record.l
+  const winRate = totalFights > 0 ? candidate.record.w / totalFights : 0.5
+
+  const qualityScore = ability * 0.4 + candidate.potential * 0.4 + winRate * 100 * 0.2
+  let leverage = clamp(0.6 + (qualityScore - 50) / 80, 0.6, 1.6)
+
+  // Prospek muda berpotensi tinggi makin pede dengan masa depan panjang
+  if (candidate.age <= 23 && leverage > 1) leverage = clamp(leverage + 0.1, 0.6, 1.6)
+  // Veteran usia 32+ punya jendela karier sempit, sedikit lebih fleksibel
+  if (candidate.age >= 32) leverage = clamp(leverage - 0.15, 0.5, 1.6)
+
+  return leverage
+}
+
+/**
  * Ekspektasi awal kandidat, dipengaruhi personality & reputasi gym (gym lebih bereputasi = ekspektasi sedikit lebih rendah).
  * Kandidat berstatus rekor amatir tidak menuntut Base Purse maupun Bonus Tanda Tangan -
  * kompensasi mereka sepenuhnya berbasis performa (Win Bonus + Bagi Hasil Purse).
@@ -81,16 +105,17 @@ function clamp(value: number, min: number, max: number) {
 export function getInitialExpectation(candidate: RecruitCandidate, reputation: number): ContractOffer {
   const profile = NEGOTIATION_PROFILES[candidate.personality]
   const repFactor = clamp(1 - (reputation - 50) * 0.002, 0.85, 1.15)
+  const leverage = getLeverage(candidate)
 
   return {
     salary: 0,
-    winBonus: roundTo(candidate.salary_monthly * profile.winBonusMult * repFactor, 100_000),
-    purseSharePct: Math.round((8 + profile.purseShareDesire * 14) * repFactor),
+    winBonus: roundTo(candidate.salary_monthly * profile.winBonusMult * repFactor * leverage, 100_000),
+    purseSharePct: clamp(Math.round((8 + profile.purseShareDesire * 14) * repFactor * leverage), 5, MAX_PURSE_SHARE_PCT),
     bonus: 0,
     contractLength: profile.contractPref,
-    titleShotClause: profile.titleShotDesire >= 0.6,
-    buyoutClause: profile.buyoutFlexPref >= 0.5
-      ? roundTo(candidate.salary_monthly * 3, 500_000)
+    titleShotClause: profile.titleShotDesire * leverage >= 0.6,
+    buyoutClause: profile.buyoutFlexPref * leverage >= 0.5
+      ? roundTo(candidate.salary_monthly * 3 / Math.max(0.7, leverage), 500_000)
       : roundTo(candidate.salary_monthly * 8, 500_000),
   }
 }
@@ -122,6 +147,10 @@ export function evaluateOffer(
   round: number
 ): NegotiationResult {
   const profile = NEGOTIATION_PROFILES[candidate.personality]
+  const leverage = getLeverage(candidate)
+  // Leverage tinggi -> kurang fleksibel (yakin dengan harga sendiri) & lebih cepat tidak sabar
+  const effFlexibility = clamp(profile.flexibility / leverage, 0.05, 0.9)
+  const effPatience = leverage > 1.2 ? Math.max(2, profile.patience - 1) : profile.patience
 
   const salaryRatio = expectation.salary > 0 ? clamp(offer.salary / expectation.salary, 0, 1.5) : 1
   const winBonusRatio = expectation.winBonus > 0 ? clamp(offer.winBonus / expectation.winBonus, 0, 1.5) : 1
@@ -153,7 +182,7 @@ export function evaluateOffer(
     }
   }
 
-  if (round >= profile.patience || round >= MAX_NEGOTIATION_ROUNDS) {
+  if (round >= effPatience || round >= MAX_NEGOTIATION_ROUNDS) {
     return {
       outcome: 'reject',
       expectation,
@@ -163,7 +192,7 @@ export function evaluateOffer(
 
   const moveToward = (current: number, target: number, step: number) => {
     if (target >= current) return current
-    return roundTo(current - (current - target) * profile.flexibility, step)
+    return roundTo(current - (current - target) * effFlexibility, step)
   }
 
   const counter: ContractOffer = {
@@ -172,7 +201,7 @@ export function evaluateOffer(
     purseSharePct: moveToward(expectation.purseSharePct, offer.purseSharePct, 1),
     bonus: moveToward(expectation.bonus, offer.bonus, 500_000),
     contractLength: clamp(
-      Math.round(expectation.contractLength - (expectation.contractLength - offer.contractLength) * profile.flexibility),
+      Math.round(expectation.contractLength - (expectation.contractLength - offer.contractLength) * effFlexibility),
       MIN_CONTRACT_LENGTH,
       MAX_CONTRACT_LENGTH
     ),
