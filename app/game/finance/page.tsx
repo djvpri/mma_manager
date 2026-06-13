@@ -7,6 +7,7 @@ import { formatCurrency } from '@/lib/format'
 import { CATEGORY_LABELS } from '@/lib/sponsor-contracts'
 import MemberSection from '@/components/finance/MemberSection'
 import { weeklyMemberIncome } from '@/lib/gym-members'
+import { calcOperationalIncome } from '@/lib/gym-income'
 import {
   LOAN_AMOUNTS,
   LOAN_TERMS,
@@ -18,9 +19,6 @@ import {
 } from '@/lib/bank-loans'
 import type { Gym, Staff, SponsorContract } from '@/types'
 
-const BASE_INCOME       = 5_000_000
-const REP_INCOME_RATE   = 250_000
-const FIGHTER_INCOME_RATE = 2_000_000
 const BASE_EXPENSE      = 15_000_000
 
 export default function FinancePage() {
@@ -70,11 +68,10 @@ export default function FinancePage() {
   if (!gym) return <p className="text-sm text-gray-400">Memuat...</p>
 
   const activeFighters  = fighters.filter((f) => f.status !== 'retired')
-  const repBonus        = gym.reputation * REP_INCOME_RATE
-  const fighterBonus    = activeFighters.length * FIGHTER_INCOME_RATE
+  const operational     = calcOperationalIncome(gym)
   const sponsorIncome   = (contracts ?? []).reduce((s, c) => s + c.weekly_income, 0)
   const memberIncome    = weeklyMemberIncome(gym)
-  const projectedIncome = BASE_INCOME + repBonus + fighterBonus + sponsorIncome + memberIncome
+  const projectedIncome = operational.total + sponsorIncome + memberIncome
 
   const fighterSalaries = activeFighters.reduce((s, f) => s + f.salary_monthly, 0)
   const staffSalaries   = (staff ?? []).reduce((s, x) => s + x.salary, 0)
@@ -271,16 +268,16 @@ export default function FinancePage() {
         <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">Rincian Pemasukan</h2>
         <div className="space-y-2 text-sm">
           <div className="flex justify-between">
-            <span className="text-gray-400">Pemasukan dasar</span>
-            <span className="text-white">{formatCurrency(BASE_INCOME)}</span>
+            <span className="text-gray-400">Day-pass &amp; drop-in (Locker Lv{operational.lockerLevel})</span>
+            <span className="text-white">{formatCurrency(operational.daypass)}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-400">Bonus reputasi ({gym.reputation} × {formatCurrency(REP_INCOME_RATE)})</span>
-            <span className="text-white">{formatCurrency(repBonus)}</span>
+            <span className="text-gray-400">Sewa fasilitas &amp; alat ({operational.totalLevels} total level)</span>
+            <span className="text-white">{formatCurrency(operational.rental)}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-400">Bonus roster ({activeFighters.length} fighter)</span>
-            <span className="text-white">{formatCurrency(fighterBonus)}</span>
+            <span className="text-gray-400">Kantin &amp; vending</span>
+            <span className="text-white">{formatCurrency(operational.canteen)}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-gray-400">Pemasukan member ({gym.member_count} member)</span>
@@ -310,7 +307,7 @@ export default function FinancePage() {
             <span className="text-octagon-teal">{formatCurrency(projectedIncome)}</span>
           </div>
 
-          {(projectedIncome - memberIncome) !== gym.monthly_income && (
+          {operational.total !== gym.monthly_income && (
             <p className="text-xs text-gray-600">
               Berlaku setelah klik &ldquo;Lanjut ke Minggu Berikutnya&rdquo; di tab Roster.
             </p>
