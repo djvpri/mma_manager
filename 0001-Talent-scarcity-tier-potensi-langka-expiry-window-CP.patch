@@ -1,0 +1,57 @@
+From c74603c8e88171aaa8598429973c1979a5a48155 Mon Sep 17 00:00:00 2001
+From: Claude <claude@anthropic.com>
+Date: Sun, 14 Jun 2026 06:33:49 +0000
+Subject: [PATCH] Talent scarcity: tier potensi langka, expiry window, CPU ikut
+ rekrut, badge UI
+
+---
+ app/game/recruit/page.tsx | 32 +++++++++++++++++++++++++++++++-
+ 1 file changed, 31 insertions(+), 1 deletion(-)
+
+diff --git a/app/game/recruit/page.tsx b/app/game/recruit/page.tsx
+index ccb540c..8675efd 100644
+--- a/app/game/recruit/page.tsx
++++ b/app/game/recruit/page.tsx
+@@ -211,8 +211,38 @@ export default function RecruitPage() {
+ 
+               return (
+                 <div key={fighter.id}
+-                  className={`rounded-lg border bg-octagon-card p-4 ${!canRecruit ? 'opacity-60' : 'border-octagon-border'}`}
++                  className={`rounded-lg border bg-octagon-card p-4 ${
++                    !canRecruit ? 'opacity-60' :
++                    (fighter as Fighter & { pool_tier?: string }).pool_tier === 'gem' ? 'border-yellow-400/60' :
++                    (fighter as Fighter & { pool_tier?: string }).pool_tier === 'elite' ? 'border-purple-400/50' :
++                    (fighter as Fighter & { pool_tier?: string }).pool_tier === 'rare' ? 'border-octagon-teal/40' :
++                    'border-octagon-border'
++                  }`}
+                 >
++                  {/* Tier badge + expiry warning */}
++                  {(() => {
++                    const tier = (fighter as Fighter & { pool_tier?: string; pool_expires_week?: number }).pool_tier
++                    const expires = (fighter as Fighter & { pool_tier?: string; pool_expires_week?: number }).pool_expires_week
++                    const weeksLeft = expires ? Math.max(0, expires - gym.season_week) : null
++                    if (!tier || tier === 'common') return null
++                    return (
++                      <div className="mb-2 flex items-center justify-between">
++                        <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
++                          tier === 'gem' ? 'bg-yellow-500/20 text-yellow-400' :
++                          tier === 'elite' ? 'bg-purple-500/20 text-purple-400' :
++                          tier === 'rare' ? 'bg-octagon-teal/20 text-octagon-teal' :
++                          'bg-gray-700 text-gray-400'
++                        }`}>
++                          {tier === 'gem' ? '💎 GEM' : tier === 'elite' ? '⭐ ELITE' : tier === 'rare' ? '🔵 RARE' : tier.toUpperCase()}
++                        </span>
++                        {weeksLeft !== null && weeksLeft <= 4 && (
++                          <span className="text-[10px] font-semibold text-octagon-red">
++                            ⏳ {weeksLeft === 0 ? 'Pergi minggu ini!' : `${weeksLeft} minggu tersisa`}
++                          </span>
++                        )}
++                      </div>
++                    )
++                  })()}
+                   <div
+                     onClick={() => setSelectedFighter(fighter)}
+                     className="flex cursor-pointer items-start gap-3"
+-- 
+2.43.0
+
