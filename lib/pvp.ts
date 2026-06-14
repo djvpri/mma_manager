@@ -1,14 +1,14 @@
 import { createClient } from './supabase'
 import type { GamePlan, CornerAdvice, RoundResult } from '@/types'
 
-export type PvpStatus = 'pending' | 'gameplan' | 'active' | 'finished' | 'declined' | 'cancelled'
+export type PvpStatus = 'waiting' | 'pending' | 'gameplan' | 'active' | 'finished' | 'declined' | 'cancelled'
 
 export interface PvpMatch {
   id: string
   challenger_gym_id: string
-  opponent_gym_id: string
+  opponent_gym_id: string | null
   challenger_gym_name: string
-  opponent_gym_name: string
+  opponent_gym_name: string | null
   challenger_fighter_id: string
   opponent_fighter_id: string | null
   challenger_fighter_name: string | null
@@ -116,5 +116,36 @@ export async function resolvePvpRound(matchId: string): Promise<{ error: string 
 export async function cancelPvpChallenge(matchId: string): Promise<{ error: string | null }> {
   const supabase = createClient()
   const { error } = await supabase.rpc('pvp_cancel_challenge', { p_match_id: matchId })
+  return { error: error?.message ?? null }
+}
+
+// ── Room publik (lobby, siapa saja bisa join) ─────────────────────────────
+
+export interface OpenRoom {
+  id: string
+  challenger_gym_id: string
+  challenger_gym_name: string
+  challenger_fighter_id: string
+  challenger_fighter_name: string
+  challenger_weight_class: string
+  created_at: string
+}
+
+export async function createPvpRoom(fighterId: string): Promise<{ error: string | null }> {
+  const supabase = createClient()
+  const { error } = await supabase.rpc('pvp_create_room', { p_fighter_id: fighterId })
+  return { error: error?.message ?? null }
+}
+
+export async function fetchOpenRooms(): Promise<OpenRoom[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase.rpc('pvp_list_open_rooms')
+  if (error || !data) return []
+  return data as OpenRoom[]
+}
+
+export async function joinPvpRoom(matchId: string, fighterId: string): Promise<{ error: string | null }> {
+  const supabase = createClient()
+  const { error } = await supabase.rpc('pvp_join_room', { p_match_id: matchId, p_fighter_id: fighterId })
   return { error: error?.message ?? null }
 }

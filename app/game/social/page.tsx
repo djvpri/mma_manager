@@ -10,7 +10,11 @@ import {
   respondPvpChallenge,
   setPvpGamePlan,
   cancelPvpChallenge,
+  createPvpRoom,
+  fetchOpenRooms,
+  joinPvpRoom,
   type PvpMatch,
+  type OpenRoom,
 } from '@/lib/pvp'
 import type { GamePlan } from '@/types'
 
@@ -40,14 +44,23 @@ export default function SocialPage() {
   const [challengeFighter, setChallengeFighter] = useState<Record<string, string>>({})
   const [respondFighter, setRespondFighter]     = useState<Record<string, string>>({})
 
+  const [openRooms, setOpenRooms]     = useState<OpenRoom[] | null>(null)
+  const [roomFighter, setRoomFighter] = useState<string>('')
+  const [joinFighter, setJoinFighter] = useState<Record<string, string>>({})
+
   useEffect(() => {
     if (!gym) return
     fetchFriendGyms().then(setFriends)
     refreshPvp()
+    refreshRooms()
   }, [gym?.id])
 
   async function refreshPvp() {
     setPvpMatches(await fetchMyPvpMatches())
+  }
+
+  async function refreshRooms() {
+    setOpenRooms(await fetchOpenRooms())
   }
 
   if (!gym) return <p className="text-sm text-gray-400">Memuat...</p>
@@ -106,6 +119,28 @@ export default function SocialPage() {
     setPvpBusy(matchId)
     await cancelPvpChallenge(matchId)
     await refreshPvp()
+    setPvpBusy(null)
+  }
+
+  async function handleCreateRoom() {
+    const fighterId = roomFighter || eligibleFighters[0]?.id
+    if (!fighterId) return
+    setPvpError(null)
+    setPvpBusy('create-room')
+    const { error } = await createPvpRoom(fighterId)
+    if (error) setPvpError('Gagal membuat room: ' + error)
+    await refreshPvp()
+    setPvpBusy(null)
+  }
+
+  async function handleJoinRoom(roomId: string) {
+    const fighterId = joinFighter[roomId] ?? eligibleFighters[0]?.id
+    if (!fighterId) return
+    setPvpError(null)
+    setPvpBusy(roomId)
+    const { error } = await joinPvpRoom(roomId, fighterId)
+    if (error) setPvpError('Gagal join room: ' + error)
+    await Promise.all([refreshPvp(), refreshRooms()])
     setPvpBusy(null)
   }
 
@@ -208,6 +243,73 @@ export default function SocialPage() {
         )}
       </div>
 
+      {/* Arena Publik: room siapa saja bisa join */}
+      <div className="rounded-lg border border-octagon-border bg-octagon-card p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-400">🌐 Arena Publik</h2>
+          <button onClick={refreshRooms} className="text-xs text-gray-500 hover:text-octagon-amber">↻ Refresh</button>
+        </div>
+
+        {eligibleFighters.length > 0 && (
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <select
+              value={roomFighter || eligibleFighters[0].id}
+              onChange={(e) => setRoomFighter(e.target.value)}
+              className="rounded border border-octagon-border bg-octagon-dark px-2 py-1 text-xs text-white focus:border-octagon-amber focus:outline-none"
+            >
+              {eligibleFighters.map((fi) => (
+                <option key={fi.id} value={fi.id}>{fi.name}</option>
+              ))}
+            </select>
+            <button
+              onClick={handleCreateRoom}
+              disabled={pvpBusy === 'create-room'}
+              className="rounded bg-octagon-teal px-3 py-1 text-xs font-semibold text-octagon-dark transition-colors hover:bg-octagon-teal/90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {pvpBusy === 'create-room' ? 'Membuat...' : '➕ Buat Room'}
+            </button>
+          </div>
+        )}
+
+        {openRooms === null ? (
+          <p className="text-sm text-gray-500">Memuat...</p>
+        ) : openRooms.length === 0 ? (
+          <p className="text-sm text-gray-500">Belum ada room terbuka. Jadilah yang pertama!</p>
+        ) : (
+          <div className="space-y-2">
+            {openRooms.map((r) => (
+              <div key={r.id} className="flex flex-col gap-2 rounded border border-octagon-border/50 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-white">{r.challenger_fighter_name}</p>
+                  <p className="text-xs text-gray-500">{r.challenger_gym_name} · {r.challenger_weight_class}</p>
+                </div>
+                {eligibleFighters.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={joinFighter[r.id] ?? eligibleFighters[0].id}
+                      onChange={(e) => setJoinFighter((c) => ({ ...c, [r.id]: e.target.value }))}
+                      className="rounded border border-octagon-border bg-octagon-dark px-2 py-1 text-xs text-white focus:border-octagon-amber focus:outline-none"
+                    >
+                      {eligibleFighters.map((fi) => (
+                        <option key={fi.id} value={fi.id}>{fi.name}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => handleJoinRoom(r.id)}
+                      disabled={pvpBusy === r.id}
+                      className="rounded bg-octagon-red px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-octagon-red/90 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {pvpBusy === r.id ? 'Join...' : '⚔️ Gabung'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+        <p className="mt-2 text-xs text-gray-600">Buat room dan tunggu pemain mana pun untuk join, atau gabung ke room yang sudah terbuka.</p>
+      </div>
+
       {/* PvP: Tantangan & Laga */}
       <div className="rounded-lg border border-octagon-border bg-octagon-card p-4">
         <div className="mb-3 flex items-center justify-between">
@@ -235,9 +337,23 @@ export default function SocialPage() {
               return (
                 <div key={m.id} className="rounded border border-octagon-border/50 px-3 py-2.5">
                   <div className="mb-1.5 flex items-center justify-between">
-                    <p className="text-sm font-semibold text-white">vs {opponentName}</p>
+                    <p className="text-sm font-semibold text-white">{m.status === 'waiting' ? '🌐 Room terbukamu' : `vs ${opponentName}`}</p>
                     <span className="text-[10px] uppercase text-gray-500">{m.status}</span>
                   </div>
+
+                  {/* Waiting: room publik milik sendiri, belum ada lawan */}
+                  {m.status === 'waiting' && (
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-gray-400">Menunggu pemain lain join dengan {m.challenger_fighter_name}...</p>
+                      <button
+                        onClick={() => handleCancel(m.id)}
+                        disabled={pvpBusy === m.id}
+                        className="rounded border border-octagon-border px-2.5 py-1 text-xs text-gray-400 hover:border-octagon-red hover:text-octagon-red"
+                      >
+                        Batalkan
+                      </button>
+                    </div>
+                  )}
 
                   {/* Pending: menunggu respons */}
                   {m.status === 'pending' && isChallenger && (
