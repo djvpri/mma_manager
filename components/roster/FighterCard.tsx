@@ -524,7 +524,14 @@ export default function FighterCard({ fighter, titleDefenses, tournamentTitles }
                       >
                         vs {fr.opponent_name}
                       </button>
-                      <p className="text-gray-500">{new Date(fr.fight_date).toLocaleDateString('id-ID')}</p>
+                      <p className="text-gray-500">{(() => {
+                        // Hitung season_week dari fight_date (base: 1 Jan 2020 = minggu 1)
+                        const base = new Date('2020-01-01')
+                        const d = new Date(fr.fight_date)
+                        const diffDays = Math.round((d.getTime() - base.getTime()) / (1000 * 60 * 60 * 24))
+                        const week = Math.floor(diffDays / 7) + 1
+                        return week > 0 ? `Minggu ke-${week}` : new Date(fr.fight_date).toLocaleDateString('id-ID')
+                      })()}</p>
                     </div>
                     <span
                       className={`shrink-0 font-semibold uppercase ${

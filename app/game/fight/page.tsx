@@ -606,6 +606,12 @@ export default function FightPage() {
         finish_round: finishRound,
         scorecard: result.scorecard || null,
         game_plan_used: fight.gamePlan,
+        fight_date: (() => {
+          // Konversi season_week ke tanggal fiktif: mulai dari 1 Jan 2020
+          const base = new Date('2020-01-01')
+          base.setDate(base.getDate() + (gym.season_week - 1) * 7)
+          return base.toISOString().split('T')[0]
+        })(),
       }),
       supabase
         .from('fighters')

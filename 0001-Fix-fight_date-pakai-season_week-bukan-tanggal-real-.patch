@@ -1,0 +1,51 @@
+From eb930e10f688c27e96400a81b3bd89e4bbda047d Mon Sep 17 00:00:00 2001
+From: Claude <claude@anthropic.com>
+Date: Sun, 14 Jun 2026 07:21:04 +0000
+Subject: [PATCH] Fix fight_date: pakai season_week bukan tanggal real,
+ tampilkan Minggu ke-X
+
+---
+ app/game/fight/page.tsx           | 6 ++++++
+ components/roster/FighterCard.tsx | 9 ++++++++-
+ 2 files changed, 14 insertions(+), 1 deletion(-)
+
+diff --git a/app/game/fight/page.tsx b/app/game/fight/page.tsx
+index cd77cda..95189d5 100644
+--- a/app/game/fight/page.tsx
++++ b/app/game/fight/page.tsx
+@@ -606,6 +606,12 @@ export default function FightPage() {
+         finish_round: finishRound,
+         scorecard: result.scorecard || null,
+         game_plan_used: fight.gamePlan,
++        fight_date: (() => {
++          // Konversi season_week ke tanggal fiktif: mulai dari 1 Jan 2020
++          const base = new Date('2020-01-01')
++          base.setDate(base.getDate() + (gym.season_week - 1) * 7)
++          return base.toISOString().split('T')[0]
++        })(),
+       }),
+       supabase
+         .from('fighters')
+diff --git a/components/roster/FighterCard.tsx b/components/roster/FighterCard.tsx
+index 701dfad..f62d39d 100644
+--- a/components/roster/FighterCard.tsx
++++ b/components/roster/FighterCard.tsx
+@@ -524,7 +524,14 @@ export default function FighterCard({ fighter, titleDefenses, tournamentTitles }
+                       >
+                         vs {fr.opponent_name}
+                       </button>
+-                      <p className="text-gray-500">{new Date(fr.fight_date).toLocaleDateString('id-ID')}</p>
++                      <p className="text-gray-500">{(() => {
++                        // Hitung season_week dari fight_date (base: 1 Jan 2020 = minggu 1)
++                        const base = new Date('2020-01-01')
++                        const d = new Date(fr.fight_date)
++                        const diffDays = Math.round((d.getTime() - base.getTime()) / (1000 * 60 * 60 * 24))
++                        const week = Math.floor(diffDays / 7) + 1
++                        return week > 0 ? `Minggu ke-${week}` : new Date(fr.fight_date).toLocaleDateString('id-ID')
++                      })()}</p>
+                     </div>
+                     <span
+                       className={`shrink-0 font-semibold uppercase ${
+-- 
+2.43.0
+
