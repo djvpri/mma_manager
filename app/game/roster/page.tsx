@@ -134,14 +134,18 @@ export default function RosterPage() {
 
     const newWeek = gym.season_week + 1
 
-    const [gymRes, fightersRes, newsRes] = await Promise.all([
+    const [gymRes, fightersRes, newsRes, cpuNewsRes] = await Promise.all([
       supabase.from('gyms').select('*').eq('id', gym.id).single(),
       supabase.from('fighters').select('*').eq('gym_id', gym.id).order('created_at'),
       supabase.from('fighter_news').select('message').eq('gym_id', gym.id).eq('season_week', newWeek),
+      supabase.from('cpu_gym_events').select('message').eq('gym_id', gym.id).eq('season_week', newWeek),
     ])
 
     let latestGym: Gym | null = null
-    let weekEvents = (newsRes.data ?? []).map((n) => n.message as string)
+    let weekEvents = [
+      ...(newsRes.data ?? []).map((n) => n.message as string),
+      ...(cpuNewsRes.data ?? []).map((n) => n.message as string),
+    ]
     if (gymRes.error) setError(gymRes.error.message)
     else if (gymRes.data) {
       setGym(gymRes.data)
