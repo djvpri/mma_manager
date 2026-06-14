@@ -1,0 +1,43 @@
+From 9f631aa5164e5a6a1809ef3d8051b26c120b36f8 Mon Sep 17 00:00:00 2001
+From: Claude <claude@anthropic.com>
+Date: Sun, 14 Jun 2026 06:08:03 +0000
+Subject: [PATCH] Fix matchmaking: hindari lawan yang sama di 5 fight terakhir
+
+---
+ lib/generate-events.ts | 19 ++++++++++++++++++-
+ 1 file changed, 18 insertions(+), 1 deletion(-)
+
+diff --git a/lib/generate-events.ts b/lib/generate-events.ts
+index d4f6bae..4b9fdaf 100644
+--- a/lib/generate-events.ts
++++ b/lib/generate-events.ts
+@@ -294,8 +294,25 @@ export async function fetchPoolOpponent(
+ 
+   if (pool.length === 0) return generateFallbackOpponent(targetWins)
+ 
++  // Ambil 5 lawan terakhir fighter ini untuk dihindari (anti-ulang lawan sama)
++  let recentOpponentIds: string[] = []
++  if (fighterId) {
++    const { data: recentFights } = await supabase
++      .from('fight_results')
++      .select('opponent_id')
++      .eq('fighter_id', fighterId)
++      .not('opponent_id', 'is', null)
++      .order('created_at', { ascending: false })
++      .limit(5)
++    recentOpponentIds = (recentFights ?? []).map((r) => r.opponent_id).filter(Boolean)
++  }
++
+   const similar = pool.filter((f) => Math.abs(f.record.w - targetWins) <= 4)
+-  const chosen  = similar.length > 0 ? pick(similar) : pick(pool)
++  const candidates = similar.length > 0 ? similar : pool
++
++  // Prioritaskan lawan yang belum pernah dihadapi baru-baru ini
++  const fresh = candidates.filter((f) => !recentOpponentIds.includes(f.id ?? ''))
++  const chosen = fresh.length > 0 ? pick(fresh) : pick(candidates)
+ 
+   // Cek histori pertemuan untuk rivalry: sudah pernah bertanding sebelumnya = rematch rival.
+   let rivalMeetings = 0
+-- 
+2.43.0
+
