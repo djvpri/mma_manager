@@ -214,6 +214,8 @@ export interface Gym {
   name: string
   city: string
   reputation: number      // 0–100
+  media_heat: number      // 0–100, naik dari viral/endorsement/campaign, turun tiap minggu
+  last_campaign_week: number
   balance: number         // IDR
   monthly_income: number
   monthly_expense: number

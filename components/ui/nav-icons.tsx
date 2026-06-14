@@ -168,6 +168,7 @@ export const NAV_ITEMS = [
   { href: '/game/recruit', label: 'Rekrutmen', icon: IconRecruit },
   { href: '/game/leaderboard', label: 'Leaderboard', icon: IconLeaderboard },
   { href: '/game/social', label: 'Sosial', icon: IconSocial },
+  { href: '/game/media', label: 'Media', icon: IconSocial },
 ]
 
 export function formatCurrency(value: number) {
