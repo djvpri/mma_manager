@@ -1,0 +1,121 @@
+From 6abc6040ef3df6d31046f3d66512f0e0966ab05e Mon Sep 17 00:00:00 2001
+From: Claude <claude@anthropic.com>
+Date: Sun, 14 Jun 2026 02:23:59 +0000
+Subject: [PATCH] Staff lebih aktif: leveling XP, burnout, initiative per
+ specialty + UI level badge
+
+---
+ app/game/staff/page.tsx | 40 +++++++++++++++++++++++++++++++++++-----
+ lib/generate-staff.ts   | 13 +++++++++++++
+ types/index.ts          |  4 ++++
+ 3 files changed, 52 insertions(+), 5 deletions(-)
+
+diff --git a/app/game/staff/page.tsx b/app/game/staff/page.tsx
+index a6be42d..bebcfd8 100644
+--- a/app/game/staff/page.tsx
++++ b/app/game/staff/page.tsx
+@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
+ import { createClient } from '@/lib/supabase'
+ import { useGameStore } from '@/store/game-store'
+ import { formatCurrency } from '@/lib/format'
+-import { generateStaffPool, type StaffCandidate } from '@/lib/generate-staff'
++import { generateStaffPool, staffLevel, STAFF_LEVEL_LABELS, type StaffCandidate } from '@/lib/generate-staff'
+ import type { Gym, Staff } from '@/types'
+ 
+ const POOL_SIZE = 4
+@@ -239,8 +239,12 @@ export default function StaffPage() {
+           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+             {hired.map((member) => {
+               const isAssistantManager = gym.assistant_manager_id === member.id
++              const lv = staffLevel(member.experience_points ?? 0)
++              const xp = member.experience_points ?? 0
++              const xpToNext = lv === 1 ? 101 : lv === 2 ? 251 : null
++              const xpPct = xpToNext ? Math.min(100, Math.round((xp / xpToNext) * 100)) : 100
+               return (
+-                <div key={member.id} className={`rounded-lg border bg-octagon-card p-4 ${isAssistantManager ? 'border-octagon-teal/50' : 'border-octagon-border'}`}>
++                <div key={member.id} className={`rounded-lg border bg-octagon-card p-4 ${member.burnout_warning ? 'border-octagon-red/60' : isAssistantManager ? 'border-octagon-teal/50' : 'border-octagon-border'}`}>
+                   <div className="flex items-center justify-between">
+                     <h3 className="font-semibold text-white">{member.name}</h3>
+                     <Stars rating={member.rating} />
+@@ -248,13 +252,39 @@ export default function StaffPage() {
+                   <p className="mt-1 text-xs text-gray-400">
+                     {member.role} · {member.specialty}
+                   </p>
+-                  {isAssistantManager && (
+-                    <p className="mt-1 inline-block rounded border border-octagon-teal/40 bg-octagon-teal/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-octagon-teal">
++
++                  {/* Level badge + XP bar */}
++                  <div className="mt-2 flex items-center gap-2">
++                    <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
++                      lv === 3 ? 'bg-yellow-500/20 text-yellow-400' :
++                      lv === 2 ? 'bg-octagon-teal/20 text-octagon-teal' :
++                      'bg-gray-700 text-gray-400'
++                    }`}>
++                      {STAFF_LEVEL_LABELS[lv]}
++                    </span>
++                    <div className="flex-1">
++                      <div className="h-1 w-full overflow-hidden rounded-full bg-octagon-dark">
++                        <div className={`h-full rounded-full ${lv === 3 ? 'bg-yellow-500' : lv === 2 ? 'bg-octagon-teal' : 'bg-gray-500'}`}
++                          style={{ width: `${xpPct}%` }} />
++                      </div>
++                    </div>
++                    <span className="text-[10px] text-gray-600">{xp} XP</span>
++                  </div>
++
++                  {/* Burnout warning */}
++                  {member.burnout_warning && (
++                    <p className="mt-1.5 text-[10px] font-semibold text-octagon-red">
++                      ⚠️ Kelelahan berat — kurangi tugas sebelum dia resign!
++                    </p>
++                  )}
++
++                  {isAssistantManager && !member.burnout_warning && (
++                    <p className="mt-1.5 inline-block rounded border border-octagon-teal/40 bg-octagon-teal/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-octagon-teal">
+                       👔 Asisten Manajer
+                     </p>
+                   )}
+                   <div className="mt-3 flex items-center justify-between text-sm">
+-                    <span className="text-xs text-gray-400">Gaji/minggu</span>
++                    <span className="text-xs text-gray-400">Gaji/minggu · {member.weeks_hired ?? 0} minggu</span>
+                     <span className="font-medium text-white">{formatCurrency(member.salary)}</span>
+                   </div>
+                   <button
+diff --git a/lib/generate-staff.ts b/lib/generate-staff.ts
+index 6e50e1d..4104573 100644
+--- a/lib/generate-staff.ts
++++ b/lib/generate-staff.ts
+@@ -41,3 +41,16 @@ export function generateStaffCandidate(): StaffCandidate {
+ export function generateStaffPool(size: number): StaffCandidate[] {
+   return Array.from({ length: size }, generateStaffCandidate)
+ }
++
++/** Level staff berdasarkan experience_points (mirror dari SQL staff_level()). */
++export function staffLevel(xp: number): 1 | 2 | 3 {
++  if (xp >= 251) return 3
++  if (xp >= 101) return 2
++  return 1
++}
++
++export const STAFF_LEVEL_LABELS: Record<1 | 2 | 3, string> = {
++  1: 'Lv.1 Junior',
++  2: 'Lv.2 Senior',
++  3: 'Lv.3 Elite',
++}
+diff --git a/types/index.ts b/types/index.ts
+index ba9f793..fa2645d 100644
+--- a/types/index.ts
++++ b/types/index.ts
+@@ -267,6 +267,10 @@ export interface Staff {
+   salary: number
+   rating: number          // 1–5
+   is_hired: boolean
++  experience_points: number  // 0+ → level 1/2/3
++  weeks_hired: number
++  burnout_warning: boolean
++  weeks_overloaded: number
+ }
+ 
+ export interface FightResult {
+-- 
+2.43.0
+

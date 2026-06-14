@@ -41,3 +41,16 @@ export function generateStaffCandidate(): StaffCandidate {
 export function generateStaffPool(size: number): StaffCandidate[] {
   return Array.from({ length: size }, generateStaffCandidate)
 }
+
+/** Level staff berdasarkan experience_points (mirror dari SQL staff_level()). */
+export function staffLevel(xp: number): 1 | 2 | 3 {
+  if (xp >= 251) return 3
+  if (xp >= 101) return 2
+  return 1
+}
+
+export const STAFF_LEVEL_LABELS: Record<1 | 2 | 3, string> = {
+  1: 'Lv.1 Junior',
+  2: 'Lv.2 Senior',
+  3: 'Lv.3 Elite',
+}

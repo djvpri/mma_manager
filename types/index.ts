@@ -267,6 +267,10 @@ export interface Staff {
   salary: number
   rating: number          // 1–5
   is_hired: boolean
+  experience_points: number  // 0+ → level 1/2/3
+  weeks_hired: number
+  burnout_warning: boolean
+  weeks_overloaded: number
 }
 
 export interface FightResult {
