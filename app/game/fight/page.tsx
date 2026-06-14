@@ -419,6 +419,18 @@ export default function FightPage() {
   const { my: liveMyStats, opp: liveOppStats } = aggregateTickStats(liveTicks)
 
   // Reset error press conference saat ganti fighter terpilih
+  // Saat halaman Fight Night dibuka, kalau state masih di fase 'result' atau
+  // 'fighting'/'corner' dari sesi sebelumnya (pemain navigasi pergi lalu balik),
+  // otomatis re-fetch data terbaru dan reset — supaya tidak perlu klik
+  // "Pertarungan Baru" atau refresh manual.
+  useEffect(() => {
+    if (!gym) return
+    if (fight.phase === 'result' || fight.phase === 'fighting' || fight.phase === 'corner') {
+      handleNewFight()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   useEffect(() => {
     setHypeError(null)
   }, [selectedFighterId])
