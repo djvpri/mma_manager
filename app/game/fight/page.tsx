@@ -27,6 +27,7 @@ import { isTitleFight, resolveTitleFight } from '@/lib/championship'
 import { ATTR_GROUPS, ALL_ATTR_KEYS } from '@/lib/attrs'
 import { EVENT_TIER_CONFIG, EVENT_TIER_BADGE_CLASS } from '@/lib/generate-events'
 import { generateScoutingReport } from '@/lib/scouting-report'
+import OpponentModal from '@/components/fighter/OpponentModal'
 import type { Fighter, FighterAttrs, GamePlan, CornerAdvice, Specialty, RoundResult, RoundTick, FightStats, EventTier, EventSlotOpponent, HypeStyle, Gym } from '@/types'
 
 const TOTAL_ROUNDS = 3
@@ -374,6 +375,7 @@ export default function FightPage() {
   const [showInstructionPicker, setShowInstructionPicker] = useState(false)
   const [weightCut, setWeightCut] = useState(false)
   const [weightCutResult, setWeightCutResult] = useState<string | null>(null)
+  const [viewingOpponentId, setViewingOpponentId] = useState<string | null>(null)
 
   const seasonWeek = gym?.season_week ?? 1
   // Ambil semua event minggu ini (bisa lebih dari satu untuk weight class berbeda)
@@ -1151,6 +1153,14 @@ export default function FightPage() {
                   <div>
                     <p className="text-sm italic text-gray-300">&ldquo;{selectedSlot.press_conference.opp_quote}&rdquo;</p>
                     <p className="mt-0.5 text-xs text-gray-500">— {selectedSlot.opponent?.name}</p>
+                    {selectedSlot.opponent?.id && (
+                      <button
+                        className="mt-1 text-[10px] text-octagon-amber underline"
+                        onClick={() => setViewingOpponentId(selectedSlot.opponent?.id ?? null)}
+                      >
+                        Lihat profil lawan →
+                      </button>
+                    )}
                   </div>
                   <p className="mt-2 rounded-md bg-octagon-dark px-3 py-2 text-xs text-octagon-amber">
                     📰 {selectedSlot.press_conference.outcome}
@@ -1935,6 +1945,11 @@ export default function FightPage() {
           </div>
         )
       })()}
+
+      <OpponentModal
+        fighterId={viewingOpponentId}
+        onClose={() => setViewingOpponentId(null)}
+      />
     </div>
   )
 }

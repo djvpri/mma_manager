@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import type { Fighter, FightResult, WeeklySchedule, TrainingSession, TrainingIntensity } from '@/types'
 import Avatar from '@/components/avatar/Avatar'
+import OpponentModal from '@/components/fighter/OpponentModal'
 import { useGameStore } from '@/store/game-store'
 import { generateFighterAvatar } from '@/lib/ai-avatar'
 import { createClient } from '@/lib/supabase'
@@ -82,6 +83,8 @@ export default function FighterCard({ fighter, titleDefenses, tournamentTitles }
   const [showHistory, setShowHistory] = useState(false)
   const [history, setHistory] = useState<FightResult[] | null>(null)
   const [loadingHistory, setLoadingHistory] = useState(false)
+  const [selectedOpponentId, setSelectedOpponentId] = useState<string | null>(null)
+  const [selectedOpponentName, setSelectedOpponentName] = useState<string | undefined>()
   const [savingSchedule, setSavingSchedule] = useState(false)
   const [savingIntensity, setSavingIntensity] = useState(false)
   const [renewing, setRenewing] = useState(false)
@@ -515,7 +518,12 @@ export default function FighterCard({ fighter, titleDefenses, tournamentTitles }
                 history.map((fr) => (
                   <div key={fr.id} className="flex items-center justify-between rounded-md bg-octagon-dark px-2.5 py-1.5 text-xs">
                     <div className="min-w-0">
-                      <p className="truncate text-gray-200">vs {fr.opponent_name}</p>
+                      <button
+                        className="truncate text-left text-gray-200 hover:text-octagon-amber hover:underline"
+                        onClick={() => { setSelectedOpponentId(fr.opponent_id ?? null); setSelectedOpponentName(fr.opponent_name) }}
+                      >
+                        vs {fr.opponent_name}
+                      </button>
                       <p className="text-gray-500">{new Date(fr.fight_date).toLocaleDateString('id-ID')}</p>
                     </div>
                     <span
@@ -584,6 +592,12 @@ export default function FighterCard({ fighter, titleDefenses, tournamentTitles }
           )}
         </div>
       )}
+
+      <OpponentModal
+        fighterId={selectedOpponentId}
+        fighterName={selectedOpponentName}
+        onClose={() => setSelectedOpponentId(null)}
+      />
     </div>
   )
 }

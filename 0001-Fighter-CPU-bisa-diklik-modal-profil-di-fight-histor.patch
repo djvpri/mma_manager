@@ -1,0 +1,247 @@
+From e9d880131644a05a0e53b7f13ef625e7ed4b8998 Mon Sep 17 00:00:00 2001
+From: Claude <claude@anthropic.com>
+Date: Sun, 14 Jun 2026 06:27:35 +0000
+Subject: [PATCH] Fighter CPU bisa diklik: modal profil di fight history, VS
+ card fight page, leaderboard sudah ada
+
+---
+ app/game/fight/page.tsx              |  15 ++++
+ components/fighter/OpponentModal.tsx | 130 +++++++++++++++++++++++++++
+ components/roster/FighterCard.tsx    |  16 +++-
+ 3 files changed, 160 insertions(+), 1 deletion(-)
+ create mode 100644 components/fighter/OpponentModal.tsx
+
+diff --git a/app/game/fight/page.tsx b/app/game/fight/page.tsx
+index 93ae675..cd77cda 100644
+--- a/app/game/fight/page.tsx
++++ b/app/game/fight/page.tsx
+@@ -27,6 +27,7 @@ import { isTitleFight, resolveTitleFight } from '@/lib/championship'
+ import { ATTR_GROUPS, ALL_ATTR_KEYS } from '@/lib/attrs'
+ import { EVENT_TIER_CONFIG, EVENT_TIER_BADGE_CLASS } from '@/lib/generate-events'
+ import { generateScoutingReport } from '@/lib/scouting-report'
++import OpponentModal from '@/components/fighter/OpponentModal'
+ import type { Fighter, FighterAttrs, GamePlan, CornerAdvice, Specialty, RoundResult, RoundTick, FightStats, EventTier, EventSlotOpponent, HypeStyle, Gym } from '@/types'
+ 
+ const TOTAL_ROUNDS = 3
+@@ -374,6 +375,7 @@ export default function FightPage() {
+   const [showInstructionPicker, setShowInstructionPicker] = useState(false)
+   const [weightCut, setWeightCut] = useState(false)
+   const [weightCutResult, setWeightCutResult] = useState<string | null>(null)
++  const [viewingOpponentId, setViewingOpponentId] = useState<string | null>(null)
+ 
+   const seasonWeek = gym?.season_week ?? 1
+   // Ambil semua event minggu ini (bisa lebih dari satu untuk weight class berbeda)
+@@ -1151,6 +1153,14 @@ export default function FightPage() {
+                   <div>
+                     <p className="text-sm italic text-gray-300">&ldquo;{selectedSlot.press_conference.opp_quote}&rdquo;</p>
+                     <p className="mt-0.5 text-xs text-gray-500">— {selectedSlot.opponent?.name}</p>
++                    {selectedSlot.opponent?.id && (
++                      <button
++                        className="mt-1 text-[10px] text-octagon-amber underline"
++                        onClick={() => setViewingOpponentId(selectedSlot.opponent?.id ?? null)}
++                      >
++                        Lihat profil lawan →
++                      </button>
++                    )}
+                   </div>
+                   <p className="mt-2 rounded-md bg-octagon-dark px-3 py-2 text-xs text-octagon-amber">
+                     📰 {selectedSlot.press_conference.outcome}
+@@ -1935,6 +1945,11 @@ export default function FightPage() {
+           </div>
+         )
+       })()}
++
++      <OpponentModal
++        fighterId={viewingOpponentId}
++        onClose={() => setViewingOpponentId(null)}
++      />
+     </div>
+   )
+ }
+diff --git a/components/fighter/OpponentModal.tsx b/components/fighter/OpponentModal.tsx
+new file mode 100644
+index 0000000..c611758
+--- /dev/null
++++ b/components/fighter/OpponentModal.tsx
+@@ -0,0 +1,130 @@
++'use client'
++
++import { useEffect, useState } from 'react'
++import { createClient } from '@/lib/supabase'
++import { overallRating, getCategoryAverages } from '@/lib/attrs'
++import type { Fighter } from '@/types'
++
++interface Props {
++  fighterId: string | null
++  fighterName?: string
++  onClose: () => void
++}
++
++export default function OpponentModal({ fighterId, fighterName, onClose }: Props) {
++  const [fighter, setFighter] = useState<Fighter | null>(null)
++  const [gymName, setGymName] = useState<string>('')
++  const [loading, setLoading] = useState(false)
++
++  useEffect(() => {
++    if (!fighterId) return
++    setLoading(true)
++    const supabase = createClient()
++    supabase
++      .from('fighters')
++      .select('*')
++      .eq('id', fighterId)
++      .single()
++      .then(async ({ data }) => {
++        if (data) {
++          setFighter(data as Fighter)
++          if (data.gym_id) {
++            const { data: gym } = await supabase
++              .from('gyms')
++              .select('name')
++              .eq('id', data.gym_id)
++              .single()
++            setGymName(gym?.name ?? 'Gym Lain')
++          } else {
++            setGymName('Free Agent')
++          }
++        }
++        setLoading(false)
++      })
++  }, [fighterId])
++
++  if (!fighterId) return null
++
++  const ovr = fighter ? overallRating(fighter.attrs) : null
++  const cats = fighter ? getCategoryAverages(fighter.attrs) : []
++  const record = fighter?.record
++
++  return (
++    <div
++      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm"
++      onClick={onClose}
++    >
++      <div
++        className="w-full max-w-lg rounded-t-2xl border-t border-octagon-border bg-octagon-dark p-5 pb-8"
++        onClick={(e) => e.stopPropagation()}
++      >
++        <div className="mb-4 flex items-center justify-between">
++          <h2 className="text-lg font-bold text-white">{fighter?.name ?? fighterName ?? '...'}</h2>
++          <button onClick={onClose} className="text-gray-500 hover:text-white">✕</button>
++        </div>
++
++        {loading && <p className="text-sm text-gray-500">Memuat data...</p>}
++
++        {fighter && !loading && (
++          <div className="space-y-4">
++            {/* Basic info */}
++            <div className="grid grid-cols-2 gap-3 text-xs">
++              <div className="rounded-lg border border-octagon-border bg-octagon-card p-3">
++                <p className="text-gray-500">Rekor</p>
++                <p className="mt-0.5 text-base font-bold text-white">
++                  {record?.w ?? 0}-{record?.l ?? 0}-{record?.d ?? 0}
++                </p>
++              </div>
++              <div className="rounded-lg border border-octagon-border bg-octagon-card p-3">
++                <p className="text-gray-500">Overall</p>
++                <p className="mt-0.5 text-base font-bold text-octagon-amber">{ovr} OVR</p>
++              </div>
++              <div className="rounded-lg border border-octagon-border bg-octagon-card p-3">
++                <p className="text-gray-500">Spesialisasi</p>
++                <p className="mt-0.5 font-semibold text-white">{fighter.specialty}</p>
++              </div>
++              <div className="rounded-lg border border-octagon-border bg-octagon-card p-3">
++                <p className="text-gray-500">Weight Class</p>
++                <p className="mt-0.5 font-semibold text-white">{fighter.weight_class}</p>
++              </div>
++              <div className="rounded-lg border border-octagon-border bg-octagon-card p-3">
++                <p className="text-gray-500">Usia</p>
++                <p className="mt-0.5 font-semibold text-white">{fighter.age} th</p>
++              </div>
++              <div className="rounded-lg border border-octagon-border bg-octagon-card p-3">
++                <p className="text-gray-500">Gym</p>
++                <p className="mt-0.5 truncate font-semibold text-white">{gymName}</p>
++              </div>
++            </div>
++
++            {/* Attribute bars */}
++            <div>
++              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Statistik</p>
++              <div className="space-y-1.5">
++                {cats.map(({ key, label, value }) => (
++                  <div key={key} className="flex items-center gap-2">
++                    <span className="w-10 text-[10px] text-gray-500">{label}</span>
++                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-octagon-dark">
++                      <div
++                        className="h-full rounded-full bg-octagon-teal"
++                        style={{ width: `${value}%` }}
++                      />
++                    </div>
++                    <span className="w-6 text-right text-[10px] text-gray-400">{value}</span>
++                  </div>
++                ))}
++              </div>
++            </div>
++
++            {/* Win streak */}
++            {(fighter.win_streak ?? 0) >= 2 && (
++              <p className="text-xs font-semibold text-octagon-amber">
++                🔥 Win streak: {fighter.win_streak}x
++              </p>
++            )}
++          </div>
++        )}
++      </div>
++    </div>
++  )
++}
+diff --git a/components/roster/FighterCard.tsx b/components/roster/FighterCard.tsx
+index 11cea7a..701dfad 100644
+--- a/components/roster/FighterCard.tsx
++++ b/components/roster/FighterCard.tsx
+@@ -3,6 +3,7 @@
+ import { useState } from 'react'
+ import type { Fighter, FightResult, WeeklySchedule, TrainingSession, TrainingIntensity } from '@/types'
+ import Avatar from '@/components/avatar/Avatar'
++import OpponentModal from '@/components/fighter/OpponentModal'
+ import { useGameStore } from '@/store/game-store'
+ import { generateFighterAvatar } from '@/lib/ai-avatar'
+ import { createClient } from '@/lib/supabase'
+@@ -82,6 +83,8 @@ export default function FighterCard({ fighter, titleDefenses, tournamentTitles }
+   const [showHistory, setShowHistory] = useState(false)
+   const [history, setHistory] = useState<FightResult[] | null>(null)
+   const [loadingHistory, setLoadingHistory] = useState(false)
++  const [selectedOpponentId, setSelectedOpponentId] = useState<string | null>(null)
++  const [selectedOpponentName, setSelectedOpponentName] = useState<string | undefined>()
+   const [savingSchedule, setSavingSchedule] = useState(false)
+   const [savingIntensity, setSavingIntensity] = useState(false)
+   const [renewing, setRenewing] = useState(false)
+@@ -515,7 +518,12 @@ export default function FighterCard({ fighter, titleDefenses, tournamentTitles }
+                 history.map((fr) => (
+                   <div key={fr.id} className="flex items-center justify-between rounded-md bg-octagon-dark px-2.5 py-1.5 text-xs">
+                     <div className="min-w-0">
+-                      <p className="truncate text-gray-200">vs {fr.opponent_name}</p>
++                      <button
++                        className="truncate text-left text-gray-200 hover:text-octagon-amber hover:underline"
++                        onClick={() => { setSelectedOpponentId(fr.opponent_id ?? null); setSelectedOpponentName(fr.opponent_name) }}
++                      >
++                        vs {fr.opponent_name}
++                      </button>
+                       <p className="text-gray-500">{new Date(fr.fight_date).toLocaleDateString('id-ID')}</p>
+                     </div>
+                     <span
+@@ -584,6 +592,12 @@ export default function FighterCard({ fighter, titleDefenses, tournamentTitles }
+           )}
+         </div>
+       )}
++
++      <OpponentModal
++        fighterId={selectedOpponentId}
++        fighterName={selectedOpponentName}
++        onClose={() => setSelectedOpponentId(null)}
++      />
+     </div>
+   )
+ }
+-- 
+2.43.0
+
