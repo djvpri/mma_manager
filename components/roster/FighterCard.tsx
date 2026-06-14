@@ -338,8 +338,28 @@ export default function FighterCard({ fighter, titleDefenses, tournamentTitles }
         <div className="mt-3 space-y-3 border-t border-octagon-border pt-3">
           <div className="flex items-center justify-between text-xs">
             <span className="text-gray-500">Personality</span>
-            <span className="text-gray-300">{fighter.personality}</span>
+            <span className={`font-semibold ${
+              fighter.personality === 'Disciplined' ? 'text-octagon-teal' :
+              fighter.personality === 'Hardworker' ? 'text-octagon-amber' :
+              fighter.personality === 'Perfectionist' ? 'text-octagon-red' :
+              fighter.personality === 'Veteran' ? 'text-gray-300' :
+              fighter.personality === 'Raw Talent' ? 'text-purple-400' : 'text-gray-300'
+            }`}>
+              {fighter.personality === 'Disciplined' ? '🧱 Disciplined' :
+               fighter.personality === 'Hardworker' ? '💪 Hardworker' :
+               fighter.personality === 'Perfectionist' ? '🎯 Perfectionist' :
+               fighter.personality === 'Veteran' ? '🎖️ Veteran' :
+               fighter.personality === 'Raw Talent' ? '⚡ Raw Talent' :
+               fighter.personality}
+            </span>
           </div>
+          <p className="text-[10px] italic text-gray-600">
+            {fighter.personality === 'Disciplined' && 'Jarang cedera · load naik lambat · morale stabil'}
+            {fighter.personality === 'Hardworker' && 'Training bonus · load terjaga · tidak pernah menuntut'}
+            {fighter.personality === 'Perfectionist' && 'Latihan hebat saat mood bagus · morale jatuh saat kalah'}
+            {fighter.personality === 'Veteran' && 'Fight IQ & mental terus naik · penurunan fisik lebih lambat'}
+            {fighter.personality === 'Raw Talent' && 'Potensi besar muda · bisa stagnan kalau jarang bertanding'}
+          </p>
 
           <div className="space-y-1.5">
             {getCategoryAverages(attrs).map(({ key, label, value }) => (
