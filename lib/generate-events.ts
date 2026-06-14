@@ -397,7 +397,46 @@ export async function registerFighterToEvent(
       }
     })
   } else {
-    const opponent = await fetchPoolOpponent(event.weight_class, fighter.record.w, fighter.id)
+    const isTitle = event.promotion === 'championship' && slot.type === 'main'
+    let opponent: MmaEvent['slots'][0]['opponent']
+
+    if (isTitle) {
+      // Title fight: cari top kontender di weight class yang sama (title_shot_pending)
+      // atau fighter CPU dengan rating tertinggi di weight class itu
+      const supabase = createClient()
+      const { data: contenderData } = await supabase
+        .from('fighters')
+        .select('id, name, attrs, record, specialty')
+        .eq('is_cpu', true)
+        .eq('weight_class', event.weight_class)
+        .eq('status', 'active')
+        .neq('id', fighter.id)
+        .order('win_streak', { ascending: false })
+        .limit(10)
+
+      if (contenderData && contenderData.length > 0) {
+        // Pilih yang rating atribut tertinggi
+        const best = contenderData.reduce((a, b) => {
+          const aOvr = Object.values(a.attrs as Record<string, number>).reduce((s, v) => s + v, 0)
+          const bOvr = Object.values(b.attrs as Record<string, number>).reduce((s, v) => s + v, 0)
+          return bOvr > aOvr ? b : a
+        })
+        opponent = {
+          id: best.id,
+          name: best.name,
+          attrs: best.attrs as Fighter['attrs'],
+          record: best.record as Fighter['record'],
+          specialty: best.specialty as Fighter['specialty'],
+          color: OPPONENT_COLORS[Math.floor(Math.random() * OPPONENT_COLORS.length)],
+          is_rival: false,
+          rival_meetings: 0,
+        }
+      } else {
+        opponent = await fetchPoolOpponent(event.weight_class, fighter.record.w, fighter.id)
+      }
+    } else {
+      opponent = await fetchPoolOpponent(event.weight_class, fighter.record.w, fighter.id)
+    }
     updatedEvents = gym.events.map((e) => {
       if (e.id !== eventId) return e
       return {
