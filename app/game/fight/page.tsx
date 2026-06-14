@@ -548,8 +548,10 @@ export default function FightPage() {
     }
     const newTrainingLoad = Math.min(100, fighter.training_load + 25)
     const newContractFightsLeft = Math.max(0, fighter.contract_fights_left - 1)
-    // Lanjut bracket turnamen: fighter tetap eligible bertanding minggu ini (bout berikutnya)
-    const newNextFightWeek = tournamentAdvance ? gym.season_week : gym.season_week + randInt(1, 3)
+    // next_fight_week: null setelah fight biasa, agar fighter eligible week depan.
+    // Untuk turnamen advance: tetap di season_week (langsung lanjut bout berikutnya).
+    // Untuk kekalahan/cedera di turnamen: null juga (gugur dari turnamen).
+    const newNextFightWeek = tournamentAdvance ? gym.season_week : null
     const finishRound = fight.roundResults.find((r) => r.finish)?.round ?? null
     // Fisioterapis: kurangi risiko cedera pasca-tanding
     const injuryReduction = specialties.includes('Pemulihan Cedera') ? 0.3 : 0
@@ -577,7 +579,7 @@ export default function FightPage() {
     const sponsorWinBonus = result.winner === 'my'
       ? activeSponsors.reduce((sum, s) => sum + s.win_bonus, 0)
       : 0
-    const newBalance = gym.balance + purse + commission + sponsorWinBonus - winBonusPaid - medicalCost - purseShare
+    const newBalance = gym.balance + purse - commission + sponsorWinBonus - winBonusPaid - medicalCost - purseShare
     const newReputation = Math.max(0, Math.min(100, gym.reputation + reputationChange))
     // Kosongkan slot fighter setelah bertanding — kecuali lanjut ke bout turnamen berikutnya
     const newEvents = event
@@ -1815,8 +1817,8 @@ export default function FightPage() {
                   {fight.fightSummary.commission > 0 && (
                     <div className="flex items-center justify-between">
                       <span className="text-gray-400">Komisi Promotor</span>
-                      <span className="font-semibold text-octagon-amber">
-                        +{formatCurrency(fight.fightSummary.commission)}
+                      <span className="font-semibold text-octagon-red">
+                        -{formatCurrency(fight.fightSummary.commission)}
                       </span>
                     </div>
                   )}
