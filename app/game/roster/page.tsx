@@ -53,6 +53,7 @@ export default function RosterPage() {
   const [tournamentTitles, setTournamentTitles] = useState<TournamentTitle[]>([])
   const [notifPermission, setNotifPermission] = useState<NotificationPermission | null>(null)
   const [viewingFighterId, setViewingFighterId] = useState<string | null>(null)
+  const [fighterNameMap, setFighterNameMap] = useState<Map<string, string>>(new Map())
 
   useEffect(() => {
     setNotifPermission(getNotificationPermission())
@@ -231,6 +232,30 @@ export default function RosterPage() {
       setReport(weeklyReport)
       showWeeklyReportNotification(weeklyReport)
 
+      // Extract semua nama kandidat dari laporan minggu lalu bulk-fetch ke DB
+      // supaya nama CPU fighter juga bisa diklik di UI.
+      const allMessages = [
+        ...weekEvents,
+        ...weeklyReport.retirements.map((r) => r.name),
+      ].join(' ')
+      // Cari pola "Nama Depan Nama Belakang" (2 kata huruf kapital, bukan di awal kalimat)
+      const namePattern = /\b([A-Z][a-z]+(?:\s[A-Z][a-z]+)+)\b/g
+      const candidateNames = [...new Set([...allMessages.matchAll(namePattern)].map((m) => m[1]))]
+        .filter((n) => n.split(' ').length >= 2 && n.split(' ').length <= 3)
+
+      if (candidateNames.length > 0) {
+        const { data: foundFighters } = await supabase
+          .from('fighters')
+          .select('id, name')
+          .in('name', candidateNames)
+        if (foundFighters && foundFighters.length > 0) {
+          const nameMap = new Map<string, string>(foundFighters.map((f: { id: string; name: string }) => [f.name, f.id]))
+          // Tambahkan fighter pemain sendiri
+          fighters.forEach((f) => nameMap.set(f.name, f.id))
+          setFighterNameMap(nameMap)
+        }
+      }
+
       const prevById = new Map(prevFighters.map((f) => [f.id, f]))
       const newlyRetired = newFighters.filter((f) => {
         const p = prevById.get(f.id)
@@ -383,6 +408,7 @@ export default function RosterPage() {
                     <ClickableFighterMessage
                       message={msg}
                       allFighters={fighters}
+                      fighterNameMap={fighterNameMap}
                       onClickFighter={setViewingFighterId}
                     />
                   </li>
@@ -453,10 +479,12 @@ export default function RosterPage() {
 function ClickableFighterMessage({
   message,
   allFighters,
+  fighterNameMap,
   onClickFighter,
 }: {
   message: string
   allFighters: import('@/types').Fighter[]
+  fighterNameMap: Map<string, string>
   onClickFighter: (id: string) => void
 }) {
   const supabase = (typeof window !== 'undefined')
@@ -464,11 +492,15 @@ function ClickableFighterMessage({
     : null
 
   async function handleClick(name: string) {
-    // Cek roster pemain dulu (cepat, tanpa DB)
+    // 1. Cek pre-fetched map dulu (sudah include CPU + pemain)
+    const mapped = fighterNameMap.get(name)
+    if (mapped) { onClickFighter(mapped); return }
+
+    // 2. Roster pemain (fallback lokal)
     const local = allFighters.find((f) => f.name === name)
     if (local) { onClickFighter(local.id); return }
 
-    // Lookup ke DB untuk CPU fighter
+    // 3. Last resort: lookup ke DB
     if (!supabase) return
     const { data } = await supabase
       .from('fighters')
@@ -479,48 +511,33 @@ function ClickableFighterMessage({
     if (data?.id) onClickFighter(data.id)
   }
 
-  // Kumpulkan semua nama fighter yang dikenal (player roster)
-  // + ekstrak nama dari teks dengan heuristik sederhana
-  const knownNames = allFighters.map((f) => f.name)
+  // Gabungkan nama dari map (CPU+pemain) dan roster lokal
+  const allKnownNames = [
+    ...fighterNameMap.keys(),
+    ...allFighters.map((f) => f.name),
+  ].filter((n, i, arr) => arr.indexOf(n) === i)
 
-  // Split pesan menjadi bagian: teks biasa dan nama yang bisa diklik
-  // Strategi: cari nama 2-3 kata berurutan yang cocok dengan fighter dikenal,
-  // atau cari pola "Nama Nama" di awal segmen setelah emoji/titik dua
-  const parts: Array<{ text: string; isName: boolean; name?: string }> = []
-  let remaining = message
+  if (allKnownNames.length === 0) return <span>{message}</span>
 
-  // Build regex dari nama yang dikenal (escape special chars)
-  if (knownNames.length > 0) {
-    const escaped = knownNames
-      .sort((a, b) => b.length - a.length) // terpanjang dulu
-      .map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-    const pattern = new RegExp(`(${escaped.join('|')})`, 'g')
-    const splitResult = remaining.split(pattern)
-
-    for (const part of splitResult) {
-      if (knownNames.includes(part)) {
-        parts.push({ text: part, isName: true, name: part })
-      } else {
-        parts.push({ text: part, isName: false })
-      }
-    }
-  } else {
-    parts.push({ text: message, isName: false })
-  }
+  const escaped = allKnownNames
+    .sort((a, b) => b.length - a.length)
+    .map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+  const pattern = new RegExp(`(${escaped.join('|')})`, 'g')
+  const parts = message.split(pattern)
 
   return (
     <span>
       {parts.map((p, i) =>
-        p.isName && p.name ? (
+        allKnownNames.includes(p) ? (
           <button
             key={i}
-            onClick={() => handleClick(p.name!)}
+            onClick={() => handleClick(p)}
             className="font-semibold text-octagon-amber underline hover:text-octagon-amber/80"
           >
-            {p.text}
+            {p}
           </button>
         ) : (
-          <span key={i}>{p.text}</span>
+          <span key={i}>{p}</span>
         )
       )}
     </span>
