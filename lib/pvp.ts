@@ -103,14 +103,21 @@ export async function submitPvpCorner(matchId: string, corner: CornerAdvice): Pr
   return { error: error?.message ?? null }
 }
 
-/** Panggil Edge Function pvp-resolve-round. Idempotent — aman dipanggil dari
+/** Panggil API route resolve-round. Idempotent — aman dipanggil dari
  *  kedua sisi, panggilan kedua akan no-op (skipped). */
 export async function resolvePvpRound(matchId: string): Promise<{ error: string | null }> {
-  const supabase = createClient()
-  const { error } = await supabase.functions.invoke('pvp-resolve-round', {
-    body: { match_id: matchId },
-  })
-  return { error: error?.message ?? null }
+  try {
+    const res = await fetch('/api/pvp/resolve-round', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ match_id: matchId }),
+    })
+    const data = await res.json()
+    if (!res.ok || data?.error) return { error: data?.error ?? 'Gagal memproses ronde' }
+    return { error: null }
+  } catch (e) {
+    return { error: String(e) }
+  }
 }
 
 export async function cancelPvpChallenge(matchId: string): Promise<{ error: string | null }> {

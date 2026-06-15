@@ -59,14 +59,18 @@ export default function PvpFightPage() {
   }, [matchId, refresh])
 
   // Begitu kedua corner advice terisi & status masih active, minta server
-  // (Edge Function) menghitung ronde. Idempotent — aman dipanggil dari kedua
-  // sisi, panggilan kedua otomatis no-op.
+  // menghitung ronde. Idempotent — aman dipanggil dari kedua sisi, panggilan
+  // kedua otomatis no-op. Refresh manual setelahnya sebagai fallback kalau
+  // event realtime tidak sampai.
   useEffect(() => {
     if (!match) return
     if (match.status === 'active' && match.challenger_corner && match.opponent_corner) {
-      resolvePvpRound(matchId)
+      resolvePvpRound(matchId).then(({ error }) => {
+        if (error) setError(error)
+        refresh()
+      })
     }
-  }, [match?.challenger_corner, match?.opponent_corner, match?.status, matchId])
+  }, [match?.challenger_corner, match?.opponent_corner, match?.status, matchId, refresh])
 
   if (!match) return <p className="text-sm text-gray-400">Memuat laga...</p>
 
