@@ -328,7 +328,7 @@ export async function fetchPoolOpponent(
   // Untuk event internasional, prioritaskan fighter CPU dengan nama internasional
   // atau override nama dengan nama internasional agar lebih realistis
   let chosenName = chosen.name
-  let chosenId = chosen.id ?? null
+  let chosenId: string | null = chosen.id ?? null
 
   if (isIntl) {
     // Cek apakah chosen punya nama internasional (bukan nama Indo)
