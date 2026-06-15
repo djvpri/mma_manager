@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import Avatar from '@/components/avatar/Avatar'
 import { useGameStore } from '@/store/game-store'
@@ -355,6 +355,9 @@ export default function FightPage() {
   const [hypeError, setHypeError] = useState<string | null>(null)
   const [savingResult, setSavingResult] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  // Guard re-entrancy: cegah saveFightResult() jalan dobel (double payout)
+  // kalau effect 'result' ter-trigger ulang sebelum request pertama selesai.
+  const savingResultRef = useRef(false)
   const [tournamentResult, setTournamentResult] = useState<{
     outcome: 'advance' | 'champion' | 'eliminated'
     round: number
@@ -464,10 +467,12 @@ export default function FightPage() {
   }, [fight.phase])
 
   async function saveFightResult() {
+    if (savingResultRef.current) return
     const fighter = fight.fighter
     const opponent = fight.opponent
     if (!fighter || !opponent || !gym || !fight.gamePlan) return
 
+    savingResultRef.current = true
     setSavingResult(true)
     setSaveError(null)
 
@@ -579,8 +584,9 @@ export default function FightPage() {
     const sponsorWinBonus = result.winner === 'my'
       ? activeSponsors.reduce((sum, s) => sum + s.win_bonus, 0)
       : 0
-    const newBalance = gym.balance + purse - commission + sponsorWinBonus - winBonusPaid - medicalCost - purseShare
-    const newReputation = Math.max(0, Math.min(100, gym.reputation + reputationChange))
+    // Balance diupdate via delta (bukan nilai absolut) lewat RPC apply_fight_result
+    // -- supaya atomic & divalidasi server-side (lihat migration 082).
+    const balanceDelta = purse - commission + sponsorWinBonus - winBonusPaid - medicalCost - purseShare
     // Kosongkan slot fighter setelah bertanding — kecuali lanjut ke bout turnamen berikutnya
     const newEvents = event
       ? gym.events.map((e) =>
@@ -595,7 +601,7 @@ export default function FightPage() {
         )
       : gym.events
 
-    const [insertRes, fighterRes, gymRes] = await Promise.all([
+    const [insertRes, applyRes] = await Promise.all([
       supabase.from('fight_results').insert({
         gym_id: gym.id,
         fighter_id: fighter.id,
@@ -616,26 +622,21 @@ export default function FightPage() {
         })(),
       }),
       supabase
-        .from('fighters')
-        .update({
-          record: newRecord,
-          training_load: newTrainingLoad,
-          contract_fights_left: newContractFightsLeft,
-          next_fight_week: newNextFightWeek,
-          win_streak: newWinStreak,
-          morale: newMorale,
-          ...(injury
-            ? { status: 'injured', injury: injury.name, injury_weeks_left: injury.weeks }
-            : {}),
+        .rpc('apply_fight_result', {
+          p_gym_id: gym.id,
+          p_fighter_id: fighter.id,
+          p_balance_delta: balanceDelta,
+          p_reputation_change: reputationChange,
+          p_new_record: newRecord,
+          p_training_load: newTrainingLoad,
+          p_contract_fights_left: newContractFightsLeft,
+          p_next_fight_week: newNextFightWeek,
+          p_win_streak: newWinStreak,
+          p_morale: newMorale,
+          p_injury_name: injury?.name ?? null,
+          p_injury_weeks: injury?.weeks ?? null,
+          p_events: newEvents,
         })
-        .eq('id', fighter.id)
-        .select()
-        .single(),
-      supabase
-        .from('gyms')
-        .update({ balance: newBalance, reputation: newReputation, events: newEvents })
-        .eq('id', gym.id)
-        .select()
         .single(),
       opponent.id
         ? supabase.rpc('record_cpu_fight_result', {
@@ -648,13 +649,15 @@ export default function FightPage() {
 
     let titleBeltResult: Awaited<ReturnType<typeof resolveTitleFight>> = null
 
-    if (insertRes.error || fighterRes.error || gymRes.error) {
+    if (insertRes.error || applyRes.error) {
       setSaveError(
-        insertRes.error?.message || fighterRes.error?.message || gymRes.error?.message || 'Gagal menyimpan hasil pertarungan.'
+        insertRes.error?.message || applyRes.error?.message || 'Gagal menyimpan hasil pertarungan.'
       )
     } else {
-      if (fighterRes.data) updateFighter(fighter.id, fighterRes.data)
-      if (gymRes.data) setGym(gymRes.data)
+      const gymRow = applyRes.data?.gym_row as Gym | undefined
+      const fighterRow = applyRes.data?.fighter_row as Fighter | undefined
+      if (fighterRow) updateFighter(fighter.id, fighterRow)
+      if (gymRow) setGym(gymRow)
 
       // Update satisfaction sponsor aktif berdasarkan hasil fight
       if (activeSponsors.length > 0) {
@@ -708,6 +711,7 @@ export default function FightPage() {
       purseShare
     )
     setSavingResult(false)
+    savingResultRef.current = false
   }
 
   async function handleHype(style: HypeStyle) {
