@@ -654,8 +654,9 @@ export default function FightPage() {
         insertRes.error?.message || applyRes.error?.message || 'Gagal menyimpan hasil pertarungan.'
       )
     } else {
-      const gymRow = applyRes.data?.gym_row as Gym | undefined
-      const fighterRow = applyRes.data?.fighter_row as Fighter | undefined
+      const applyData = applyRes.data as unknown as { gym_row: Gym; fighter_row: Fighter } | null
+      const gymRow = applyData?.gym_row
+      const fighterRow = applyData?.fighter_row
       if (fighterRow) updateFighter(fighter.id, fighterRow)
       if (gymRow) setGym(gymRow)
 
