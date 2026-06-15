@@ -112,7 +112,11 @@ export async function runAssistantManagerEventRegistration(
     const updated = await registerFighterToEvent(currentGym, candidateEvent.id, fighter)
     if (updated) {
       currentGym = updated
-      messages.push(`📅 Asisten Manajer mendaftarkan ${fighter.name} ke ${candidateEvent.name} (Minggu ke-${candidateEvent.week}).`)
+      const registeredEvent = currentGym.events.find((e) => e.id === candidateEvent.id)
+      const registeredSlot = registeredEvent?.slots.find((s) => s.fighter_id === fighter.id)
+      const opponentName = registeredSlot?.opponent?.name ?? registeredSlot?.opponents?.[0]?.name
+      const lawanText = opponentName ? ` vs ${opponentName}` : ''
+      messages.push(`📅 Asisten Manajer mendaftarkan ${fighter.name} ke ${candidateEvent.name} (Minggu ke-${candidateEvent.week})${lawanText}.`)
     }
   }
 
